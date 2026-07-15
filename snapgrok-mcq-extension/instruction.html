@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Name and Instruction</title>
+    <link rel="stylesheet" href="editor.css" />
+  </head>
+  <body>
+    <main>
+      <h1>Name & instruction</h1>
+      <p class="lead">
+        This instruction is sent with the screenshot whenever this shortcut runs. The extension automatically adds the strict requirement that Grok return only A, B, C, D, or E.
+      </p>
+
+      <label for="shortcutName">Shortcut name</label>
+      <input id="shortcutName" maxlength="80" placeholder="Example: Physics conceptual questions" />
+
+      <label for="instruction">Detailed instruction</label>
+      <textarea id="instruction" maxlength="12000" placeholder="Example: Solve the visible physics question. Prioritize the diagram and use standard sign conventions."></textarea>
+
+      <p class="note">Do not paste an API key here. Your existing local server continues to hold the API key.</p>
+
+      <div class="actions">
+        <button id="cancel" class="secondary" type="button">Cancel</button>
+        <button id="save" class="primary" type="button">Save</button>
+      </div>
+      <div id="message" class="message" role="status"></div>
+    </main>
+
+    <script src="shared.js"></script>
+    <script src="instruction.js"></script>
+  </body>
+</html>

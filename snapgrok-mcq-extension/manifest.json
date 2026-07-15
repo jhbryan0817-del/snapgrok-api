@@ -1,0 +1,66 @@
+{
+  "manifest_version": 3,
+  "name": "SnapGrok MCQ Assistant",
+  "version": "0.2.0",
+  "description": "Capture the visible Chrome tab with a shortcut, ask Grok for an A-E multiple-choice answer, and show the answer as the toolbar icon color.",
+  "minimum_chrome_version": "102",
+  "permissions": [
+    "activeTab",
+    "storage",
+    "tabs",
+    "notifications"
+  ],
+  "host_permissions": [
+    "http://127.0.0.1:8787/*",
+    "http://localhost:8787/*"
+  ],
+  "background": {
+    "service_worker": "service-worker.js"
+  },
+  "action": {
+    "default_title": "Open SnapGrok MCQ settings",
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/default16.png",
+      "32": "icons/default32.png",
+      "48": "icons/default48.png",
+      "128": "icons/default128.png"
+    }
+  },
+  "commands": {
+    "run-shortcut-1": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+A",
+        "mac": "Command+Shift+A"
+      },
+      "description": "Run MCQ shortcut 1"
+    },
+    "run-shortcut-2": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+B",
+        "mac": "Command+Shift+B"
+      },
+      "description": "Run MCQ shortcut 2"
+    },
+    "run-shortcut-3": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+C",
+        "mac": "Command+Shift+C"
+      },
+      "description": "Run MCQ shortcut 3"
+    },
+    "pause-extension": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+Z",
+        "mac": "Command+Shift+Z"
+      },
+      "description": "Pause SnapGrok MCQ Assistant"
+    }
+  },
+  "icons": {
+    "16": "icons/default16.png",
+    "32": "icons/default32.png",
+    "48": "icons/default48.png",
+    "128": "icons/default128.png"
+  }
+}
