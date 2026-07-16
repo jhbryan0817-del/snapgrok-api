@@ -1,0 +1,15 @@
+{
+  "name": "snapgrok-api",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Cloud-ready Node.js backend for the SnapGrok Chrome extension.",
+  "type": "module",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "check": "node --check src/server.js && node --check src/xai.js && node --check src/data-store.js && node --check src/env.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
