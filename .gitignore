@@ -1,9 +1,0 @@
-# Secrets
-.env
-
-# Dependencies
-node_modules/
-
-# Runtime data and logs
-data/
-*.log
