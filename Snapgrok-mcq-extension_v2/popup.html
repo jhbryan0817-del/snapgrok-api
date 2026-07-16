@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SnapGrok MCQ</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <main class="panel">
+      <section class="legend" aria-label="Answer icon legend">
+        <div class="answer-legend">
+          <div class="answer-item"><img src="icons/answer-a32.png" alt="" /><span>A</span></div>
+          <div class="answer-item"><img src="icons/answer-b32.png" alt="" /><span>B</span></div>
+          <div class="answer-item"><img src="icons/answer-c32.png" alt="" /><span>C</span></div>
+          <div class="answer-item"><img src="icons/answer-d32.png" alt="" /><span>D</span></div>
+          <div class="answer-item"><img src="icons/answer-e32.png" alt="" /><span>E</span></div>
+        </div>
+
+        <div class="error-legend">
+          <div class="error-item">
+            <img src="icons/inconclusive32.png" alt="" />
+            <span>Inconclusive</span>
+          </div>
+          <div class="error-item">
+            <img src="icons/system-error32.png" alt="" />
+            <span>System Error</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="controls" aria-label="Shortcut and instruction settings">
+        <div class="mode-label">Full-screen</div>
+        <button id="fullScreenShortcut" class="shortcut-button" type="button">Assign</button>
+
+        <button id="instructionButton" class="instruction-button" type="button">
+          <span id="instructionPreview">Add Instruction</span>
+        </button>
+
+        <div class="mode-label">Select Zone</div>
+        <button id="zoneShortcut" class="shortcut-button" type="button">Assign</button>
+      </section>
+
+      <p class="footer-note">Click either shortcut box to assign or change it in Chrome.</p>
+    </main>
+
+    <script src="shared.js"></script>
+    <script src="popup.js"></script>
+  </body>
+</html>
