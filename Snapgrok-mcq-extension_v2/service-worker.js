@@ -2,7 +2,7 @@ importScripts("shared.js");
 
 const SERVER_URL = "https://snapgrok-api.onrender.com";
 const SERVER_MINIMUM_WORD_LIMIT = 20;
-const RESULT_DISPLAY_MS = 5000;
+const RESULT_DISPLAY_MS = 4000;
 const OPERATION_STATE_KEY = "operationState";
 
 const ICONS = {
