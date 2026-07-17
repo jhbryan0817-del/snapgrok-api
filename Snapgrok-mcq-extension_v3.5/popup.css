@@ -1,0 +1,153 @@
+:root {
+  color-scheme: light;
+  font-family: Georgia, "Times New Roman", serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  width: 430px;
+  min-height: 270px;
+  background: #ffffff;
+  color: #303030;
+}
+
+button {
+  font: inherit;
+}
+
+.panel {
+  margin: 14px;
+  padding: 18px;
+  border: 1px solid #707070;
+  background: #dff8f8;
+}
+
+.legend {
+  display: grid;
+  grid-template-columns: 1fr 165px;
+  gap: 18px;
+  align-items: start;
+}
+
+.answers {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+}
+
+.legend-item,
+.error-item {
+  display: flex;
+  align-items: center;
+}
+
+.legend-item {
+  flex-direction: column;
+  gap: 2px;
+  font-size: 16px;
+}
+
+.legend-item img,
+.error-item img {
+  width: 30px;
+  height: 30px;
+}
+
+.errors {
+  display: grid;
+  gap: 8px;
+}
+
+.error-item {
+  gap: 8px;
+  white-space: nowrap;
+  font-size: 16px;
+}
+
+.controls {
+  display: grid;
+  grid-template-columns: 190px 1fr;
+  gap: 8px 16px;
+  margin-top: 24px;
+}
+
+.capture-row {
+  grid-column: 1;
+  display: grid;
+  grid-template-columns: 86px 86px;
+  gap: 7px;
+  align-items: center;
+}
+
+.capture-label {
+  font-style: italic;
+  font-size: 16px;
+}
+
+.shortcut-button {
+  min-height: 38px;
+  border: 1px solid #737373;
+  background: #f3d4d4;
+  cursor: pointer;
+  font-size: 17px;
+}
+
+.shortcut-button:hover,
+.shortcut-button:focus-visible {
+  background: #ebc3c3;
+}
+
+.shortcut-value {
+  grid-column: 1 / -1;
+  margin-left: 93px;
+  margin-top: -6px;
+  min-height: 16px;
+  font-family: Arial, sans-serif;
+  font-size: 11px;
+  color: #555555;
+}
+
+.instruction-button {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  min-height: 94px;
+  padding: 12px;
+  border: 1px solid #737373;
+  background: #d5e5f5;
+  cursor: pointer;
+  text-align: center;
+  overflow: hidden;
+}
+
+.instruction-button:hover,
+.instruction-button:focus-visible {
+  background: #c8dcf0;
+}
+
+#instructionTitle {
+  display: block;
+  font-size: 18px;
+}
+
+#instructionPreview {
+  display: -webkit-box;
+  margin-top: 6px;
+  overflow: hidden;
+  font-family: Arial, sans-serif;
+  font-size: 12px;
+  line-height: 1.35;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.message {
+  min-height: 16px;
+  margin: 12px 0 0;
+  font-family: Arial, sans-serif;
+  font-size: 12px;
+  color: #8e2020;
+}
