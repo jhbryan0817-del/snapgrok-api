@@ -1,0 +1,280 @@
+(() => {
+  "use strict";
+
+  const LISTENER_KEY = "__snapgrokV37ZoneListenerInstalled";
+  const CONTROLLER_KEY = "__snapgrokV37ZoneController";
+  const DIALOG_ID = "__snapgrok-v37-selector-dialog";
+  const BACKDROP_STYLE_ID = "__snapgrok-v37-selector-style";
+
+  if (globalThis[LISTENER_KEY]) return;
+  globalThis[LISTENER_KEY] = true;
+
+  chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+    if (message?.type !== "SNAPGROK_START_ZONE_SELECTOR") return false;
+
+    void startSelector(message.operationId)
+      .then(() => sendResponse({ ok: true, visible: true }))
+      .catch((error) => {
+        sendResponse({
+          ok: false,
+          visible: false,
+          error: error?.message || "The selector could not start.",
+        });
+      });
+
+    return true;
+  });
+
+  async function startSelector(operationId) {
+    if (typeof operationId !== "string" || !operationId) {
+      throw new Error("The selector operation ID was invalid.");
+    }
+
+    globalThis[CONTROLLER_KEY]?.cleanup?.();
+    document.getElementById(DIALOG_ID)?.remove();
+    document.getElementById(BACKDROP_STYLE_ID)?.remove();
+
+    const rootElement = document.body || document.documentElement;
+    if (!rootElement) {
+      throw new Error("The webpage is not ready for area selection.");
+    }
+
+    const backdropStyle = document.createElement("style");
+    backdropStyle.id = BACKDROP_STYLE_ID;
+    backdropStyle.textContent = `
+      dialog#${DIALOG_ID}::backdrop {
+        background: transparent !important;
+        background-color: transparent !important;
+        backdrop-filter: none !important;
+      }
+    `;
+    (document.head || document.documentElement).appendChild(backdropStyle);
+
+    const dialog = document.createElement("dialog");
+    dialog.id = DIALOG_ID;
+    dialog.setAttribute("aria-label", "SnapGrok screenshot area selector");
+    dialog.style.cssText = [
+      "all: initial !important",
+      "position: fixed !important",
+      "inset: 0 !important",
+      "width: 100vw !important",
+      "height: 100vh !important",
+      "max-width: none !important",
+      "max-height: none !important",
+      "margin: 0 !important",
+      "padding: 0 !important",
+      "border: 0 !important",
+      "outline: 0 !important",
+      "background: transparent !important",
+      "overflow: hidden !important",
+      "box-sizing: border-box !important",
+      "pointer-events: auto !important",
+      "user-select: none !important",
+      "touch-action: none !important",
+      "cursor: crosshair !important",
+    ].join(";");
+
+    const shadowHost = document.createElement("div");
+    shadowHost.style.cssText = [
+      "all: initial !important",
+      "position: fixed !important",
+      "inset: 0 !important",
+      "width: 100vw !important",
+      "height: 100vh !important",
+      "pointer-events: auto !important",
+      "cursor: crosshair !important",
+    ].join(";");
+
+    const shadow = shadowHost.attachShadow({ mode: "closed" });
+    const surface = document.createElement("div");
+    const box = document.createElement("div");
+
+    surface.tabIndex = -1;
+    surface.setAttribute("role", "application");
+    surface.setAttribute("aria-label", "Drag to select a screenshot area");
+    surface.style.cssText = [
+      "all: initial !important",
+      "position: fixed !important",
+      "inset: 0 !important",
+      "width: 100vw !important",
+      "height: 100vh !important",
+      "background: transparent !important",
+      "pointer-events: auto !important",
+      "user-select: none !important",
+      "touch-action: none !important",
+      "box-sizing: border-box !important",
+      "outline: none !important",
+      "cursor: crosshair !important",
+    ].join(";");
+
+    box.style.cssText = [
+      "all: initial !important",
+      "position: fixed !important",
+      "display: none !important",
+      "border: 2px solid rgba(255,255,255,0.98) !important",
+      "box-shadow: 0 0 0 1px rgba(0,0,0,0.92) !important",
+      "background: transparent !important",
+      "box-sizing: border-box !important",
+      "pointer-events: none !important",
+    ].join(";");
+
+    surface.appendChild(box);
+    shadow.appendChild(surface);
+    dialog.appendChild(shadowHost);
+    rootElement.appendChild(dialog);
+
+    let startX = null;
+    let startY = null;
+    let activePointerId = null;
+    let finished = false;
+
+    function cleanup() {
+      if (finished) return;
+      finished = true;
+
+      surface.removeEventListener("pointerdown", onPointerDown, true);
+      surface.removeEventListener("pointermove", onPointerMove, true);
+      surface.removeEventListener("pointerup", onPointerUp, true);
+      surface.removeEventListener("pointercancel", onPointerCancel, true);
+      window.removeEventListener("keydown", onKeyDown, true);
+      dialog.removeEventListener("cancel", onDialogCancel, true);
+
+      try {
+        if (dialog.open) dialog.close();
+      } catch {}
+
+      dialog.remove();
+      backdropStyle.remove();
+      delete globalThis[CONTROLLER_KEY];
+    }
+
+    function sendAfterRemoval(message) {
+      cleanup();
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          void chrome.runtime.sendMessage(message).catch(() => {});
+        });
+      });
+    }
+
+    function updateBox(currentX, currentY) {
+      const x = Math.min(startX, currentX);
+      const y = Math.min(startY, currentY);
+      const width = Math.abs(currentX - startX);
+      const height = Math.abs(currentY - startY);
+
+      box.style.setProperty("display", "block", "important");
+      box.style.setProperty("left", `${x}px`, "important");
+      box.style.setProperty("top", `${y}px`, "important");
+      box.style.setProperty("width", `${width}px`, "important");
+      box.style.setProperty("height", `${height}px`, "important");
+    }
+
+    function resetSmallSelection() {
+      startX = null;
+      startY = null;
+      activePointerId = null;
+      box.style.setProperty("display", "none", "important");
+    }
+
+    function onPointerDown(event) {
+      if (event.button !== 0 || activePointerId !== null) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+
+      startX = clamp(event.clientX, 0, window.innerWidth);
+      startY = clamp(event.clientY, 0, window.innerHeight);
+      activePointerId = event.pointerId;
+      surface.setPointerCapture(event.pointerId);
+      updateBox(startX, startY);
+    }
+
+    function onPointerMove(event) {
+      if (event.pointerId !== activePointerId || startX === null) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+      updateBox(
+        clamp(event.clientX, 0, window.innerWidth),
+        clamp(event.clientY, 0, window.innerHeight),
+      );
+    }
+
+    function onPointerUp(event) {
+      if (event.pointerId !== activePointerId || startX === null) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+
+      const endX = clamp(event.clientX, 0, window.innerWidth);
+      const endY = clamp(event.clientY, 0, window.innerHeight);
+      const x = Math.min(startX, endX);
+      const y = Math.min(startY, endY);
+      const width = Math.abs(endX - startX);
+      const height = Math.abs(endY - startY);
+
+      if (width < 8 || height < 8) {
+        resetSmallSelection();
+        return;
+      }
+
+      sendAfterRemoval({
+        type: "SNAPGROK_ZONE_SELECTED",
+        operationId,
+        rectangle: { x, y, width, height },
+        viewport: {
+          width: window.innerWidth,
+          height: window.innerHeight,
+        },
+      });
+    }
+
+    function onPointerCancel(event) {
+      if (event.pointerId !== activePointerId) return;
+      sendAfterRemoval({
+        type: "SNAPGROK_ZONE_CANCELLED",
+        operationId,
+      });
+    }
+
+    function onKeyDown(event) {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      event.stopPropagation();
+      sendAfterRemoval({
+        type: "SNAPGROK_ZONE_CANCELLED",
+        operationId,
+      });
+    }
+
+    function onDialogCancel(event) {
+      event.preventDefault();
+      sendAfterRemoval({
+        type: "SNAPGROK_ZONE_CANCELLED",
+        operationId,
+      });
+    }
+
+    surface.addEventListener("pointerdown", onPointerDown, true);
+    surface.addEventListener("pointermove", onPointerMove, true);
+    surface.addEventListener("pointerup", onPointerUp, true);
+    surface.addEventListener("pointercancel", onPointerCancel, true);
+    window.addEventListener("keydown", onKeyDown, true);
+    dialog.addEventListener("cancel", onDialogCancel, true);
+
+    globalThis[CONTROLLER_KEY] = { cleanup };
+
+    try {
+      dialog.showModal();
+      surface.focus({ preventScroll: true });
+    } catch (error) {
+      cleanup();
+      throw error;
+    }
+  }
+
+  function clamp(value, minimum, maximum) {
+    return Math.min(Math.max(value, minimum), maximum);
+  }
+})();
