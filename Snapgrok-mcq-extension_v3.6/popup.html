@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SnapGrok MCQ</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <main class="panel">
+      <section class="legend" aria-label="Answer icon legend">
+        <div class="answers">
+          <div class="legend-item"><img src="icons/answer-a32.png" alt="" /><span>A</span></div>
+          <div class="legend-item"><img src="icons/answer-b32.png" alt="" /><span>B</span></div>
+          <div class="legend-item"><img src="icons/answer-c32.png" alt="" /><span>C</span></div>
+          <div class="legend-item"><img src="icons/answer-d32.png" alt="" /><span>D</span></div>
+          <div class="legend-item"><img src="icons/answer-e32.png" alt="" /><span>E</span></div>
+        </div>
+        <div class="errors">
+          <div class="error-item"><img src="icons/processing32.png" alt="" /><span>Processing</span></div>
+          <div class="error-item"><img src="icons/inconclusive32.png" alt="" /><span>Inconclusive</span></div>
+          <div class="error-item"><img src="icons/system-error32.png" alt="" /><span>System Error</span></div>
+        </div>
+      </section>
+
+      <section class="controls" aria-label="Capture controls">
+        <div class="capture-row">
+          <span class="capture-label">Full-screen</span>
+          <button id="assignFull" class="shortcut-button" type="button">Assign</button>
+          <span id="fullShortcut" class="shortcut-value">Loading…</span>
+        </div>
+        <div class="capture-row">
+          <span class="capture-label">Select Zone</span>
+          <button id="assignZone" class="shortcut-button" type="button">Assign</button>
+          <span id="zoneShortcut" class="shortcut-value">Loading…</span>
+        </div>
+        <button id="editInstruction" class="instruction-button" type="button">
+          <span id="instructionTitle">Add Instruction</span>
+          <span id="instructionPreview"></span>
+        </button>
+      </section>
+
+      <p id="message" class="message" role="status"></p>
+    </main>
+
+    <script src="settings.js"></script>
+    <script src="popup.js"></script>
+  </body>
+</html>

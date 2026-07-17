@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SnapGrok Instruction</title>
+    <link rel="stylesheet" href="instruction.css" />
+  </head>
+  <body>
+    <main class="editor">
+      <p class="explanation">The instruction below will be sent to the AI model along with the screenshot.</p>
+      <textarea id="instruction" maxlength="12000" placeholder="Type here" spellcheck="true"></textarea>
+      <div class="actions">
+        <button id="cancel" type="button">Cancel</button>
+        <button id="save" type="button">Save</button>
+      </div>
+      <p id="message" role="status"></p>
+    </main>
+
+    <script src="settings.js"></script>
+    <script src="instruction.js"></script>
+  </body>
+</html>
