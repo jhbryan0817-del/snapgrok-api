@@ -1,0 +1,74 @@
+:root {
+  font-family: Georgia, "Times New Roman", serif;
+  color: #3b3b3b;
+  background: #ffffff;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+main {
+  padding: 24px;
+}
+
+.description {
+  margin: 0 0 16px;
+  font-size: 18px;
+  line-height: 1.35;
+}
+
+textarea {
+  width: 100%;
+  height: 235px;
+  resize: vertical;
+  padding: 12px;
+  border: 1px solid #777;
+  background: #f3f3f3;
+  font: italic 16px/1.4 Georgia, "Times New Roman", serif;
+  outline: none;
+}
+
+textarea:focus {
+  border-color: #333;
+}
+
+.automatic-rule {
+  margin: 10px 0 0;
+  color: #666;
+  font-family: Arial, sans-serif;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 9px;
+  margin-top: 17px;
+}
+
+#status {
+  margin-right: auto;
+  color: #25652b;
+  font-family: Arial, sans-serif;
+  font-size: 12px;
+}
+
+button {
+  min-width: 82px;
+  padding: 8px 14px;
+  border: 1px solid #777;
+  background: #f2f2f2;
+  font: 15px Georgia, "Times New Roman", serif;
+  cursor: pointer;
+}
+
+#save {
+  background: #dcebf9;
+}
