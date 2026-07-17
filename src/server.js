@@ -6,8 +6,9 @@ import { analyzeScreenshot, getPrepaidBalance } from "./xai.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const serverDirectory = path.resolve(__dirname, "..");
-loadEnv(path.join(serverDirectory, ".env"));
+const projectDirectory = path.resolve(__dirname, "..");
+
+loadEnv(path.join(projectDirectory, ".env"));
 
 const config = {
   port: envNumber("PORT", 8787),
@@ -18,7 +19,8 @@ const config = {
   mockMode: envBoolean("MOCK_XAI", false),
   managementApiKey: process.env.XAI_MANAGEMENT_API_KEY || "",
   teamId: process.env.XAI_TEAM_ID || "",
-  outputUsdPerMillionTokens: process.env.XAI_OUTPUT_USD_PER_MILLION_TOKENS || "",
+  outputUsdPerMillionTokens:
+    process.env.XAI_OUTPUT_USD_PER_MILLION_TOKENS || "",
 };
 
 function setCommonHeaders(request, response) {
@@ -43,7 +45,9 @@ function setCommonHeaders(request, response) {
 
 function sendJson(request, response, status, body) {
   setCommonHeaders(request, response);
-  response.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
+  response.writeHead(status, {
+    "Content-Type": "application/json; charset=utf-8",
+  });
   response.end(JSON.stringify(body));
 }
 
@@ -64,6 +68,7 @@ async function readJsonBody(request) {
   }
 
   if (!chunks.length) return {};
+
   try {
     return JSON.parse(Buffer.concat(chunks).toString("utf8"));
   } catch {
@@ -74,15 +79,17 @@ async function readJsonBody(request) {
 }
 
 function validateAnalyzeRequest(body) {
-  if (typeof body.imageDataUrl !== "string" || !body.imageDataUrl.startsWith("data:image/")) {
-    throw Object.assign(new Error("imageDataUrl must be an image data URL."), { status: 400 });
+  if (
+    typeof body.imageDataUrl !== "string" ||
+    !body.imageDataUrl.startsWith("data:image/")
+  ) {
+    throw Object.assign(new Error("imageDataUrl must be an image data URL."), {
+      status: 400,
+    });
   }
+
   if (typeof body.instruction !== "string" || !body.instruction.trim()) {
     throw Object.assign(new Error("instruction is required."), { status: 400 });
-  }
-  const maxWords = Number(body.maxWords);
-  if (!Number.isFinite(maxWords) || maxWords < 20 || maxWords > 2000) {
-    throw Object.assign(new Error("maxWords must be between 20 and 2000."), { status: 400 });
   }
 }
 
@@ -94,20 +101,29 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
-  const url = new URL(request.url || "/", `http://${request.headers.host || "localhost"}`);
+  const url = new URL(
+    request.url || "/",
+    `http://${request.headers.host || "localhost"}`,
+  );
 
   try {
     if (request.method === "GET" && url.pathname === "/api/health") {
       sendJson(request, response, 200, {
         ok: true,
+        version: "3.7.0",
         model: config.mockMode ? "mock-xai" : config.model,
         mockMode: config.mockMode,
+        resultFormat: {
+          status: "answered | inconclusive",
+          answers: "array of option labels",
+        },
         inferenceKeyConfigured: Boolean(
           config.apiKey && config.apiKey !== "paste_your_xai_api_key_here",
         ),
-        balanceConfigured: Boolean(config.managementApiKey && config.teamId),
+        balanceConfigured: Boolean(
+          config.managementApiKey && config.teamId,
+        ),
         persistentStorage: false,
-        storagePolicy: "Request content is processed transiently and is not written to files or a database.",
       });
       return;
     }
@@ -124,6 +140,7 @@ const server = http.createServer(async (request, response) => {
 
     if (request.method === "POST" && url.pathname === "/api/analyze") {
       let body = await readJsonBody(request);
+
       try {
         validateAnalyzeRequest(body);
 
@@ -133,20 +150,15 @@ const server = http.createServer(async (request, response) => {
           timeoutMs: config.timeoutMs,
           imageDataUrl: body.imageDataUrl,
           instruction: body.instruction.trim(),
-          maxWords: Number(body.maxWords),
           shortcutName: String(body.shortcutName || "").trim(),
           mockMode: config.mockMode,
         });
 
-        // No screenshot, instruction, response, URL, title, or usage record is
-        // written to a file or database. The response is returned directly.
         sendJson(request, response, 200, {
           ok: true,
           ...result,
         });
       } finally {
-        // Remove references to request content as soon as processing finishes.
-        // JavaScript memory reclamation itself is controlled by the runtime.
         if (body && typeof body === "object") {
           body.imageDataUrl = "";
           body.instruction = "";
@@ -161,9 +173,10 @@ const server = http.createServer(async (request, response) => {
 
     sendJson(request, response, 404, { ok: false, error: "Not found." });
   } catch (error) {
-    // Log only the error category/message. Request bodies and screenshots are
-    // never printed to logs.
-    console.error(`[${new Date().toISOString()}] ${error?.name || "Error"}: ${error?.message || "Unknown error"}`);
+    console.error(
+      `[${new Date().toISOString()}] ${error?.name || "Error"}: ${error?.message || "Unknown error"}`,
+    );
+
     sendJson(request, response, error.status || 500, {
       ok: false,
       error: error.message || "Internal server error.",
@@ -172,16 +185,8 @@ const server = http.createServer(async (request, response) => {
 });
 
 server.listen(config.port, "0.0.0.0", () => {
-  console.log(`SnapGrok no-storage server is listening on port ${config.port}`);
+  console.log(`SnapGrok server is listening on port ${config.port}`);
   console.log(`Model: ${config.mockMode ? "mock-xai" : config.model}`);
+  console.log("Structured multi-answer results: enabled");
   console.log("Persistent request storage: disabled");
-
-  if (!config.mockMode && !config.apiKey) {
-    console.warn("XAI_API_KEY is not configured.");
-  }
-  if (!config.managementApiKey || !config.teamId) {
-    console.warn(
-      "Live prepaid-credit display is disabled until the Management API key and team ID are configured.",
-    );
-  }
 });
