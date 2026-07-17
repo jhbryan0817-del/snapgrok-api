@@ -8,6 +8,7 @@ const COMMAND_TO_SLOT = {
 
 const ICONS = {
   default: iconPath("default"),
+  processing: iconPath("processing"),
   A: iconPath("answer-a"),
   B: iconPath("answer-b"),
   C: iconPath("answer-c"),
@@ -129,8 +130,8 @@ async function processShortcut(slotIndex) {
 
   const requestToken = crypto.randomUUID();
   await chrome.storage.session.set({ latestRequestToken: requestToken });
-  await resetAnswerIcon({ preserveRequestToken: true });
-  await chrome.action.setTitle({ title: "SnapGrok is analyzing the visible tab…" });
+  
+  await showProcessingIcon();
 
   try {
     const imageDataUrl = await chrome.tabs.captureVisibleTab(activeTab.windowId, {
@@ -198,6 +199,23 @@ function parseChoice(value) {
 
   const labelled = text.match(/(?:ANSWER|CHOICE|OPTION|FINAL)\s*(?:ANSWER\s*)?(?:IS|:|=|-)??\s*\(?([A-E])\)?[.!]?\s*$/);
   return labelled ? labelled[1] : null;
+}
+
+async function showProcessingIcon() {
+  if (resetTimerId !== null) {
+    clearTimeout(resetTimerId);
+    resetTimerId = null;
+  }
+
+  await chrome.storage.session.remove("iconState");
+
+  await chrome.action.setIcon({
+    path: ICONS.processing,
+  });
+
+  await chrome.action.setTitle({
+    title: "SnapGrok is processing the question…",
+  });
 }
 
 async function showAnswerIcon(choice) {
