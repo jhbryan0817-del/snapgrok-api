@@ -1,0 +1,64 @@
+{
+  "manifest_version": 3,
+  "name": "SnapGrok MCQ Assistant V3.8",
+  "version": "3.8.2",
+  "description": "Capture a visible Chrome tab or selected zone, solve single- or multiple-answer MCQs, robustly parse structured xAI results, and display larger toolbar result icons.",
+  "minimum_chrome_version": "109",
+  "permissions": [
+    "activeTab",
+    "storage",
+    "tabs",
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://snapgrok-api.onrender.com/*"
+  ],
+  "background": {
+    "service_worker": "service-worker.js"
+  },
+  "action": {
+    "default_title": "Open SnapGrok settings",
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/default16.png",
+      "32": "icons/default32.png",
+      "48": "icons/default48.png",
+      "128": "icons/default128.png"
+    }
+  },
+  "commands": {
+    "capture-full-screen": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+A",
+        "mac": "Command+Shift+A"
+      },
+      "description": "Capture the full visible Chrome tab"
+    },
+    "capture-selected-zone": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+X",
+        "mac": "Command+Shift+X"
+      },
+      "description": "Select and capture part of the visible Chrome tab"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "http://*/*",
+        "https://*/*"
+      ],
+      "js": [
+        "zone-selector.js"
+      ],
+      "run_at": "document_start",
+      "all_frames": false
+    }
+  ],
+  "icons": {
+    "16": "icons/default16.png",
+    "32": "icons/default32.png",
+    "48": "icons/default48.png",
+    "128": "icons/default128.png"
+  }
+}

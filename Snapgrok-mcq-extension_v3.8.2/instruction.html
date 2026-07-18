@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Edit SnapGrok instruction</title>
+    <link rel="stylesheet" href="instruction.css" />
+  </head>
+  <body>
+    <main class="editor-shell">
+      <header class="editor-header">
+        <div class="editor-mark">S</div>
+        <div>
+          <span class="eyebrow">Shared instruction</span>
+          <h1>Guide every screenshot</h1>
+          <p>This text is sent with each captured question. SnapGrok separately asks the model for one or several correct options.</p>
+        </div>
+      </header>
+
+      <section class="editor-card">
+        <label for="instruction">Instruction</label>
+        <textarea id="instruction" maxlength="12000" placeholder="Example: Solve the question using standard undergraduate engineering conventions. Prioritize the wording shown in the screenshot." spellcheck="true"></textarea>
+        <div class="textarea-meta">
+          <span>Do not include API keys or account information.</span>
+          <span id="counter">0 / 12,000</span>
+        </div>
+      </section>
+
+      <div class="actions">
+        <p id="message" role="status"></p>
+        <button id="cancel" class="secondary" type="button">Cancel</button>
+        <button id="save" class="primary" type="button">Save instruction</button>
+      </div>
+    </main>
+
+    <script src="settings.js"></script>
+    <script src="instruction.js"></script>
+  </body>
+</html>

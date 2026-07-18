@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SnapGrok</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="app-header">
+        <div class="brand-mark" aria-hidden="true">S</div>
+        <div class="brand-copy">
+          <h1>SnapGrok</h1>
+          <p>MCQ capture assistant</p>
+        </div>
+        <span class="status-pill"><span></span>Always on</span>
+      </header>
+
+      <section class="section-block" aria-labelledby="captureHeading">
+        <div class="section-heading">
+          <div>
+            <span class="eyebrow">Capture</span>
+            <h2 id="captureHeading">Choose how to scan</h2>
+          </div>
+        </div>
+
+        <div class="capture-grid">
+          <article class="capture-card">
+            <div class="capture-icon full-icon" aria-hidden="true"></div>
+            <div class="capture-copy">
+              <h3>Visible tab</h3>
+              <p>Capture the whole visible webpage.</p>
+            </div>
+            <div class="shortcut-line">
+              <kbd id="fullShortcut">Loading…</kbd>
+              <button id="assignFull" class="ghost-button" type="button">Change</button>
+            </div>
+          </article>
+
+          <article class="capture-card">
+            <div class="capture-icon zone-icon" aria-hidden="true"></div>
+            <div class="capture-copy">
+              <h3>Select area</h3>
+              <p>Drag over only the question you need.</p>
+            </div>
+            <div class="shortcut-line">
+              <kbd id="zoneShortcut">Loading…</kbd>
+              <button id="assignZone" class="ghost-button" type="button">Change</button>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="instruction-card" aria-labelledby="instructionHeading">
+        <div class="instruction-header">
+          <div>
+            <span class="eyebrow">AI instruction</span>
+            <h2 id="instructionHeading">Shared prompt</h2>
+          </div>
+          <button id="editInstruction" class="primary-button" type="button">Edit</button>
+        </div>
+        <p id="instructionPreview" class="instruction-preview">No instruction saved yet.</p>
+      </section>
+
+      <section class="result-card" aria-labelledby="resultHeading">
+        <div class="section-heading compact">
+          <div>
+            <span class="eyebrow">Toolbar results</span>
+            <h2 id="resultHeading">One glance, no popup</h2>
+          </div>
+        </div>
+        <div class="result-strip">
+          <div class="result-item"><img src="icons/result-a32.png" alt="" /><span>Single</span></div>
+          <div class="result-item"><img src="icons/result-multi-232.png" alt="" /><span>Multiple</span></div>
+          <div class="result-item"><img src="icons/result-inconclusive32.png" alt="" /><span>Unclear</span></div>
+          <div class="result-item"><img src="icons/result-error32.png" alt="" /><span>Error</span></div>
+          <div class="result-item"><img src="icons/processing32.png" alt="" /><span>Working</span></div>
+        </div>
+      </section>
+
+      <footer class="privacy-note">
+        <span class="privacy-dot" aria-hidden="true"></span>
+        Screenshots are sent only for the current request and are not saved by the extension.
+      </footer>
+
+      <p id="message" class="message" role="status"></p>
+    </main>
+
+    <script src="settings.js"></script>
+    <script src="popup.js"></script>
+  </body>
+</html>
