@@ -1,0 +1,405 @@
+:root {
+  color-scheme: light;
+  --ink: #171821;
+  --muted: #737480;
+  --line: #e8e6ec;
+  --paper: #f6f5f3;
+  --purple: #6754e9;
+  --purple-dark: #503dd0;
+  --purple-soft: #f0edff;
+  --green: #2a9d5b;
+  --red: #cf4a55;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  width: 420px;
+  min-height: 590px;
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+button {
+  font: inherit;
+}
+
+.app-shell {
+  padding: 18px;
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.brand-mark {
+  width: 40px;
+  height: 40px;
+  border-radius: 13px;
+  display: grid;
+  place-items: center;
+  color: white;
+  background: linear-gradient(145deg, #887aff, #4e3bcf);
+  box-shadow: 0 9px 20px rgba(103, 84, 233, 0.25);
+  font-size: 17px;
+  font-weight: 900;
+  transform: rotate(-5deg);
+}
+
+.brand-copy {
+  flex: 1;
+}
+
+.brand-copy h1,
+.brand-copy p,
+.section-heading h2,
+.capture-copy h3,
+.capture-copy p,
+.account-copy h2,
+.account-copy p {
+  margin: 0;
+}
+
+.brand-copy h1 {
+  font-size: 18px;
+  letter-spacing: -0.04em;
+}
+
+.brand-copy p {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.status-pill,
+.account-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 9px;
+  border-radius: 999px;
+  color: #32784f;
+  background: #eaf7ef;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.status-pill span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #39c96e;
+}
+
+.account-card,
+.section-block {
+  border: 1px solid var(--line);
+  border-radius: 19px;
+  background: rgba(255, 255, 255, 0.93);
+}
+
+.account-card {
+  display: grid;
+  grid-template-columns: 46px 1fr auto;
+  gap: 11px;
+  padding: 14px;
+  box-shadow: 0 12px 30px rgba(37, 29, 68, 0.07);
+}
+
+.account-icon {
+  width: 46px;
+  height: 46px;
+  border-radius: 15px;
+  display: grid;
+  place-items: center;
+  color: var(--purple);
+  background: var(--purple-soft);
+  font-size: 17px;
+  font-weight: 900;
+}
+
+.account-copy {
+  min-width: 0;
+}
+
+.eyebrow {
+  display: block;
+  margin-bottom: 3px;
+  color: #9a96a1;
+  font-size: 9px;
+  font-weight: 850;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.account-copy h2 {
+  overflow: hidden;
+  font-size: 14px;
+  letter-spacing: -0.02em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-copy p {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.account-state {
+  align-self: start;
+  color: #6b6672;
+  background: #f0eff2;
+}
+
+.account-state.connected {
+  color: #32784f;
+  background: #eaf7ef;
+}
+
+.account-actions {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 3px;
+}
+
+.hidden {
+  display: none !important;
+}
+
+.primary-button,
+.secondary-button,
+.danger-button,
+.text-button,
+.shortcut-button,
+.popup-footer button {
+  border: 0;
+  cursor: pointer;
+}
+
+.primary-button,
+.secondary-button,
+.danger-button {
+  min-height: 39px;
+  border-radius: 11px;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.primary-button {
+  color: white;
+  background: var(--purple);
+  box-shadow: 0 8px 18px rgba(103, 84, 233, 0.22);
+}
+
+.primary-button:hover {
+  background: var(--purple-dark);
+}
+
+.secondary-button {
+  border: 1px solid var(--line);
+  color: #4d4e57;
+  background: white;
+}
+
+.danger-button {
+  color: var(--red);
+  background: #fff0f1;
+}
+
+.section-block {
+  margin-top: 12px;
+  padding: 14px;
+}
+
+.section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 11px;
+}
+
+.section-heading h2 {
+  font-size: 14px;
+  letter-spacing: -0.025em;
+}
+
+.capture-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 9px;
+}
+
+.capture-card {
+  min-width: 0;
+  min-height: 184px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 15px;
+  display: flex;
+  flex-direction: column;
+  background: #fbfafc;
+}
+
+.capture-icon {
+  width: 43px;
+  height: 32px;
+  margin-bottom: 13px;
+  border: 2px solid var(--purple);
+  border-radius: 8px;
+  position: relative;
+}
+
+.full-icon::after {
+  content: "";
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: -7px;
+  height: 2px;
+  background: var(--purple);
+}
+
+.zone-icon::before,
+.zone-icon::after {
+  content: "";
+  position: absolute;
+  width: 13px;
+  height: 13px;
+}
+
+.zone-icon::before {
+  left: -5px;
+  top: -5px;
+  border-left: 2px solid var(--purple);
+  border-top: 2px solid var(--purple);
+}
+
+.zone-icon::after {
+  right: -5px;
+  bottom: -5px;
+  border-right: 2px solid var(--purple);
+  border-bottom: 2px solid var(--purple);
+}
+
+.capture-copy h3 {
+  font-size: 13px;
+}
+
+.capture-copy p {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.shortcut-button {
+  width: 100%;
+  min-height: 38px;
+  margin-top: auto;
+  padding: 6px 8px;
+  border: 1px solid #ddd9e7;
+  border-bottom-width: 2px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #52515a;
+  background: white;
+  text-align: left;
+}
+
+.shortcut-button span {
+  overflow: hidden;
+  font-size: 9px;
+  font-weight: 850;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.shortcut-button small {
+  color: var(--purple);
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.instruction-block {
+  padding-bottom: 13px;
+}
+
+.instruction-heading {
+  margin-bottom: 7px;
+}
+
+.text-button {
+  padding: 5px 8px;
+  color: var(--purple);
+  background: transparent;
+  font-size: 10px;
+  font-weight: 850;
+}
+
+.instruction-preview {
+  max-height: 58px;
+  margin: 0;
+  overflow: auto;
+  color: #555660;
+  font-size: 10px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
+.instruction-preview.is-empty {
+  color: #92909a;
+}
+
+.message {
+  min-height: 0;
+  margin-top: 8px;
+  padding: 0;
+  border-radius: 10px;
+  font-size: 10px;
+}
+
+.message.error {
+  padding: 9px 11px;
+  color: #a73742;
+  background: #fff0f1;
+}
+
+.popup-footer {
+  min-height: 35px;
+  padding: 9px 4px 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #9b98a2;
+  font-size: 9px;
+}
+
+.popup-footer button {
+  padding: 0;
+  color: #77737d;
+  background: transparent;
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.popup-footer button:hover,
+.text-button:hover {
+  color: var(--purple-dark);
+}
