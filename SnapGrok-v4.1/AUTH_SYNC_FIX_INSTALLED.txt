@@ -1,0 +1,12 @@
+SnapGrok V4.0.3 authentication synchronization fix
+Installed: 20/07/2026, 1:25:35 am
+
+Changed:
+- Replaced Clerk's service-worker-incompatible window.location.reload fallback.
+- Added auth-sync-fix.js with a top-level Clerk cookie listener.
+- Reloads the cached background auth client only when login presence changes.
+- Added popup retries, focus refresh, visibility refresh, and short polling.
+- Updated manifest version to 4.0.3.
+
+Backup:
+C:\Users\simon\Downloads\SnapGrok-v4.1\_auth-fix-backup-20260719-172535297
