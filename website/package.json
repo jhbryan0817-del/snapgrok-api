@@ -3,16 +3,14 @@
   "version": "0.2.0",
   "private": true,
   "engines": {
-    "node": ">=22.13.0"
+    "node": ">=22.13.0 <23"
   },
   "scripts": {
     "install:ci": "npm ci",
-    "dev": "vite --host 127.0.0.1 --port 3000",
-    "build": "vinext build && node scripts/validate-artifact.mjs",
-    "start": "vinext start",
-    "test": "npm run build && node --test tests/rendered-html.test.mjs",
-    "validate:artifact": "node scripts/validate-artifact.mjs",
-    "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint . --ignore-pattern .next",
     "db:generate": "drizzle-kit generate"
   },
   "dependencies": {
