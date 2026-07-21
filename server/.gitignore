@@ -1,10 +1,6 @@
-# Secrets
 .env
-
-# Dependencies
+.env.*
+!.env.example
 node_modules/
-
-# Logs and operating-system files
 *.log
 .DS_Store
-Thumbs.db
