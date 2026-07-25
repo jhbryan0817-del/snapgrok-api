@@ -48,9 +48,7 @@ export default function HomePage() {
           <h1 id="hero-title">
             Capture in silence,
             <br />
-            answers remain
-            <br />
-            undetected
+            Stay undetected
           </h1>
           <p className="hero-description">
             SneakSolve is a discreet MCQ capture assistant that helps you get answers without drawing attention.

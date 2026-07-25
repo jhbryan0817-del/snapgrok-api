@@ -1,4 +1,4 @@
-# SneakSolve website — restored and corrected
+# SneakSolve website — latest corrected version
 
 This folder restores the approved SneakSolve landing-page redesign and applies only the requested website changes:
 
@@ -6,6 +6,8 @@ This folder restores the approved SneakSolve landing-page redesign and applies o
 - one global header appears on all website pages
 - the header contains Home, Why SneakSolve, Account, and Pricing
 - authentication pages use a centered Clerk form with a short welcome line
+- the Clerk card itself is horizontally centered inside the authentication panel
+- the homepage heading reads “Capture in silence, Stay undetected” and uses smaller responsive sizing
 - the signed-in profile menu renders above the demo and its Manage account / Sign out actions work
 
 The Clerk provider, publishable-key validation, website origin validation, security headers, dependency versions, and extension/backend code are not changed.
@@ -38,7 +40,7 @@ NEXT_PUBLIC_SITE_URL=https://www.sneaksolve.com
 
 ```bash
 npm ci
-npm test
+node --test tests/*.test.mjs
 npm run lint
 npm run build
 ```

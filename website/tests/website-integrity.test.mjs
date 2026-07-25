@@ -9,6 +9,8 @@ const read = (path) => readFileSync(resolve(root, path), "utf8");
 test("approved redesigned landing page is restored", () => {
   const page = read("app/page.tsx");
   assert.match(page, /Capture in silence/);
+  assert.match(page, /Stay undetected/);
+  assert.doesNotMatch(page, /answers remain/);
   assert.match(page, /How the icon works/);
   assert.match(page, /Privacy &amp; Security/);
   assert.doesNotMatch(page, /Capture the question\. Keep your focus\./);
@@ -43,6 +45,13 @@ test("authentication shell is intentionally simple", () => {
   assert.match(shell, /Welcome to SneakSolve\./);
   assert.match(shell, /auth-simple-card/);
   assert.doesNotMatch(shell, /auth-proof-card|auth-assurance|auth-mode-switch/);
+});
+
+test("Clerk card is centered inside the authentication panel", () => {
+  const css = read("app/globals.css");
+  assert.match(css, /\.auth-simple-card \.clerk-surface[\s\S]*justify-content: center/);
+  assert.match(css, /\[class\*="cl-rootBox"\][\s\S]*justify-content: center/);
+  assert.match(css, /\[class\*="cl-cardBox"\][\s\S]*margin-inline: auto/);
 });
 
 test("profile popover escapes demo clipping and retains working actions", () => {

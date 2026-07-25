@@ -73,7 +73,7 @@ img { display: block; max-width: 100%; }
 .hero-copy { padding-left: 8px; }
 .trust-pill { display: inline-flex; align-items: center; gap: 9px; padding: 8px 14px; border: 1px solid rgba(103, 56, 241, .12); border-radius: 999px; background: rgba(255,255,255,.7); color: var(--purple); font-weight: 700; font-size: 14px; box-shadow: 0 8px 25px rgba(88, 53, 156, .05); }
 .trust-pill svg { width: 18px; height: 18px; }
-.hero h1 { margin: 28px 0 20px; max-width: 650px; font-size: clamp(51px, 5.25vw, 78px); line-height: 1.05; letter-spacing: -.064em; font-weight: 790; }
+.hero h1 { margin: 28px 0 20px; max-width: 620px; font-size: clamp(44px, 4.4vw, 64px); line-height: 1.06; letter-spacing: -.058em; font-weight: 790; }
 .hero-description { max-width: 590px; margin: 0; color: var(--muted); font-size: 18px; line-height: 1.75; }
 .hero-actions { display: flex; align-items: center; gap: 18px; margin-top: 31px; }
 .primary-button, .secondary-button { min-height: 58px; display: inline-flex; align-items: center; justify-content: center; border-radius: 15px; font-size: 16px; font-weight: 750; }
@@ -243,7 +243,7 @@ img { display: block; max-width: 100%; }
   .site-header { grid-template-columns: auto 1fr auto; }
   .primary-nav { gap: 24px; }
   .hero { gap: 38px; }
-  .hero h1 { font-size: 56px; }
+  .hero h1 { font-size: 52px; }
   .icon-workflow { grid-template-columns: 215px 30px minmax(0,1fr); padding: 25px 18px; gap: 12px; }
   .state-grid { gap: 8px; }
   .state-card { padding-inline: 6px; }
@@ -290,7 +290,7 @@ img { display: block; max-width: 100%; }
   .account-menu-name { display: none; }
   .account-menu-trigger { padding: 3px; }
   .hero { padding-top: 45px; padding-bottom: 45px; }
-  .hero h1 { font-size: clamp(42px,13vw,56px); }
+  .hero h1 { font-size: clamp(38px,10.5vw,48px); }
   .hero-description { font-size: 16px; }
   .hero-actions { flex-direction: column; align-items: stretch; }
   .primary-button, .secondary-button { width: 100%; }
@@ -356,8 +356,27 @@ img { display: block; max-width: 100%; }
   background: rgba(255,255,255,.9);
   box-shadow: 0 30px 80px rgba(56,34,105,.14);
 }
-.auth-simple-card .clerk-surface { min-height: 400px; display: grid; place-items: start center; }
-.auth-simple-card .clerk-surface > div { width: 100%; }
+.auth-simple-card .clerk-surface {
+  min-height: 400px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+}
+.auth-simple-card .clerk-surface > div {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+.auth-simple-card .clerk-surface [class*="cl-rootBox"] {
+  width: 100% !important;
+  display: flex !important;
+  justify-content: center !important;
+  margin-inline: auto !important;
+}
+.auth-simple-card .clerk-surface [class*="cl-cardBox"] {
+  width: min(100%, 460px) !important;
+  margin-inline: auto !important;
+}
 
 /* The signed-in menu is portalled to <body>, so the demo cannot clip or cover it. */
 .account-popover-portal {
