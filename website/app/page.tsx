@@ -6,7 +6,7 @@ const answerStates = [
   {
     icon: "/sneaksolve-icons/result-a.png",
     title: "Single answer",
-    description: "One answer found: option A",
+    description: "One answer found - option A",
   },
   {
     icon: "/sneaksolve-icons/result-multi.png",
@@ -16,12 +16,12 @@ const answerStates = [
   {
     icon: "/sneaksolve-icons/processing.png",
     title: "Processing",
-    description: "Checking the question.",
+    description: "Checking the question",
   },
   {
     icon: "/sneaksolve-icons/result-inconclusive.png",
     title: "Inconclusive",
-    description: "Not enough info.",
+    description: "Not enough information to answer",
   },
   {
     icon: "/sneaksolve-icons/result-error.png",
