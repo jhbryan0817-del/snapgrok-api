@@ -1,0 +1,19 @@
+{
+  "name": "sneaksolve-api",
+  "version": "5.0.3",
+  "private": true,
+  "description": "Render-ready SneakSolve backend with Clerk authentication, strict CORS, rate limiting, and no persistent request-data storage.",
+  "type": "module",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "check": "node --check src/server.js && node --check src/auth.js && node --check src/rate-limit.js && node --check src/xai.js && node --check src/env.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "@clerk/backend": "^3.11.7"
+  },
+  "engines": {
+    "node": ">=20.9.0"
+  }
+}
