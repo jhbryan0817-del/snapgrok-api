@@ -322,3 +322,74 @@ img { display: block; max-width: 100%; }
   html { scroll-behavior: auto; }
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
+
+/* Unified navigation and focused authentication pages. */
+.primary-nav { gap: 30px; }
+.auth-page > .site-header,
+.account-page > .site-header { width: min(1200px, 100%); }
+
+.auth-page-simple { display: flex; flex-direction: column; }
+.auth-simple-layout {
+  position: relative;
+  z-index: 1;
+  width: min(520px, 100%);
+  margin: clamp(54px, 9vh, 100px) auto 40px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+}
+.auth-simple-welcome {
+  margin: 0;
+  color: var(--ink);
+  font-size: clamp(28px, 4vw, 42px);
+  line-height: 1.1;
+  letter-spacing: -.045em;
+  font-weight: 790;
+  text-align: center;
+}
+.auth-simple-card {
+  width: 100%;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  background: rgba(255,255,255,.9);
+  box-shadow: 0 30px 80px rgba(56,34,105,.14);
+}
+.auth-simple-card .clerk-surface { min-height: 400px; display: grid; place-items: start center; }
+.auth-simple-card .clerk-surface > div { width: 100%; }
+
+/* The signed-in menu is portalled to <body>, so the demo cannot clip or cover it. */
+.account-popover-portal {
+  position: fixed;
+  right: auto;
+  bottom: auto;
+  z-index: 10000;
+  width: min(292px, calc(100vw - 30px));
+  visibility: hidden;
+}
+.account-popover-link:disabled { cursor: wait; opacity: .68; }
+.account-signout { color: #a53b50; }
+.account-avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: inherit; }
+
+@media (max-width: 1080px) {
+  .primary-nav { gap: 20px; font-size: 14px; }
+}
+
+@media (max-width: 900px) {
+  .auth-page > .site-header,
+  .account-page > .site-header { width: 100%; }
+}
+
+@media (max-width: 600px) {
+  .auth-simple-layout { margin-top: 46px; gap: 18px; }
+  .auth-simple-card { padding: 8px; border-radius: 19px; }
+}
+
+.account-page-loading { min-height: 100vh; }
+.account-loading-centered {
+  position: relative;
+  z-index: 1;
+  min-height: calc(100vh - 150px);
+  justify-content: center;
+}

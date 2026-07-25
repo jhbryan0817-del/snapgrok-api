@@ -29,8 +29,9 @@ export default function AccountPage() {
 
   if (!isLoaded) {
     return (
-      <main className="account-loading-page">
-        <div className="account-loading-mark">
+      <main className="account-page account-page-loading">
+        <SiteHeader activeItem="account" />
+        <div className="account-loading-mark account-loading-centered">
           <img src="/sneaksolve-icons/default.png" alt="" />
           <span>Loading your SneakSolve account…</span>
         </div>
@@ -66,7 +67,7 @@ export default function AccountPage() {
   return (
     <main className="account-page">
       <div className="account-aurora" aria-hidden="true" />
-      <SiteHeader />
+      <SiteHeader activeItem="account" />
       <section className="account-welcome">
         <div>
           <span className="section-kicker">YOUR SNEAKSOLVE ACCOUNT</span>

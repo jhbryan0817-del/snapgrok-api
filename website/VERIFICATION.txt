@@ -1,0 +1,17 @@
+SNEAKSOLVE WEBSITE PACKAGE VERIFICATION
+
+Completed checks:
+- 9/9 source integrity tests passed
+- TypeScript source check passed with strict test stubs
+- CSS opening and closing brace counts match
+- Required icon and social-image assets are present
+- No .env.local or real publishable key is included
+
+Not run in this isolated environment:
+- full npm ci / Next.js production build, because external package installation is unavailable here
+
+Run after upload from the existing repository website directory:
+  npm ci
+  npm test
+  npm run lint
+  npm run build

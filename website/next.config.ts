@@ -4,6 +4,7 @@ const clerkFrontendApiOrigin = requiredHttpsOrigin(
   process.env.NEXT_PUBLIC_CLERK_FRONTEND_API_URL,
   "NEXT_PUBLIC_CLERK_FRONTEND_API_URL",
 );
+
 const contentSecurityPolicy = [
   "default-src 'self'", "base-uri 'self'", "object-src 'none'", "frame-ancestors 'none'", "form-action 'self'",
   `script-src 'self' 'unsafe-inline' ${clerkFrontendApiOrigin} https://challenges.cloudflare.com`,
@@ -12,6 +13,7 @@ const contentSecurityPolicy = [
   "frame-src 'self' https://challenges.cloudflare.com", "worker-src 'self' blob:", "manifest-src 'self'",
   ...(process.env.NODE_ENV === "production" ? ["upgrade-insecure-requests"] : []),
 ].join("; ");
+
 const securityHeaders = [
   { key: "Content-Security-Policy", value: contentSecurityPolicy },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
@@ -23,11 +25,13 @@ const securityHeaders = [
   { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), payment=()" },
   ...(process.env.NODE_ENV === "production" ? [{ key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" }] : []),
 ];
+
 const nextConfig: NextConfig = {
   poweredByHeader: false,
   reactStrictMode: true,
   async headers() { return [{ source: "/(.*)", headers: securityHeaders }]; },
 };
+
 export default nextConfig;
 
 function requiredHttpsOrigin(value: string | undefined, name: string): string {
