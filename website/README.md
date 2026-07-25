@@ -1,52 +1,53 @@
-# SneakSolve website
+# SneakSolve website redesign
 
-The public landing page and Clerk-backed sign-in, sign-up, sign-out, and account
-management experience for SneakSolve.
+Complete Next.js source for the approved SneakSolve landing-page redesign. The Clerk account and authentication flow, environment-variable validation, route structure, dependency versions, and security headers are retained. The redesign is limited to front-end presentation, responsive styling, assets, and landing-page copy.
 
 ## Routes
 
-- `/` — promotional landing page
-- `/account?mode=sign-in` — primary sign-in gateway
-- `/account?mode=sign-up` — primary registration gateway
-- `/account` — signed-in profile and security settings
+- `/` — redesigned landing page
+- `/account?mode=sign-in` — sign-in gateway
+- `/account?mode=sign-up` — registration gateway
+- `/account` — signed-in account settings
 - `/sign-in` and `/sign-up` — direct authentication routes
 
-Signed-out visitors see separate **Log in** and **Sign up** actions. Signed-in
-visitors see their name and avatar with **Manage account** and **Sign out**.
+## Existing environment values
 
-## Required configuration
+Keep the same values already configured in Render. For local use, copy `.env.example` to `.env.local` and insert the existing Clerk publishable key.
 
 ```text
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_live_Y2xlcmsuc25lYWtzb2x2ZS5jb20k
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_live_...
 NEXT_PUBLIC_CLERK_FRONTEND_API_URL=https://clerk.sneaksolve.com
 NEXT_PUBLIC_SITE_URL=https://www.sneaksolve.com
 ```
 
-The build fails if a value is missing or invalid. Production builds also reject
-a non-live Clerk Publishable Key. A Clerk Secret Key must never be placed in the
-website service.
+For local testing only, use `NEXT_PUBLIC_SITE_URL=http://localhost:3000`.
 
-For local development, set `NEXT_PUBLIC_SITE_URL=http://localhost:3000` in
-`.env.local`. The Clerk Frontend API remains HTTPS. Only localhost or
-`127.0.0.1` may use HTTP for the site URL.
+## Uploading over the current repository
 
-## Commands
+Upload this folder's contents on top of the current repository `website` directory rather than deleting the directory first. Keep the existing `website/package-lock.json`; dependency versions are unchanged. See `UPLOAD-NOTES.txt` for the exact steps.
 
-```powershell
-npm.cmd ci
-npm.cmd run test
-npm.cmd run lint
-npm.cmd run build
-npm.cmd run dev
+## Local commands
+
+Starting from this ZIP alone:
+
+```bash
+npm install
+npm test
+npm run dev
 ```
 
-## Render settings
+With the existing repository lock file:
+
+```bash
+npm ci
+npm run check
+```
+
+## Render
 
 - Root directory: `website`
-- Runtime: Node
-- Build command: `npm ci && npm run build`
+- Build command with the existing lock file: `npm ci && npm run build`
 - Start command: `npm start`
-- Node version: 22 (the repository currently requires 22.13 or newer)
+- Node: 22.13 or newer, below 23
 
-The website sets CSP, HSTS in production, clickjacking, MIME-sniffing,
-referrer, permissions, and cross-origin isolation headers through Next.js.
+Never commit `.env.local`, Clerk secret keys, API keys, or other secrets.

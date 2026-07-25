@@ -1,0 +1,30 @@
+SNEAKSOLVE WEBSITE REDESIGN — UPLOAD NOTES
+
+This folder contains the complete Next.js source for the redesigned website.
+It contains no .env.local file, real Clerk key, API key, or other secret.
+
+SAFEST GITHUB UPDATE METHOD
+1. Open the repository's existing website folder.
+2. Do NOT delete the website folder first.
+3. Extract this ZIP, open its website folder, and upload all of its contents on top of the existing website folder.
+4. Confirm replacement of files with matching names.
+5. Leave the repository's existing website/package-lock.json in place. Dependency versions were not changed.
+6. Leave your Render environment variables unchanged.
+
+This method also leaves any unrelated legacy folders already in the repository untouched.
+
+LOCAL INSTALL WHEN STARTING FROM THIS ZIP ALONE
+Run:
+  npm install
+  npm run dev
+
+Running npm install creates a matching package-lock.json automatically.
+
+RENDER
+With the existing package-lock.json:
+  Build command: npm ci && npm run build
+  Start command: npm start
+
+Without package-lock.json:
+  Build command: npm install && npm run build
+  Start command: npm start

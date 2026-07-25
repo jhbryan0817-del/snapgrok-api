@@ -2,13 +2,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { AccountNav } from "./account-nav";
 
-export function AuthShell({
-  eyebrow,
-  title,
-  description,
-  mode,
-  children,
-}: {
+export function AuthShell({ eyebrow, title, description, mode, children }: {
   eyebrow: string;
   title: string;
   description: string;
@@ -32,7 +26,6 @@ export function AuthShell({
           <span className="section-kicker">{eyebrow}</span>
           <h1>{title}</h1>
           <p>{description}</p>
-
           <div className="auth-proof-card">
             <div className="auth-proof-icon" aria-hidden="true">S</div>
             <div>
@@ -40,14 +33,12 @@ export function AuthShell({
               <p>Sign in on the website and your Chrome extension will securely pick up the session.</p>
             </div>
           </div>
-
           <div className="auth-assurance" aria-label="Security highlights">
             <div><span aria-hidden="true">01</span><p>Identity and sessions are secured by Clerk.</p></div>
             <div><span aria-hidden="true">02</span><p>Secret API keys stay on the server.</p></div>
             <div><span aria-hidden="true">03</span><p>You can review sessions or sign out at any time.</p></div>
           </div>
         </div>
-
         <div className="auth-card-frame">
           <div className="auth-mode-switch" aria-label="Choose an account action">
             <a className={mode === "sign-in" ? "active" : ""} href="/account?mode=sign-in">Log in</a>

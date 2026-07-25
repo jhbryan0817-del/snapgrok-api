@@ -4,9 +4,7 @@ import { ClerkProvider } from "@clerk/react";
 
 const publishableKey = requiredPublishableKey();
 
-export function SneakSolveClerkProvider({
-  children,
-}: Readonly<{ children: React.ReactNode }>) {
+export function SneakSolveClerkProvider({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <ClerkProvider
       publishableKey={publishableKey}
@@ -22,14 +20,10 @@ export function SneakSolveClerkProvider({
 function requiredPublishableKey(): string {
   const value = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
   if (!value) {
-    throw new Error(
-      "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY is required. SneakSolve will not fall back to a development Clerk instance.",
-    );
+    throw new Error("NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY is required. SneakSolve will not fall back to a development Clerk instance.");
   }
   if (process.env.NODE_ENV === "production" && !value.startsWith("pk_live_")) {
-    throw new Error(
-      "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY must use the Clerk production instance in production.",
-    );
+    throw new Error("NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY must use the Clerk production instance in production.");
   }
   return value;
 }

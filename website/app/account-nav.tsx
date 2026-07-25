@@ -57,7 +57,7 @@ export function AccountNav() {
     return (
       <span className="account-entry-actions">
         <a className="nav-login" href="/account?mode=sign-in">Log in</a>
-        <a className="nav-signup" href="/account?mode=sign-up">Sign up</a>
+        <a className="nav-signup" href="/account?mode=sign-up">Get Started</a>
       </span>
     );
   }
@@ -96,14 +96,10 @@ export function AccountNav() {
             <span className="account-avatar account-avatar-large" aria-hidden="true">
               {user.hasImage ? <img src={user.imageUrl} alt="" /> : initials(name)}
             </span>
-            <div>
-              <strong>{name}</strong>
-              <span>{email}</span>
-            </div>
+            <div><strong>{name}</strong><span>{email}</span></div>
           </div>
           <a className="account-popover-link" href="/account" role="menuitem">
-            <span aria-hidden="true">&#9786;</span>
-            Manage account
+            <span aria-hidden="true">&#9786;</span>Manage account
           </a>
           <button
             className="account-popover-link account-signout"
