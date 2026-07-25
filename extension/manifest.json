@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "SneakSolve MCQ Assistant",
   "version": "5.0.3",
-  "key": "pjfanaeopegobidkbpnlmeegmkmnabmk"
+  "key": "pjfanaeopegobidkbpnlmeegmkmnabmk",
   "description": "Capture visible tabs or selected zones, securely authenticate with Clerk, and solve single- or multiple-answer MCQs.",
   "minimum_chrome_version": "109",
   "permissions": [
