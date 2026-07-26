@@ -89,7 +89,7 @@ export default function HomePage() {
           <div className="stat-line">
             <strong>10k+</strong>
             <div>
-              <h2>active users</h2>
+              <h2>Active Users</h2>
               <p>Trusting SneakSolve every day</p>
             </div>
           </div>
@@ -100,8 +100,8 @@ export default function HomePage() {
           <div className="stat-line">
             <strong>100k+</strong>
             <div>
-              <h2>questions solved</h2>
-              <p>Answers delivered with less friction</p>
+              <h2>Questions Solved</h2>
+              <p>Answers delivered with perfection</p>
             </div>
           </div>
         </article>
