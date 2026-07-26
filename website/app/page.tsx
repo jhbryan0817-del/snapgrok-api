@@ -46,7 +46,7 @@ export default function HomePage() {
           </div>
 
           <h1 id="hero-title">
-            Capture in silence,
+            Capture in Silence,
             <br />
             Stay Undetected.
           </h1>
