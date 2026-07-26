@@ -1,0 +1,14 @@
+SNEAKSOLVE WEBSITE V5.2.0 - UPLOAD NOTES
+
+1. Back up the current repository website directory.
+2. Extract the v5.2.0 website ZIP.
+3. Upload every extracted item into the existing repository website directory.
+4. Replace matching files, including package.json and package-lock.json.
+5. Confirm the final path is website/app/page.tsx, not website/website/app/page.tsx.
+6. Keep all Render environment-variable values unchanged.
+7. Deploy the latest commit and confirm the Render build succeeds.
+8. Test /, /pricing, /account, sign-in, sign-out, and the extension popup.
+
+This package changes only the website. It does not change the server,
+extension, Clerk production instance, Chrome extension ID, or session-sync
+architecture.
