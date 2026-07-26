@@ -1,9 +1,0 @@
-SNEAKSOLVE WEBSITE REPLACEMENT
-
-1. Extract this zip.
-2. In the GitHub repository, replace the existing website folder with the website folder included here.
-3. Do not upload node_modules, .next, or .env.local.
-4. Commit and push the replacement.
-5. Render should redeploy automatically from the existing website root directory.
-
-Only the website folder is included. The extension and server are not changed.
