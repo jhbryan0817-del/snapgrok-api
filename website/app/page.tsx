@@ -48,7 +48,7 @@ export default function HomePage() {
           <h1 id="hero-title">
             Capture in silence,
             <br />
-            stay in your flow.
+            Stay Undetected.
           </h1>
           <p className="hero-description">
             SneakSolve turns a keyboard shortcut into a clear MCQ answer,
