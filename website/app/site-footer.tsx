@@ -11,7 +11,6 @@ export function SiteFooter() {
             <small>Capture in silence.</small>
           </span>
         </Link>
-
         <nav className="footer-nav" aria-label="Footer navigation">
           <Link href="/pricing">Pricing</Link>
           <Link href="/affiliate">Affiliate Marketing</Link>
@@ -19,12 +18,11 @@ export function SiteFooter() {
           <Link href="/account">Account</Link>
         </nav>
       </div>
-
       <div className="site-footer-legal shell">
         <p>&copy; {new Date().getFullYear()} SneakSolve. All rights reserved.</p>
         <p>
-          Grok is a trademark of xAI. SneakSolve is an independent product and
-          is not affiliated with or endorsed by xAI.
+          Grok is a trademark of xAI. SneakSolve is an independent product and is not affiliated with or
+          endorsed by xAI.
         </p>
       </div>
     </footer>

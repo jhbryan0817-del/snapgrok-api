@@ -1,15 +1,9 @@
-SNEAKSOLVE WEBSITE V5.3.0 - UPLOAD NOTES
+SNEAKSOLVE WEBSITE REPLACEMENT
 
-1. Back up the current repository website directory.
-2. Extract the v5.3.0 website ZIP.
-3. Upload every extracted item into the existing repository website directory.
-4. Replace matching files, including package.json and package-lock.json.
-5. Confirm the final path is website/app/page.tsx, not website/website/app/page.tsx.
-6. Keep all Render environment-variable values unchanged.
-7. Deploy the latest commit and confirm the Render build succeeds.
-8. Test /, /pricing, /affiliate, /privacy, /account, sign-in, sign-out, and
-   the extension popup.
+1. Extract this zip.
+2. In the GitHub repository, replace the existing website folder with the website folder included here.
+3. Do not upload node_modules, .next, or .env.local.
+4. Commit and push the replacement.
+5. Render should redeploy automatically from the existing website root directory.
 
-This package changes only the website. It does not change the server,
-extension, Clerk production instance, Chrome extension ID, or session-sync
-architecture.
+Only the website folder is included. The extension and server are not changed.

@@ -10,9 +10,10 @@ export function SiteHeader({ activeItem }: { activeItem?: HeaderItem }) {
         <img src="/sneaksolve-icons/default.png" alt="" />
         <span>SneakSolve</span>
       </Link>
-
       <nav className="primary-nav" aria-label="Primary navigation">
-        <Link className={activeItem === "pricing" ? "active" : ""} href="/pricing">Pricing</Link>
+        <Link className={activeItem === "pricing" ? "active" : ""} href="/pricing">
+          Pricing
+        </Link>
         <Link className={activeItem === "affiliate" ? "active" : ""} href="/affiliate">
           Affiliate Marketing
         </Link>
@@ -20,7 +21,6 @@ export function SiteHeader({ activeItem }: { activeItem?: HeaderItem }) {
           Privacy Policy
         </Link>
       </nav>
-
       <AccountNav />
     </header>
   );

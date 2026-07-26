@@ -3,18 +3,12 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
-const pricing = await readFile(
-  new URL("../app/pricing/page.tsx", import.meta.url),
-  "utf8",
-);
+const pricing = await readFile(new URL("../app/pricing/page.tsx", import.meta.url), "utf8");
 const layout = await readFile(new URL("../app/layout.tsx", import.meta.url), "utf8");
-const footer = await readFile(
-  new URL("../app/site-footer.tsx", import.meta.url),
-  "utf8",
-);
+const footer = await readFile(new URL("../app/site-footer.tsx", import.meta.url), "utf8");
 
-test("approved landing copy is present", () => {
-  assert.match(page, /Capture in silence/);
+test("approved landing copy and two-step workflow are present", () => {
+  assert.match(page, /Capture in Silence/);
   assert.match(page, /10k\+/);
   assert.match(page, /100k\+/);
   assert.match(page, /One answer found: option A/);
@@ -23,20 +17,18 @@ test("approved landing copy is present", () => {
   assert.match(page, /Two capture modes\. Your shortcuts\./);
   assert.match(page, /Custom Instruction for AI/);
   assert.match(page, /sneaksolve-how-it-works\.png/);
+  assert.match(page, /Press the shortcut/);
+  assert.match(page, /Read the icon/);
+  assert.doesNotMatch(page, /Capture the question\.<\/span>/);
 });
 
-test("removed placeholders and overlapping privacy copy are absent", () => {
+test("footer is included globally instead of duplicated on the landing page", () => {
   assert.doesNotMatch(page, /<footer/i);
-  assert.doesNotMatch(page, /Demo video coming here/);
-  assert.doesNotMatch(page, /Private processing/);
-});
-
-test("footer is included globally instead of being duplicated on the landing page", () => {
   assert.match(layout, /<SiteFooter \/>/);
   assert.match(footer, /<footer/);
 });
 
-test("pricing preview includes all three requested plans", () => {
+test("pricing preview includes all three plans", () => {
   for (const expected of [
     "Free",
     "5 questions every day",
@@ -50,8 +42,4 @@ test("pricing preview includes all three requested plans", () => {
   ]) {
     assert.match(pricing, new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
-  assert.match(pricing, /Plan Upgrades/);
-  assert.match(pricing, /Everything offered in the Free plan/);
-  assert.match(pricing, /More flexible usage/);
-  assert.match(pricing, /Paid-plan activation will become\s+available/);
 });

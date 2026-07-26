@@ -1,56 +1,31 @@
-# SneakSolve website v5.3.0
+# SneakSolve website v5.3.1
 
-Render-ready redesign of the SneakSolve marketing and account website.
+Render-ready SneakSolve marketing and account website.
 
-## What changed in v5.3.0
+## Changes in v5.3.1
 
-- Simplified the header to Pricing, Affiliate Marketing, and Privacy Policy.
-- Added a compact global footer with core links and xAI trademark attribution.
-- Updated pricing copy and made Ultra the Most Popular plan.
-- Added a preview of the planned 20% affiliate program.
-- Added a product-aligned working privacy-policy draft.
-
-## Preserved production behavior
-
-- The required Clerk production Publishable Key and Frontend API origin.
-- Website-to-extension session synchronization through Clerk.
-- Signed-in profile menu, Manage account, and immediate sign-out.
-- Login and registration completion return to `/account`.
-- Production CSP and security headers.
-- No server or extension source is included or changed.
-
-## Routes
-
-- `/` - redesigned landing page
-- `/pricing` - presentation-only plan comparison
-- `/affiliate` - planned affiliate-program preview
-- `/privacy` - working privacy-policy draft
-- `/account` - Clerk sign-in or signed-in account management
-- `/account?mode=sign-up` - Clerk registration
-- `/sign-in` and `/sign-up` - compatibility routes returning to `/account`
+- Replaced the Inconclusive icon with a white question mark on a yellow rounded-square background.
+- Replaced the Error icon with a white exclamation mark on a red rounded-square background.
+- Replaced the homepage illustration with a two-step workflow:
+  1. Press the shortcut.
+  2. Read the icon.
+- The example question remains unanswered on the page; answer B appears only in the pinned Chrome extension icon.
+- Clerk authentication, account management, security headers, pricing, affiliate, and privacy pages remain unchanged.
 
 ## Local validation
 
 ```bash
 npm ci
+npm run test
 npm run lint
-npm test
 npm run build
 ```
 
-Use Node.js 22.13 or newer, below 23, matching the Render runtime.
+Use Node.js 22.13 or newer, below 23.
 
 ## Render
 
-Keep the existing environment variables:
-
-```text
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_live_...
-NEXT_PUBLIC_CLERK_FRONTEND_API_URL=https://clerk.sneaksolve.com
-NEXT_PUBLIC_SITE_URL=https://www.sneaksolve.com
-```
-
-Settings remain:
+Keep the existing settings:
 
 ```text
 Root Directory: website
@@ -58,4 +33,12 @@ Build Command: npm ci && npm run build
 Start Command: npm start
 ```
 
-See `DEPLOYMENT_GUIDE.md` for the complete replacement and rollback process.
+Keep the existing public environment variables:
+
+```text
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_live_...
+NEXT_PUBLIC_CLERK_FRONTEND_API_URL=https://clerk.sneaksolve.com
+NEXT_PUBLIC_SITE_URL=https://www.sneaksolve.com
+```
+
+Never add a Clerk secret key or xAI API key to this website folder.

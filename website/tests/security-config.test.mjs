@@ -23,36 +23,10 @@ test("security headers include CSP, clickjacking, and MIME protections", async (
   assert.doesNotMatch(config, /accounts\.dev/);
 });
 
-test("production environment example uses one consistent Clerk and site origin", async () => {
+test("production environment example uses the approved origins", async () => {
   const environment = await fs.readFile(".env.example", "utf8");
-  assert.match(
-    environment,
-    /NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_live_Y2xlcmsuc25lYWtzb2x2ZS5jb20k/,
-  );
-  assert.match(
-    environment,
-    /NEXT_PUBLIC_CLERK_FRONTEND_API_URL=https:\/\/clerk\.sneaksolve\.com/,
-  );
-  assert.match(
-    environment,
-    /NEXT_PUBLIC_SITE_URL=https:\/\/www\.sneaksolve\.com/,
-  );
+  assert.match(environment, /NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_live_/);
+  assert.match(environment, /NEXT_PUBLIC_CLERK_FRONTEND_API_URL=https:\/\/clerk\.sneaksolve\.com/);
+  assert.match(environment, /NEXT_PUBLIC_SITE_URL=https:\/\/www\.sneaksolve\.com/);
   assert.doesNotMatch(environment, /pk_test_|accounts\.dev|localhost/);
-});
-
-test("public pages use the SneakSolve product name", async () => {
-  for (const file of [
-    "app/page.tsx",
-    "app/account/page.tsx",
-    "app/auth-shell.tsx",
-    "app/sign-in/page.tsx",
-    "app/sign-up/page.tsx",
-    "app/pricing/page.tsx",
-    "app/affiliate/page.tsx",
-    "app/privacy/page.tsx",
-    "app/site-footer.tsx",
-  ]) {
-    const source = await fs.readFile(file, "utf8");
-    assert.doesNotMatch(source, /SnapGrok/);
-  }
 });

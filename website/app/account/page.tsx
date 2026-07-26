@@ -9,11 +9,8 @@ type AccountMode = "sign-in" | "sign-up";
 
 function requestedMode(): AccountMode {
   if (typeof window === "undefined") return "sign-in";
-  return new URLSearchParams(window.location.search).get("mode") === "sign-up"
-    ? "sign-up"
-    : "sign-in";
+  return new URLSearchParams(window.location.search).get("mode") === "sign-up" ? "sign-up" : "sign-in";
 }
-
 function subscribeToModeChange(callback: () => void) {
   window.addEventListener("popstate", callback);
   return () => window.removeEventListener("popstate", callback);
@@ -21,11 +18,7 @@ function subscribeToModeChange(callback: () => void) {
 
 export default function AccountPage() {
   const { isLoaded, isSignedIn, user } = useUser();
-  const mode = useSyncExternalStore(
-    subscribeToModeChange,
-    requestedMode,
-    () => "sign-in" as AccountMode,
-  );
+  const mode = useSyncExternalStore(subscribeToModeChange, requestedMode, () => "sign-in" as AccountMode);
 
   if (!isLoaded) {
     return (
@@ -63,63 +56,32 @@ export default function AccountPage() {
 
   const name = user?.firstName || user?.fullName || "there";
   const email = user?.primaryEmailAddress?.emailAddress || "Signed-in account";
-
   return (
     <main className="account-page">
       <div className="account-aurora" aria-hidden="true" />
       <SiteHeader />
-      <section className="account-welcome">
+      <section className="account-welcome shell">
         <div>
           <span className="section-kicker">YOUR SNEAKSOLVE ACCOUNT</span>
           <h1>Good to see you, {name}.</h1>
-          <p>
-            Manage your profile, passwords, connected sign-in methods, and active sessions from one secure place.
-          </p>
+          <p>Manage your profile, passwords, connected sign-in methods, and active sessions from one secure place.</p>
         </div>
         <div className="account-status-card">
           <span className="account-status-dot" aria-hidden="true" />
-          <div>
-            <strong>Signed in and ready</strong>
-            <p>{email}</p>
-          </div>
+          <div><strong>Signed in and ready</strong><p>{email}</p></div>
         </div>
       </section>
-
-      <section className="account-summary-grid" aria-label="Account overview">
-        <article>
-          <span className="account-card-icon" aria-hidden="true">01</span>
-          <div>
-            <strong>Extension access</strong>
-            <p>Make sure you have downloaded the extension. Open it, and you are ready to go.</p>
-          </div>
-        </article>
-        <article>
-          <span className="account-card-icon" aria-hidden="true">02</span>
-          <div>
-            <strong>Security controls</strong>
-            <p>Review passwords, connected accounts, and active devices below.</p>
-          </div>
-        </article>
-        <article>
-          <span className="account-card-icon" aria-hidden="true">03</span>
-          <div>
-            <strong>Quick sign out</strong>
-            <p>Open your profile menu in the top-right corner whenever you need it.</p>
-          </div>
-        </article>
+      <section className="account-summary-grid shell" aria-label="Account overview">
+        <article><span className="account-card-icon" aria-hidden="true">01</span><div><strong>Extension access</strong><p>Make sure you have downloaded the extension. Open it, and you are ready to go.</p></div></article>
+        <article><span className="account-card-icon" aria-hidden="true">02</span><div><strong>Security controls</strong><p>Review passwords, connected accounts, and active devices below.</p></div></article>
+        <article><span className="account-card-icon" aria-hidden="true">03</span><div><strong>Quick sign out</strong><p>Open your profile menu in the top-right corner whenever you need it.</p></div></article>
       </section>
-
-      <section className="account-settings-section" aria-labelledby="account-settings-title">
+      <section className="account-settings-section shell" aria-labelledby="account-settings-title">
         <div className="account-settings-heading">
-          <div>
-            <span className="section-kicker">PROFILE &amp; SECURITY</span>
-            <h2 id="account-settings-title">Your account details</h2>
-          </div>
+          <div><span className="section-kicker">PROFILE &amp; SECURITY</span><h2 id="account-settings-title">Your account details</h2></div>
           <p>Changes are handled securely through Clerk and apply to your SneakSolve session.</p>
         </div>
-        <div className="profile-shell" aria-label="SneakSolve account settings">
-          <UserProfile routing="hash" />
-        </div>
+        <div className="profile-shell" aria-label="SneakSolve account settings"><UserProfile routing="hash" /></div>
       </section>
     </main>
   );
