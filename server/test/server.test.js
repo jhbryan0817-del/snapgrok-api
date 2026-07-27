@@ -8,6 +8,8 @@ import {
 } from "../src/server.js";
 
 const EXTENSION_ORIGIN = "chrome-extension://abcdefghijklmnopabcdefghijklmnop";
+const WEBSITE_ORIGIN = "https://www.sneaksolve.com";
+const OPERATION_ID = "11111111-1111-4111-8111-111111111111";
 
 function testConfig() {
   return createConfig({
@@ -57,10 +59,11 @@ test("health endpoint reveals no secret configuration", async () => {
     );
     assert.deepEqual(await response.json(), {
       ok: true,
-      version: "5.2.0",
+      version: "5.3.0",
       service: "sneaksolve-api",
       authRequired: true,
       persistentRequestStorage: false,
+      billingMode: "off",
     });
   });
 });
@@ -126,6 +129,209 @@ test("analyze accepts a valid authenticated extension request", async () => {
     });
     assert.equal(authenticateCalls, 2);
   });
+});
+
+test("billing status is authenticated and available to the website origin", async () => {
+  let statusUserId = "";
+  await withServer(
+    {
+      config: billingRouteConfig(),
+      billing: billingStub({
+        status: async (userId) => {
+          statusUserId = userId;
+          return {
+            billingEnabled: true,
+            mode: "test",
+            plan: { id: "free", allowance: 5, cadence: "day" },
+            usage: {
+              allowance: 5,
+              consumed: 1,
+              reserved: 0,
+              remaining: 4,
+              resetsAt: "2026-07-28T00:00:00.000Z",
+            },
+            subscription: null,
+          };
+        },
+      }),
+    },
+    async (baseUrl) => {
+      const response = await fetch(`${baseUrl}/api/billing/status`, {
+        headers: {
+          Origin: WEBSITE_ORIGIN,
+          Authorization: "Bearer test-token",
+        },
+      });
+      assert.equal(response.status, 200);
+      assert.equal(response.headers.get("access-control-allow-origin"), WEBSITE_ORIGIN);
+      const payload = await response.json();
+      assert.equal(payload.ok, true);
+      assert.equal(payload.plan.id, "free");
+      assert.equal(payload.usage.remaining, 4);
+      assert.equal(statusUserId, "user_test");
+    },
+  );
+});
+
+test("checkout is rejected from the extension even though its origin is API-allowed", async () => {
+  let checkoutCalls = 0;
+  await withServer(
+    {
+      config: billingRouteConfig(),
+      billing: billingStub({
+        createCheckout: async () => {
+          checkoutCalls += 1;
+          return { url: "https://sneaksolve.lemonsqueezy.com/checkout/example" };
+        },
+      }),
+    },
+    async (baseUrl) => {
+      const response = await fetch(`${baseUrl}/api/billing/checkout`, {
+        method: "POST",
+        headers: {
+          Origin: EXTENSION_ORIGIN,
+          Authorization: "Bearer test-token",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ plan: "plus" }),
+      });
+      assert.equal(response.status, 403);
+      assert.equal((await response.json()).code, "BILLING_ORIGIN_NOT_ALLOWED");
+      assert.equal(checkoutCalls, 0);
+    },
+  );
+});
+
+test("analyze reserves and consumes exactly one quota operation", async () => {
+  const calls = [];
+  await withServer(
+    {
+      billing: billingStub({
+        reserveAnalysis: async (input) => {
+          calls.push(["reserve", input]);
+          return {
+            allowed: true,
+            model: "grok-4.5",
+            reservation: { operationId: input.operationId },
+          };
+        },
+        consumeAnalysis: async (input) => {
+          calls.push(["consume", input]);
+          return true;
+        },
+        releaseAnalysis: async (input) => {
+          calls.push(["release", input]);
+          return true;
+        },
+      }),
+    },
+    async (baseUrl) => {
+      const response = await fetch(
+        `${baseUrl}/api/analyze`,
+        requestOptions({ ...validBody(), operationId: OPERATION_ID }),
+      );
+      assert.equal(response.status, 200);
+    },
+  );
+
+  assert.deepEqual(calls.map(([name]) => name), ["reserve", "consume"]);
+  assert.equal(calls[0][1].operationId, OPERATION_ID);
+  assert.equal(calls[0][1].userId, "user_test");
+  assert.equal(calls[1][1].reservation.operationId, OPERATION_ID);
+});
+
+test("analyze releases a reserved quota operation when xAI fails", async () => {
+  const calls = [];
+  const upstreamError = Object.assign(new Error("upstream failed"), {
+    status: 502,
+    code: "XAI_UPSTREAM_ERROR",
+  });
+  await withServer(
+    {
+      billing: billingStub({
+        reserveAnalysis: async (input) => {
+          calls.push(["reserve", input]);
+          return {
+            allowed: true,
+            model: "grok-4.5",
+            reservation: { operationId: input.operationId },
+          };
+        },
+        consumeAnalysis: async (input) => {
+          calls.push(["consume", input]);
+        },
+        releaseAnalysis: async (input) => {
+          calls.push(["release", input]);
+          return true;
+        },
+      }),
+      analyze: async () => {
+        throw upstreamError;
+      },
+    },
+    async (baseUrl) => {
+      const response = await fetch(
+        `${baseUrl}/api/analyze`,
+        requestOptions({ ...validBody(), operationId: OPERATION_ID }),
+      );
+      assert.equal(response.status, 502);
+      assert.equal((await response.json()).code, "XAI_UPSTREAM_ERROR");
+    },
+  );
+
+  assert.deepEqual(calls.map(([name]) => name), ["reserve", "release"]);
+  assert.equal(calls[1][1].reservation.operationId, OPERATION_ID);
+});
+
+test("quota exhaustion is returned without calling xAI", async () => {
+  let analyzeCalls = 0;
+  const quotaError = Object.assign(
+    new Error("Your plan quota has been reached."),
+    {
+      status: 429,
+      code: "QUOTA_EXHAUSTED",
+      quota: {
+        planId: "free",
+        allowance: 5,
+        used: 5,
+        reserved: 0,
+        resetsAt: new Date("2026-07-28T00:00:00.000Z"),
+      },
+    },
+  );
+  await withServer(
+    {
+      billing: billingStub({
+        reserveAnalysis: async () => {
+          throw quotaError;
+        },
+      }),
+      analyze: async () => {
+        analyzeCalls += 1;
+      },
+    },
+    async (baseUrl) => {
+      const response = await fetch(
+        `${baseUrl}/api/analyze`,
+        requestOptions({ ...validBody(), operationId: OPERATION_ID }),
+      );
+      assert.equal(response.status, 429);
+      assert.deepEqual(await response.json(), {
+        ok: false,
+        error: "Your plan quota has been reached.",
+        code: "QUOTA_EXHAUSTED",
+        requestId: response.headers.get("x-request-id"),
+        quota: {
+          plan: "free",
+          allowance: 5,
+          used: 5,
+          reserved: 0,
+          resetsAt: "2026-07-28T00:00:00.000Z",
+        },
+      });
+      assert.equal(analyzeCalls, 0);
+    },
+  );
 });
 
 test("analyze accepts empty or omitted optional context", async () => {
@@ -495,6 +701,43 @@ test("NODE_ENV=production enables production Clerk enforcement by default", () =
   );
 });
 
+test("the supplied Lemon Squeezy test rollout identifiers pass fail-closed configuration", () => {
+  const config = createConfig({
+    NODE_ENV: "production",
+    XAI_API_KEY: "xai-test-placeholder",
+    XAI_MODEL: "grok-4.5",
+    ALLOWED_XAI_MODELS: "grok-4.3,grok-4.5",
+    MOCK_XAI: "false",
+    CLERK_SECRET_KEY: "sk_live_placeholder",
+    CLERK_PUBLISHABLE_KEY: "pk_live_placeholder",
+    REQUIRE_PRODUCTION_CLERK: "true",
+    ALLOWED_ORIGINS: `${EXTENSION_ORIGIN},${WEBSITE_ORIGIN}`,
+    CLERK_AUTHORIZED_PARTIES: `${EXTENSION_ORIGIN},${WEBSITE_ORIGIN}`,
+    REQUIRE_ALLOWED_ORIGIN: "true",
+    BILLING_MODE: "test",
+    BILLING_TESTER_USER_IDS:
+      "user_3Gz7yVU8kEhL2wq9r1I7MWOmLHz,user_3GxBDK6RNVw9loNv9eTxVMC05yO",
+    BILLING_WEBSITE_ORIGIN: WEBSITE_ORIGIN,
+    DATABASE_URL:
+      "postgresql://sneaksolve:password@internal-postgres/sneaksolve",
+    LEMONSQUEEZY_API_KEY: "test_api_key_placeholder_value",
+    LEMONSQUEEZY_WEBHOOK_SECRET:
+      "0123456789abcdef0123456789abcdef",
+    LEMONSQUEEZY_STORE_ID: "439517",
+    LEMONSQUEEZY_PRODUCT_ID: "1247816",
+    LEMONSQUEEZY_PLUS_VARIANT_ID: "1950632",
+    LEMONSQUEEZY_ULTRA_VARIANT_ID: "1950672",
+    LEMONSQUEEZY_STORE_URL: "https://sneaksolve.lemonsqueezy.com",
+  });
+
+  assert.doesNotThrow(() => validateRuntimeConfig(config));
+  assert.equal(config.lemonStoreId, "439517");
+  assert.equal(config.lemonProductId, "1247816");
+  assert.equal(config.lemonPlusVariantId, "1950632");
+  assert.equal(config.lemonUltraVariantId, "1950672");
+  assert.equal(config.billingTesterUserIds.size, 2);
+});
+
 function requestOptions(body) {
   return {
     method: "POST",
@@ -523,5 +766,51 @@ function baseEnvironment() {
     MAX_CONCURRENT_REQUESTS_PER_USER: "2",
     MAX_REQUEST_MB: "1",
     MOCK_XAI: "true",
+  };
+}
+
+function billingRouteConfig() {
+  return createConfig({
+    ...baseEnvironment(),
+    ALLOWED_ORIGINS: `${EXTENSION_ORIGIN},${WEBSITE_ORIGIN}`,
+    CLERK_AUTHORIZED_PARTIES: `${EXTENSION_ORIGIN},${WEBSITE_ORIGIN}`,
+    BILLING_WEBSITE_ORIGIN: WEBSITE_ORIGIN,
+  });
+}
+
+function billingStub(overrides = {}) {
+  return {
+    async initialize() {},
+    async close() {},
+    async maintenance() {},
+    async status() {
+      return {
+        billingEnabled: false,
+        mode: "legacy",
+        plan: null,
+        usage: null,
+        subscription: null,
+      };
+    },
+    async reserveAnalysis({ defaultModel }) {
+      return {
+        allowed: true,
+        model: defaultModel,
+        reservation: null,
+        planId: "legacy",
+      };
+    },
+    async consumeAnalysis() {},
+    async releaseAnalysis() {},
+    async createCheckout() {
+      throw new Error("not implemented");
+    },
+    async customerPortal() {
+      throw new Error("not implemented");
+    },
+    async handleWebhook() {
+      throw new Error("not implemented");
+    },
+    ...overrides,
   };
 }

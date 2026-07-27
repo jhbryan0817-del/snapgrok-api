@@ -3,7 +3,13 @@ import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createAuthenticator } from "./auth.js";
+import {
+  createBillingService,
+  createBypassBillingService,
+} from "./billing-service.js";
+import { createPostgresBillingStore } from "./billing-store.js";
 import { loadEnv } from "./env.js";
+import { createLemonSqueezyClient } from "./lemon-squeezy.js";
 import { UserRateLimiter } from "./rate-limit.js";
 import { analyzeScreenshot, getPrepaidBalance } from "./xai.js";
 
@@ -172,6 +178,85 @@ export function createConfig(environment = process.env) {
       8192,
       65536,
     ),
+
+    billingMode: enumFrom(
+      environment,
+      "BILLING_MODE",
+      "off",
+      new Set(["off", "test", "live"]),
+    ),
+    billingTesterUserIds: new Set(
+      parseCsv(environment.BILLING_TESTER_USER_IDS),
+    ),
+    billingWebsiteOrigin: String(
+      environment.BILLING_WEBSITE_ORIGIN || "",
+    ).trim().replace(/\/$/, ""),
+    databaseUrl: String(environment.DATABASE_URL || "").trim(),
+    databasePoolMax: boundedInteger(
+      environment,
+      "DATABASE_POOL_MAX",
+      10,
+      1,
+      50,
+    ),
+    databaseConnectionTimeoutMs: boundedInteger(
+      environment,
+      "DATABASE_CONNECTION_TIMEOUT_MS",
+      5000,
+      1000,
+      30000,
+    ),
+    databaseStatementTimeoutMs: boundedInteger(
+      environment,
+      "DATABASE_STATEMENT_TIMEOUT_MS",
+      10000,
+      1000,
+      60000,
+    ),
+    lemonApiKey: String(environment.LEMONSQUEEZY_API_KEY || "").trim(),
+    lemonWebhookSecret: String(
+      environment.LEMONSQUEEZY_WEBHOOK_SECRET || "",
+    ).trim(),
+    lemonStoreId: positiveId(environment.LEMONSQUEEZY_STORE_ID),
+    lemonProductId: positiveId(environment.LEMONSQUEEZY_PRODUCT_ID),
+    lemonPlusVariantId: positiveId(
+      environment.LEMONSQUEEZY_PLUS_VARIANT_ID,
+    ),
+    lemonUltraVariantId: positiveId(
+      environment.LEMONSQUEEZY_ULTRA_VARIANT_ID,
+    ),
+    lemonStoreUrl: String(
+      environment.LEMONSQUEEZY_STORE_URL || "",
+    ).trim().replace(/\/$/, ""),
+    billingApiTimeoutMs: boundedInteger(
+      environment,
+      "BILLING_API_TIMEOUT_MS",
+      10000,
+      1000,
+      30000,
+    ),
+    billingWebhookMaxBytes:
+      boundedInteger(
+        environment,
+        "BILLING_WEBHOOK_MAX_KB",
+        256,
+        16,
+        1024,
+      ) * 1024,
+    billingReservationTtlMs: boundedInteger(
+      environment,
+      "BILLING_RESERVATION_TTL_MS",
+      300000,
+      60000,
+      900000,
+    ),
+    billingWebhookRetentionDays: boundedInteger(
+      environment,
+      "BILLING_WEBHOOK_RETENTION_DAYS",
+      30,
+      1,
+      90,
+    ),
   };
 }
 
@@ -245,6 +330,89 @@ export function validateRuntimeConfig(config) {
     throw new Error("HEADERS_TIMEOUT_MS cannot exceed REQUEST_TIMEOUT_MS.");
   }
 
+  if (config.billingMode !== "off") {
+    const missingBilling = [];
+    for (const [name, value] of [
+      ["DATABASE_URL", config.databaseUrl],
+      ["BILLING_WEBSITE_ORIGIN", config.billingWebsiteOrigin],
+      ["LEMONSQUEEZY_API_KEY", config.lemonApiKey],
+      ["LEMONSQUEEZY_WEBHOOK_SECRET", config.lemonWebhookSecret],
+      ["LEMONSQUEEZY_STORE_ID", config.lemonStoreId],
+      ["LEMONSQUEEZY_PRODUCT_ID", config.lemonProductId],
+      ["LEMONSQUEEZY_PLUS_VARIANT_ID", config.lemonPlusVariantId],
+      ["LEMONSQUEEZY_ULTRA_VARIANT_ID", config.lemonUltraVariantId],
+      ["LEMONSQUEEZY_STORE_URL", config.lemonStoreUrl],
+    ]) {
+      if (!value) missingBilling.push(name);
+    }
+    if (missingBilling.length) {
+      throw new Error(
+        `Billing configuration is missing: ${missingBilling.join(", ")}.`,
+      );
+    }
+    if (
+      config.billingMode === "test" &&
+      config.billingTesterUserIds.size === 0
+    ) {
+      throw new Error(
+        "BILLING_MODE=test requires at least one BILLING_TESTER_USER_IDS value.",
+      );
+    }
+    for (const userId of config.billingTesterUserIds) {
+      if (!/^user_[A-Za-z0-9]{10,80}$/.test(userId)) {
+        throw new Error(
+          "BILLING_TESTER_USER_IDS contains an invalid Clerk user ID.",
+        );
+      }
+    }
+    if (
+      config.lemonPlusVariantId === config.lemonUltraVariantId ||
+      !/^[1-9]\d*$/.test(config.lemonStoreId) ||
+      !/^[1-9]\d*$/.test(config.lemonProductId) ||
+      !/^[1-9]\d*$/.test(config.lemonPlusVariantId) ||
+      !/^[1-9]\d*$/.test(config.lemonUltraVariantId)
+    ) {
+      throw new Error(
+        "Lemon Squeezy store, product, and distinct variant IDs are required.",
+      );
+    }
+    if (
+      config.lemonWebhookSecret.length < 24 ||
+      config.lemonWebhookSecret.length > 128
+    ) {
+      throw new Error(
+        "LEMONSQUEEZY_WEBHOOK_SECRET must contain 24 to 128 characters.",
+      );
+    }
+    if (config.lemonApiKey.length < 20) {
+      throw new Error("LEMONSQUEEZY_API_KEY has an invalid length.");
+    }
+    requireDatabaseUrl(config.databaseUrl);
+    requireExactHttpsOrigin(
+      config.billingWebsiteOrigin,
+      "BILLING_WEBSITE_ORIGIN",
+    );
+    requireExactHttpsOrigin(
+      config.lemonStoreUrl,
+      "LEMONSQUEEZY_STORE_URL",
+    );
+    if (
+      !config.allowedOrigins.has(config.billingWebsiteOrigin) ||
+      !config.clerkAuthorizedParties.includes(config.billingWebsiteOrigin)
+    ) {
+      throw new Error(
+        "BILLING_WEBSITE_ORIGIN must be included in ALLOWED_ORIGINS and CLERK_AUTHORIZED_PARTIES.",
+      );
+    }
+    for (const requiredModel of ["grok-4.3", "grok-4.5"]) {
+      if (!config.allowedModels.has(requiredModel)) {
+        throw new Error(
+          `Billing requires ${requiredModel} in ALLOWED_XAI_MODELS.`,
+        );
+      }
+    }
+  }
+
   for (const [name, origins] of [
     ["ALLOWED_ORIGINS", [...config.allowedOrigins]],
     ["CLERK_AUTHORIZED_PARTIES", config.clerkAuthorizedParties],
@@ -272,7 +440,8 @@ export function createSneakSolveServer({
   getBalance = getPrepaidBalance,
   limiter,
   globalLimiter,
-  resolveAnalysisAccess = defaultAnalysisAccess,
+  resolveAnalysisAccess,
+  billing,
 } = {}) {
   const authenticateRequest =
     authenticate ||
@@ -303,11 +472,21 @@ export function createSneakSolveServer({
       maxTrackedUsers: 1,
       scope: "global",
     });
+  const billingService = billing || createBillingRuntime(config);
 
   const cleanupTimer = setInterval(
     () => {
       userRateLimiter.cleanupExpired?.();
       globalRequestLimiter.cleanupExpired?.();
+      void billingService.maintenance?.().catch((error) => {
+        console.error(
+          JSON.stringify({
+            timestamp: new Date().toISOString(),
+            code: publicErrorCode(error),
+            operation: "billing_maintenance",
+          }),
+        );
+      });
     },
     5 * 60 * 1000,
   );
@@ -348,13 +527,136 @@ export function createSneakSolveServer({
             200,
             {
               ok: true,
-              version: "5.2.0",
+              version: "5.3.0",
               service: "sneaksolve-api",
               authRequired: true,
-              persistentRequestStorage: false,
+              persistentRequestStorage:
+                config.billingMode === "off"
+                  ? false
+                  : "billing-metadata-only",
+              billingMode: config.billingMode,
             },
             requestId,
           );
+          return;
+        }
+
+        if (
+          request.method === "POST" &&
+          url.pathname === "/api/billing/webhook"
+        ) {
+          requireSingleRequestHeader(request, "x-signature");
+          requireSingleRequestHeader(request, "x-event-name");
+          const rawBody = await readRawBody(
+            request,
+            config.billingWebhookMaxBytes,
+            config.requestBodyTimeoutMs,
+            "application/json",
+          );
+          const result = await billingService.handleWebhook({
+            rawBody,
+            signature: request.headers["x-signature"],
+            headerEventName: request.headers["x-event-name"],
+          });
+          sendJson(
+            config,
+            request,
+            response,
+            200,
+            { ok: true, ...result },
+            requestId,
+          );
+          return;
+        }
+
+        if (
+          request.method === "GET" &&
+          url.pathname === "/api/billing/status"
+        ) {
+          enforceOrigin(config, request);
+          const releaseGlobalLimit =
+            globalRequestLimiter.acquire("protected-api");
+          try {
+            const auth = await authenticateRequest(request);
+            const status = await billingService.status(auth.userId);
+            sendJson(
+              config,
+              request,
+              response,
+              200,
+              { ok: true, ...status },
+              requestId,
+            );
+          } finally {
+            releaseGlobalLimit();
+          }
+          return;
+        }
+
+        if (
+          request.method === "POST" &&
+          url.pathname === "/api/billing/checkout"
+        ) {
+          enforceOrigin(config, request);
+          enforceBillingWebsiteOrigin(config, request);
+          const releaseGlobalLimit =
+            globalRequestLimiter.acquire("protected-api");
+          try {
+            const auth = await authenticateRequest(request);
+            const body = await readJsonBody(config, request);
+            validateCheckoutRequest(body);
+            const checkout = await billingService.createCheckout({
+              userId: auth.userId,
+              planId: body.plan,
+              email: body.email,
+              name: body.name,
+            });
+            sendJson(
+              config,
+              request,
+              response,
+              200,
+              { ok: true, ...checkout },
+              requestId,
+            );
+          } finally {
+            releaseGlobalLimit();
+          }
+          return;
+        }
+
+        if (
+          request.method === "POST" &&
+          url.pathname === "/api/billing/portal"
+        ) {
+          enforceOrigin(config, request);
+          enforceBillingWebsiteOrigin(config, request);
+          const releaseGlobalLimit =
+            globalRequestLimiter.acquire("protected-api");
+          try {
+            const auth = await authenticateRequest(request);
+            const body = await readJsonBody(config, request);
+            if (Object.keys(body).length !== 0) {
+              throw httpError(
+                400,
+                "Billing portal request must be empty.",
+                "BILLING_PORTAL_REQUEST_INVALID",
+              );
+            }
+            const portal = await billingService.customerPortal({
+              userId: auth.userId,
+            });
+            sendJson(
+              config,
+              request,
+              response,
+              200,
+              { ok: true, ...portal },
+              requestId,
+            );
+          } finally {
+            releaseGlobalLimit();
+          }
           return;
         }
 
@@ -390,6 +692,8 @@ export function createSneakSolveServer({
             const releaseRateLimit = userRateLimiter.acquire(auth.userId);
             const downstreamController = new AbortController();
             let body = null;
+            let access = null;
+            let reservationSettled = false;
 
             const abortDownstream = () => {
               if (!response.writableEnded) {
@@ -403,19 +707,26 @@ export function createSneakSolveServer({
             response.once("close", abortDownstream);
 
             try {
-              const access = validateAnalysisAccess(
-                config,
-                await resolveAnalysisAccess({
-                  userId: auth.userId,
-                  sessionId: auth.sessionId,
-                  organizationId: auth.organizationId || null,
-                  requestId,
-                  defaultModel: config.model,
-                }),
-              );
-
               body = await readJsonBody(config, request);
               validateAnalyzeRequest(config, body);
+
+              access = validateAnalysisAccess(
+                config,
+                await (resolveAnalysisAccess
+                  ? resolveAnalysisAccess({
+                      userId: auth.userId,
+                      sessionId: auth.sessionId,
+                      organizationId: auth.organizationId || null,
+                      operationId: body.operationId || null,
+                      requestId,
+                      defaultModel: config.model,
+                    })
+                  : billingService.reserveAnalysis({
+                      userId: auth.userId,
+                      operationId: body.operationId,
+                      defaultModel: config.model,
+                    })),
+              );
 
               const result = await analyze({
                 apiKey: config.apiKey,
@@ -431,6 +742,12 @@ export function createSneakSolveServer({
                 signal: downstreamController.signal,
               });
 
+              await billingService.consumeAnalysis({
+                userId: auth.userId,
+                reservation: access.reservation || null,
+              });
+              reservationSettled = true;
+
               if (!downstreamController.signal.aborted && !response.writableEnded) {
                 // Re-check Clerk after the potentially long xAI call. A session
                 // ended while analysis was running must not receive the result.
@@ -445,6 +762,24 @@ export function createSneakSolveServer({
                 );
               }
             } finally {
+              if (
+                access?.reservation &&
+                !reservationSettled
+              ) {
+                await billingService.releaseAnalysis({
+                  userId: auth.userId,
+                  reservation: access.reservation,
+                }).catch((error) => {
+                  console.error(
+                    JSON.stringify({
+                      timestamp: new Date().toISOString(),
+                      requestId,
+                      code: publicErrorCode(error),
+                      operation: "billing_reservation_release",
+                    }),
+                  );
+                });
+              }
               request.off("aborted", abortDownstream);
               response.off("close", abortDownstream);
               releaseRateLimit();
@@ -488,6 +823,7 @@ export function createSneakSolveServer({
             error: publicErrorMessage(error),
             code: errorCode,
             requestId,
+            ...(publicQuota(error) ? { quota: publicQuota(error) } : {}),
           },
           requestId,
           retryAfterSeconds ? { "Retry-After": retryAfterSeconds } : {},
@@ -496,7 +832,11 @@ export function createSneakSolveServer({
     },
   );
 
-  server.once("close", () => clearInterval(cleanupTimer));
+  server.once("close", () => {
+    clearInterval(cleanupTimer);
+    void billingService.close?.().catch(() => {});
+  });
+  server.billingService = billingService;
   server.headersTimeout = config.headersTimeoutMs;
   server.requestTimeout = config.requestTimeoutMs;
   server.keepAliveTimeout = config.keepAliveTimeoutMs;
@@ -506,10 +846,6 @@ export function createSneakSolveServer({
 
 // Compatibility alias for earlier tests and integrations.
 export const createSnapGrokServer = createSneakSolveServer;
-
-async function defaultAnalysisAccess({ defaultModel }) {
-  return { allowed: true, model: defaultModel };
-}
 
 function validateAnalysisAccess(config, access) {
   if (!access || access.allowed !== true) {
@@ -525,7 +861,31 @@ function validateAnalysisAccess(config, access) {
       "ANALYSIS_ACCESS_INVALID",
     );
   }
-  return { model: access.model };
+  return {
+    model: access.model,
+    reservation: access.reservation || null,
+    planId: access.planId || "legacy",
+  };
+}
+
+export function createBillingRuntime(config) {
+  if (config.billingMode === "off") {
+    return createBypassBillingService(config);
+  }
+  const store = createPostgresBillingStore({
+    connectionString: config.databaseUrl,
+    poolMax: config.databasePoolMax,
+    connectionTimeoutMs: config.databaseConnectionTimeoutMs,
+    statementTimeoutMs: config.databaseStatementTimeoutMs,
+  });
+  const lemonClient = createLemonSqueezyClient({
+    apiKey: config.lemonApiKey,
+    storeId: config.lemonStoreId,
+    storeUrl: config.lemonStoreUrl,
+    testMode: config.billingMode === "test",
+    timeoutMs: config.billingApiTimeoutMs,
+  });
+  return createBillingService({ config, store, lemonClient });
 }
 
 function parseCsv(value) {
@@ -557,6 +917,42 @@ function isExactSafeOrigin(value) {
   );
 }
 
+function requireExactHttpsOrigin(value, name) {
+  let url;
+  try {
+    url = new URL(value);
+  } catch {
+    throw new Error(`${name} must be an exact HTTPS origin.`);
+  }
+  if (
+    url.protocol !== "https:" ||
+    url.origin !== value ||
+    url.username ||
+    url.password
+  ) {
+    throw new Error(`${name} must be an exact HTTPS origin.`);
+  }
+}
+
+function requireDatabaseUrl(value) {
+  let url;
+  try {
+    url = new URL(value);
+  } catch {
+    throw new Error("DATABASE_URL must be a PostgreSQL connection URL.");
+  }
+  if (
+    !["postgres:", "postgresql:"].includes(url.protocol) ||
+    !url.hostname ||
+    !url.username ||
+    !url.password ||
+    !url.pathname ||
+    url.pathname === "/"
+  ) {
+    throw new Error("DATABASE_URL must be a PostgreSQL connection URL.");
+  }
+}
+
 function boundedInteger(environment, name, fallback, minimum, maximum) {
   const raw = environment[name];
   if (raw == null || raw === "") return fallback;
@@ -566,6 +962,19 @@ function boundedInteger(environment, name, fallback, minimum, maximum) {
   const value = Number(raw);
   if (!Number.isSafeInteger(value) || value < minimum || value > maximum) {
     throw new Error(`${name} must be an integer between ${minimum} and ${maximum}.`);
+  }
+  return value;
+}
+
+function positiveId(value) {
+  const id = String(value || "").trim();
+  return /^[1-9]\d*$/.test(id) ? id : "";
+}
+
+function enumFrom(environment, name, fallback, allowed) {
+  const value = String(environment[name] || fallback).trim().toLowerCase();
+  if (!allowed.has(value)) {
+    throw new Error(`${name} must be one of: ${[...allowed].join(", ")}.`);
   }
   return value;
 }
@@ -644,6 +1053,69 @@ function enforceOrigin(config, request) {
   if (!isOriginAllowed(config, origin)) {
     throw httpError(403, "Request origin is not allowed.", "ORIGIN_NOT_ALLOWED");
   }
+}
+
+function enforceBillingWebsiteOrigin(config, request) {
+  if (requestOrigin(request) !== config.billingWebsiteOrigin) {
+    throw httpError(
+      403,
+      "Billing actions are only available from the SneakSolve website.",
+      "BILLING_ORIGIN_NOT_ALLOWED",
+    );
+  }
+}
+
+async function readRawBody(
+  request,
+  maximumBytes,
+  timeoutMs,
+  expectedContentType,
+) {
+  requireSingleRequestHeader(request, "content-type");
+  requireSingleRequestHeader(request, "content-length");
+  const contentType = String(request.headers["content-type"] || "")
+    .split(";", 1)[0]
+    .trim()
+    .toLowerCase();
+  if (contentType !== expectedContentType) {
+    throw httpError(
+      415,
+      `Content-Type must be ${expectedContentType}.`,
+      "UNSUPPORTED_CONTENT_TYPE",
+    );
+  }
+  const contentLength = request.headers["content-length"];
+  if (contentLength != null) {
+    if (!/^(?:0|[1-9]\d*)$/.test(String(contentLength))) {
+      throw httpError(400, "Content-Length is invalid.", "INVALID_CONTENT_LENGTH");
+    }
+    if (Number(contentLength) > maximumBytes) {
+      throw httpError(413, "Request body is too large.", "REQUEST_TOO_LARGE");
+    }
+  }
+
+  const chunks = [];
+  let total = 0;
+  const timeout = setTimeout(() => {
+    request.destroy(
+      httpError(408, "Request body timed out.", "REQUEST_BODY_TIMEOUT"),
+    );
+  }, timeoutMs);
+  try {
+    for await (const chunk of request) {
+      total += chunk.length;
+      if (total > maximumBytes) {
+        throw httpError(413, "Request body is too large.", "REQUEST_TOO_LARGE");
+      }
+      chunks.push(chunk);
+    }
+  } finally {
+    clearTimeout(timeout);
+  }
+  if (!chunks.length) {
+    throw httpError(400, "Request body is required.", "REQUEST_BODY_MISSING");
+  }
+  return Buffer.concat(chunks);
 }
 
 async function readJsonBody(config, request) {
@@ -756,6 +1228,44 @@ function validateAnalyzeRequest(config, body) {
   }
 }
 
+function validateCheckoutRequest(body) {
+  const allowedKeys = new Set(["plan", "email", "name"]);
+  if (Object.keys(body).some((key) => !allowedKeys.has(key))) {
+    throw httpError(
+      400,
+      "Checkout request contains unsupported fields.",
+      "BILLING_CHECKOUT_REQUEST_INVALID",
+    );
+  }
+  if (!["plus", "ultra"].includes(body.plan)) {
+    throw httpError(400, "Unknown paid plan.", "BILLING_PLAN_INVALID");
+  }
+  if (
+    body.email !== undefined &&
+    (
+      typeof body.email !== "string" ||
+      body.email.length > 254 ||
+      !/^[^\s@]{1,64}@[^\s@]{1,190}$/.test(body.email)
+    )
+  ) {
+    throw httpError(
+      400,
+      "Checkout email is invalid.",
+      "BILLING_EMAIL_INVALID",
+    );
+  }
+  if (
+    body.name !== undefined &&
+    (typeof body.name !== "string" || body.name.trim().length > 100)
+  ) {
+    throw httpError(
+      400,
+      "Checkout name is invalid.",
+      "BILLING_NAME_INVALID",
+    );
+  }
+}
+
 function requireSingleRequestHeader(request, name) {
   const distinct = request.headersDistinct?.[name];
   const fallback = request.headers?.[name];
@@ -843,6 +1353,22 @@ function publicErrorMessage(error) {
   return error?.message || "Internal server error.";
 }
 
+function publicQuota(error) {
+  const quota = error?.quota;
+  if (!quota || error?.code !== "QUOTA_EXHAUSTED") return null;
+  const resetsAt = new Date(quota.resetsAt);
+  if (!Number.isFinite(resetsAt.getTime())) return null;
+  return {
+    plan: ["free", "plus", "ultra"].includes(quota.planId)
+      ? quota.planId
+      : "free",
+    allowance: Math.max(0, Number(quota.allowance) || 0),
+    used: Math.max(0, Number(quota.used) || 0),
+    reserved: Math.max(0, Number(quota.reserved) || 0),
+    resetsAt: resetsAt.toISOString(),
+  };
+}
+
 function normalizeHttpStatus(value) {
   const status = Number(value);
   return Number.isInteger(status) && status >= 400 && status <= 599
@@ -859,6 +1385,7 @@ async function startServer() {
   const config = createConfig();
   validateRuntimeConfig(config);
   const server = createSneakSolveServer({ config });
+  await server.billingService.initialize();
   server.listen(config.port, "0.0.0.0", () => {
     console.log(`SneakSolve server is listening on port ${config.port}`);
     console.log(`Model: ${config.mockMode ? "mock-xai" : config.model}`);
@@ -867,7 +1394,12 @@ async function startServer() {
     console.log(
       `Per-user rate limit: ${config.rateLimitMaxRequests} requests per ${config.rateLimitWindowMs} ms`,
     );
-    console.log("Persistent request storage: disabled");
+    console.log(`Billing mode: ${config.billingMode}`);
+    console.log(
+      config.billingMode === "off"
+        ? "Persistent request storage: disabled"
+        : "Persistent storage: billing metadata only; screenshots and prompts are not stored",
+    );
   });
 }
 

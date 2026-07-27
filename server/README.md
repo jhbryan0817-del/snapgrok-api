@@ -1,118 +1,86 @@
-# SneakSolve API v5.2.0
+# SneakSolve API v5.3.0
 
-Render-ready API with Clerk authentication, exact-origin CORS, per-user abuse
-controls, downstream cancellation, and no persistent request-content storage.
+Render-ready API with production Clerk authentication, exact-origin CORS,
+PostgreSQL quotas, server-created Lemon Squeezy test checkout, signed webhook
+processing, abuse controls, and transient screenshot analysis.
 
-## Authentication boundary
+## API routes
 
-- `/api/analyze` and `/api/balance` require a Clerk session token.
-- Clerk validates the token signature, timing claims, production instance, and
-  identity claims.
-- Browser-minted tokens validate `azp` through Clerk `authorizedParties`.
-- Native Chrome tokens have no `azp` because Clerk mints them from an
-  `Authorization`-only request. They are accepted only when the API request
-  originates from the exact configured `chrome-extension://...` party.
-- The API asks Clerk's Backend API for the current session state before work.
-- The API checks the session again after xAI work and before returning a result,
-  so signing out during an analysis withholds that result.
-- Clerk outages fail closed with HTTP 503; inactive sessions receive HTTP 401.
-- `ALLOWED_ORIGINS` and `CLERK_AUTHORIZED_PARTIES` must list the exact
-  `chrome-extension://...` origin. CORS alone is defense-in-depth, not identity.
+| Route | Authentication | Purpose |
+|---|---|---|
+| `GET /api/health` | Public | Redacted health/version metadata |
+| `POST /api/analyze` | Clerk + allowed origin | Reserve quota and analyze one screenshot |
+| `GET /api/billing/status` | Clerk + allowed origin | Return server-authoritative plan/usage |
+| `POST /api/billing/checkout` | Clerk + exact website origin | Create an allowlisted paid checkout |
+| `POST /api/billing/portal` | Clerk + exact website origin | Retrieve a fresh signed customer portal URL |
+| `POST /api/billing/webhook` | Raw-body HMAC | Apply Lemon Squeezy subscription state |
+| `GET /api/balance` | Clerk admin only | Optional xAI prepaid balance |
 
-## Request and data protections
+## Security and data boundary
 
-- Authentication occurs before the screenshot body is read.
-- Missing, malformed, oversized, or duplicated security headers are rejected
-  before a Clerk network call.
-- Clerk calls, request bodies, HTTP headers, total requests, and xAI responses
-  have explicit time and size bounds.
-- JSON request size, image signatures, image data-URL type, instruction length,
-  and shortcut-name length are bounded.
-- Custom context is optional. The API always applies its default MCQ prompt,
-  mapping the first through fifth displayed choices to A through E regardless
-  of the labels printed in the image.
-- Disconnecting the extension aborts the in-flight xAI call and releases the
-  user's concurrency slot.
-- The xAI and Clerk secret keys stay server-side.
-- Screenshots, prompts, answers, page URLs, and tokens are not written to logs,
-  files, or a database. xAI requests set `store: false`.
-- Provider error details are converted to stable API codes and are not returned
-  to the extension.
+- Clerk verifies the production token and the API confirms the live session
+  before work and before returning an analysis result.
+- Native Chrome tokens without `azp` are accepted only from the exact
+  configured extension origin.
+- Screenshots, prompts, answers, tokens, and page content are not stored.
+- Billing storage contains Clerk IDs, Lemon Squeezy resource IDs/status/dates,
+  checkout intents, quota counters, operation UUIDs, and temporarily retained
+  signed webhook payloads.
+- Lemon Squeezy and PostgreSQL secrets remain server-side.
+- Checkout maps `plus`/`ultra` to fixed variant IDs; the browser cannot choose
+  provider IDs, model IDs, allowance, or entitlement.
+- Webhooks are HMAC-verified before parsing and then strictly validate event,
+  store, product, variant, resource, test mode, and Clerk checkout mapping.
+- PostgreSQL transactions reserve and settle quota atomically across API
+  processes.
+- In-memory per-user/global limits remain abuse guards, not subscription
+  quotas.
 
-## Abuse controls versus future subscription quotas
-
-The current per-user and global fixed-window controls are admission/abuse
-guards. They are held in memory inside one Node process, reset on restart, and
-do not coordinate across multiple Render instances. They must never be used as
-the Free/Plus/Ultra source of truth.
-
-The global default is deliberately a coarse 3,000-request-per-minute ceiling,
-not a customer quota. It limits authentication floods while avoiding a low
-application-wide threshold that a remote client could cheaply exhaust. Put a
-trusted edge rate limiter in front of the API before substantially increasing
-traffic; do not derive client IPs from arbitrary forwarded headers in this app.
-
-`createSneakSolveServer()` accepts a server-side `resolveAnalysisAccess` hook.
-Its returned model is checked against `ALLOWED_XAI_MODELS`; request fields can
-never choose a model. During Lemon Squeezy integration, replace the default
-hook with a database-backed entitlement lookup. Add a separate atomic usage
-reservation transaction immediately after request validation and before the
-xAI call. That transaction must:
-
-1. lock or atomically update the Clerk user's usage row;
-2. enforce the current entitlement and reset boundary;
-3. reserve one request with a unique request ID;
-4. select the model from a server-owned plan map;
-5. settle the reservation idempotently after the provider outcome.
-
-Webhook processing must update entitlements separately and idempotently. A
-webhook payload must never directly increment user quota without signature,
-event-ID, product/variant, status, and Clerk-user mapping validation.
-
-## Required Render environment variables
+## Render
 
 ```text
-XAI_API_KEY=...
-CLERK_SECRET_KEY=sk_live_... (Render only)
-CLERK_PUBLISHABLE_KEY=pk_live_Y2xlcmsuc25lYWtzb2x2ZS5jb20k
-REQUIRE_PRODUCTION_CLERK=true
-ALLOWED_ORIGINS=chrome-extension://pjfanaeopegobidkbpnlmeegmkmnabmk
-CLERK_AUTHORIZED_PARTIES=chrome-extension://pjfanaeopegobidkbpnlmeegmkmnabmk
-REQUIRE_ALLOWED_ORIGIN=true
+Root Directory: server
+Build Command: npm ci --ignore-scripts
+Start Command: npm run start:render
+Health Check: /api/health
+Node: 22.13.1
 ```
 
-`CLERK_JWT_KEY` is optional. Leave it blank unless you deliberately maintain a
-pinned public key and rotate it with Clerk. It does not replace
-`CLERK_SECRET_KEY`, because live session status requires the Backend API. See
-`.env.example` for limits and optional balance settings.
+The start command runs `scripts/migrate.js` before the server. Migrations are
+tracked in `schema_migrations` and protected by a PostgreSQL advisory lock.
 
-When `REQUIRE_PRODUCTION_CLERK=true`, startup rejects `sk_test_` or `pk_test_`
-credentials. This prevents a production Render deployment from silently
-returning to the development Clerk instance.
+See `.env.example` and the root `DEPLOYMENT_GUIDE.md`. Use Render's internal
+PostgreSQL URL. Never commit a populated `.env`.
 
-Security-sensitive booleans and numeric limits are parsed strictly. A typo now
-stops startup instead of silently disabling a control. Production Clerk mode
-also rejects `MOCK_XAI=true`, `REQUIRE_ALLOWED_ORIGIN=false`, and HTTP origins.
-See `.env.example` for the global admission, timeout, header, and model
-allowlist settings.
+## Quota behavior
 
-## Render settings
+- Free: 5 per UTC day, Grok 4.3.
+- Plus: 200 per successful subscription cycle, Grok 4.3.
+- Ultra: 300 per successful subscription cycle, Grok 4.5.
+- Successful xAI results consume; technical failure releases; inconclusive
+  consumes.
+- A stable operation UUID prevents duplicate consumption.
+- Successful renewal invoices advance the paid period. Retry changes to
+  `renews_at` cannot reset quota.
+- Lemon Squeezy access remains active in all statuses except `expired`;
+  cancelled access stops at `ends_at`.
 
-- Root directory: `server`
-- Runtime: Node
-- Build command: `npm ci --ignore-scripts`
-- Start command: `npm start`
-- Health check path: `/api/health`
-- Node version: 22.13.1 (tested; 20.9 or newer is supported)
-
-## Local checks
+## Local verification
 
 ```powershell
 npm.cmd ci --ignore-scripts
 npm.cmd run check
 npm.cmd test
-npm.cmd start
+npm.cmd audit --omit=dev --audit-level=low
 ```
 
-The `instruction` request field is now optional and may be an empty string.
-Authentication still requires `Authorization: Bearer <Clerk session token>`.
+The PostgreSQL transaction test skips unless `TEST_DATABASE_URL` is set. CI
+provides a disposable PostgreSQL 16 service and runs that test on every push
+and pull request.
+
+For reconciliation of already-mapped subscriptions:
+
+```powershell
+npm.cmd run billing:reconcile
+```
+
