@@ -1,0 +1,19 @@
+SNEAKSOLVE WEBSITE V5.5.0 - VERIFICATION
+
+Completed locally:
+- ESLint
+- 31/31 website/security/copy tests
+- TypeScript production compilation
+- Next.js production build for every route
+- npm dependency installation audit: 0 known vulnerabilities
+- production Clerk/site/API origin pinning
+- CSP connection restriction to the canonical API and Clerk hosts
+- no credential-shaped secrets in source
+- authenticated checkout and customer-portal client boundaries
+- account plan/usage panel
+- existing design, authentication redirects, footer, pages, and extension
+  synchronization retained
+
+Live Lemon Squeezy checkout and webhook behavior requires the Render secrets,
+PostgreSQL migration, and dashboard steps in the root DEPLOYMENT_GUIDE.md.
+
