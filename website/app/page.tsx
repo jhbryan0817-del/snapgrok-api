@@ -56,7 +56,7 @@ export default function HomePage() {
             Stay Focused
           </h1>
           <p className="hero-description">
-            SneakSolve analyzes your multiple-choice questions and delivers
+            SneakSolve analyzes on-screen multiple-choice questions and delivers
             answers instantly, without pulling you away from your tab.
           </p>
           <div className="hero-actions">
@@ -94,7 +94,7 @@ export default function HomePage() {
           <div className="stat-line">
             <strong>20k+</strong>
             <div>
-              <h2>active users</h2>
+              <h2>Active Users</h2>
               <p>Trusting SneakSolve every day</p>
             </div>
           </div>
@@ -105,8 +105,8 @@ export default function HomePage() {
           <div className="stat-line">
             <strong>300k+</strong>
             <div>
-              <h2>questions solved</h2>
-              <p>Answers delivered with less friction</p>
+              <h2>Questions Solved</h2>
+              <p>Answers delivered securely</p>
             </div>
           </div>
         </article>
