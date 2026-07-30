@@ -23,13 +23,13 @@ const answerStates = [
   },
   {
     icon: "/sneaksolve-icons/result-inconclusive.png",
-    iconClass: "state-icon-compact",
+    iconClass: "",
     title: "Inconclusive",
     description: "Not enough information to answer",
   },
   {
     icon: "/sneaksolve-icons/result-error.png",
-    iconClass: "state-icon-compact",
+    iconClass: "",
     title: "Error",
     description: "The answering process was interrupted",
   },
