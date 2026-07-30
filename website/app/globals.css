@@ -69,7 +69,7 @@ img { display: block; max-width: 100%; }
 .account-nav-loading { width: 136px; height: 44px; margin-left: auto; border-radius: 12px; background: linear-gradient(90deg,#f3f0fa,#fff,#f3f0fa); background-size: 200% 100%; animation: shimmer 1.3s linear infinite; }
 @keyframes shimmer { to { background-position: -200% 0; } }
 
-.hero { display: grid; grid-template-columns: .92fr 1.08fr; gap: 70px; align-items: center; padding-top: 82px; padding-bottom: 72px; }
+.hero { display: grid; grid-template-columns: .92fr 1.08fr; gap: 70px; align-items: center; padding-top: 45px; padding-bottom: 72px; }
 .hero-copy { padding-left: 8px; }
 .trust-pill { display: inline-flex; align-items: center; gap: 9px; padding: 8px 14px; border: 1px solid rgba(103, 56, 241, .12); border-radius: 999px; background: rgba(255,255,255,.7); color: var(--purple); font-weight: 700; font-size: 14px; box-shadow: 0 8px 25px rgba(88, 53, 156, .05); }
 .trust-pill svg { width: 18px; height: 18px; }
