@@ -451,8 +451,9 @@ img { display: block; max-width: 100%; }
   position: relative;
   z-index: 1;
   width: 100%;
-  aspect-ratio: 3 / 2;
-  object-fit: cover;
+  height: auto;
+  object-fit: contain;
+  object-position: center;
   border-radius: 20px;
 }
 .illustration-glow {
