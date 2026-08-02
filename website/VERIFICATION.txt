@@ -1,0 +1,20 @@
+SNEAKSOLVE WEBSITE V5.8.0 - VERIFICATION
+
+Completed locally:
+- ESLint
+- 38/38 website/security/copy/pricing-label tests
+- TypeScript production compilation
+- Next.js production build for every route
+- npm dependency installation audit: 0 known vulnerabilities
+- production Clerk/site/API origin pinning
+- CSP connection restriction to the canonical API and Clerk hosts
+- no credential-shaped secrets in source
+- authenticated Whop checkout and server-side cancellation boundaries
+- account plan/usage panel and live readiness indicator
+- plan-aware pricing labels with display-only subscription changes
+- affiliate route removed and landing-page copy/order updated
+- extension v5.2.2 read-only installation ping (unchanged)
+- authentication redirects and screenshot behavior retained
+
+Live Whop sandbox checkout and webhook behavior requires the Render secrets,
+PostgreSQL migration, and dashboard steps in the root DEPLOYMENT_GUIDE.md.
