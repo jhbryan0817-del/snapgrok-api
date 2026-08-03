@@ -1,0 +1,67 @@
+:root {
+  color-scheme: light;
+  font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --ink: #111827;
+  --muted: #667085;
+  --accent: #0549fd;
+  --line: #e4e7ec;
+}
+* { box-sizing: border-box; }
+body {
+  min-height: 100vh;
+  margin: 0;
+  color: var(--ink);
+  background:
+    radial-gradient(circle at 90% 0%, rgba(5,73,253,.15), transparent 34%),
+    #f7f9fc;
+}
+button, textarea { font: inherit; }
+.editor-shell { max-width: 760px; margin: 0 auto; padding: 34px; }
+.editor-header { display: flex; gap: 16px; align-items: flex-start; }
+.editor-mark {
+  display: grid;
+  flex: 0 0 auto;
+  width: 48px;
+  height: 48px;
+  place-items: center;
+  border-radius: 15px;
+  color: white;
+  background: linear-gradient(145deg, #0549fd, #003bd4);
+  box-shadow: 0 10px 24px rgba(5,73,253,.24);
+  font-size: 22px;
+  font-weight: 800;
+}
+.eyebrow { color: var(--accent); font-size: 10px; font-weight: 800; letter-spacing: .13em; text-transform: uppercase; }
+h1 { margin: 5px 0 7px; font-size: 25px; letter-spacing: -.035em; }
+.editor-header p { max-width: 560px; margin: 0; color: var(--muted); font-size: 13px; line-height: 1.5; }
+.editor-card {
+  margin-top: 24px;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: white;
+  box-shadow: 0 12px 30px rgba(20,28,45,.06);
+}
+label { display: block; margin-bottom: 10px; font-size: 13px; font-weight: 750; }
+textarea {
+  width: 100%;
+  min-height: 315px;
+  resize: vertical;
+  padding: 16px;
+  border: 1px solid #d9dde5;
+  border-radius: 13px;
+  outline: none;
+  color: #252b37;
+  background: #fafbfc;
+  font-size: 14px;
+  line-height: 1.6;
+  transition: border-color .15s ease, box-shadow .15s ease, background .15s ease;
+}
+textarea:focus { border-color: #6f95ff; background: white; box-shadow: 0 0 0 4px rgba(5,73,253,.11); }
+.textarea-meta { display: flex; justify-content: space-between; gap: 12px; margin-top: 9px; color: #8a93a3; font-size: 10px; }
+.actions { display: flex; align-items: center; justify-content: flex-end; gap: 10px; margin-top: 16px; }
+.actions p { flex: 1; min-height: 18px; margin: 0; font-size: 12px; }
+button { padding: 10px 15px; border-radius: 10px; font-size: 12px; font-weight: 750; cursor: pointer; }
+.secondary { border: 1px solid #d7dbe3; color: #344054; background: white; }
+.primary { border: 0; color: white; background: linear-gradient(135deg, #0549fd, #003bd4); box-shadow: 0 7px 18px rgba(5,73,253,.22); }
+button:focus-visible { outline: 3px solid rgba(5,73,253,.2); outline-offset: 2px; }
