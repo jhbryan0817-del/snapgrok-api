@@ -77,8 +77,8 @@ function requiredSiteOrigin(value: string | undefined): string {
   if (url.username || url.password || url.pathname !== "/" || url.search || url.hash) {
     throw new Error("NEXT_PUBLIC_SITE_URL must contain only the site origin.");
   }
-  if (process.env.NODE_ENV === "production" && url.hostname !== "www.sneaksolve.com") {
-    throw new Error("NEXT_PUBLIC_SITE_URL must use https://www.sneaksolve.com in production.");
+  if (process.env.NODE_ENV === "production" && url.hostname !== "www.zenaian.com") {
+    throw new Error("NEXT_PUBLIC_SITE_URL must use https://www.zenaian.com in production.");
   }
   return url.origin;
 }
