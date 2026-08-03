@@ -48,11 +48,11 @@ test("production environment example uses one consistent Clerk and site origin",
   );
   assert.match(
     environment,
-    /NEXT_PUBLIC_CLERK_FRONTEND_API_URL=https:\/\/clerk\.sneaksolve\.com/,
+    /NEXT_PUBLIC_CLERK_FRONTEND_API_URL=https:\/\/clerk\.zenaian\.com/,
   );
   assert.match(
     environment,
-    /NEXT_PUBLIC_SITE_URL=https:\/\/www\.sneaksolve\.com/,
+    /NEXT_PUBLIC_SITE_URL=https:\/\/www\.zenaian\.com/,
   );
   assert.match(
     environment,
@@ -84,10 +84,10 @@ test("production site, API, and Clerk origins are pinned", async () => {
   const proxy = await fs.readFile("proxy.ts", "utf8");
   const billingApi = await fs.readFile("app/billing-api.ts", "utf8");
   assert.match(provider, /must identify the same Clerk instance/);
-  assert.match(provider, /clerk\.sneaksolve\.com/);
-  assert.match(config, /www\.sneaksolve\.com/);
+  assert.match(provider, /clerk\.zenaian\.com/);
+  assert.match(config, /www\.zenaian\.com/);
   assert.match(config, /snapgrok-api\.onrender\.com/);
-  assert.match(layout, /www\.sneaksolve\.com/);
+  assert.match(layout, /www\.zenaian\.com/);
   assert.match(proxy, /snapgrok-api\.onrender\.com/);
   assert.match(billingApi, /snapgrok-api\.onrender\.com/);
 });
