@@ -71,9 +71,9 @@ function requiredClerkOrigin(value: string | undefined): string {
   ) {
     throw new Error("NEXT_PUBLIC_CLERK_FRONTEND_API_URL must be an HTTPS origin without a path.");
   }
-  if (process.env.NODE_ENV === "production" && url.hostname !== "clerk.sneaksolve.com") {
+  if (process.env.NODE_ENV === "production" && url.hostname !== "clerk.zenaian.com") {
     throw new Error(
-      "NEXT_PUBLIC_CLERK_FRONTEND_API_URL must use https://clerk.sneaksolve.com in production.",
+      "NEXT_PUBLIC_CLERK_FRONTEND_API_URL must use https://clerk.zenaian.com in production.",
     );
   }
   return url.origin;
