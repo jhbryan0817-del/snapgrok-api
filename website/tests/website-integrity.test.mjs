@@ -256,9 +256,9 @@ test("account readiness combines extension installation and server quota state",
   assert.doesNotMatch(account, /account-summary-grid|Extension access|Security controls|Quick sign out/);
   assert.match(extensionApi, /NEXT_PUBLIC_EXTENSION_ID/);
   assert.match(read(".env.example"), /jjgjlopdpefphgappfmkkkpiknpnoijb/);
-  assert.match(readiness, /SNEAKSOLVE_EXTENSION_PING/);
-  assert.match(readiness, /SNEAKSOLVE_EXTENSION_PAIRING_NONCE_REQUEST/);
-  assert.match(readiness, /SNEAKSOLVE_EXTENSION_PAIR/);
+  assert.match(readiness, /ZENAIAN_EXTENSION_PING/);
+  assert.match(readiness, /ZENAIAN_EXTENSION_PAIRING_NONCE_REQUEST/);
+  assert.match(readiness, /ZENAIAN_EXTENSION_PAIR/);
   assert.match(readiness, /status\.usage\.remaining <= 0/);
   assert.match(readiness, /Ready\. Make sure that your extension is pinned/);
   assert.match(readiness, /Please download the extension/);
