@@ -52,7 +52,7 @@ export default function HomePage() {
 
           <h1 id="hero-title">Ask in Silence, Stay Focused</h1>
           <p className="hero-description">
-            Zenaian analyzes on-screen multiple-choice questions and delivers
+            Zenaian analyzes your multiple-choice questions and delivers
             answers instantly, without pulling you away from your tab.
           </p>
           <div className="hero-actions">
