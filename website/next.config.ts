@@ -3,7 +3,7 @@ import type { NextConfig } from "next";
 requiredHttpsOrigin(
   process.env.NEXT_PUBLIC_CLERK_FRONTEND_API_URL,
   "NEXT_PUBLIC_CLERK_FRONTEND_API_URL",
-  "clerk.sneaksolve.com",
+  "clerk.zenaian.com",
 );
 requiredSiteOrigin(process.env.NEXT_PUBLIC_SITE_URL);
 requiredHttpsOrigin(
