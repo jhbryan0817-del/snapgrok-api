@@ -111,7 +111,7 @@ img { display: block; max-width: 100%; }
 .hero-copy { padding-left: 8px; }
 .trust-pill { display: inline-flex; align-items: center; gap: 9px; padding: 8px 14px; border: 1px solid rgba(5, 73, 253, .12); border-radius: 999px; background: rgba(255,255,255,.7); color: var(--blue); font-weight: 700; font-size: 14px; box-shadow: 0 8px 25px rgba(8, 23, 52, .05); }
 .trust-pill svg { width: 18px; height: 18px; }
-.hero h1 { margin: 28px 0 20px; max-width: 620px; font-size: clamp(44px, 4.4vw, 64px); line-height: 1.06; letter-spacing: -.058em; font-weight: 790; }
+.hero h1 { margin: 28px 0 20px; max-width: 680px; font-family: var(--font-eb-garamond), Georgia, serif; font-weight: 500; font-size: clamp(55px, 5.5vw, 80px); line-height: 1.02; letter-spacing: -0.012em !important; }
 .hero-description { max-width: 650px; margin: 0; color: var(--muted); font-size: clamp(15px, 1.2vw, 16.5px); line-height: 1.65; letter-spacing: -.01em; }
 .hero-actions { display: flex; align-items: center; gap: 18px; margin-top: 31px; }
 .primary-button, .secondary-button { min-height: 58px; display: inline-flex; align-items: center; justify-content: center; border-radius: 15px; font-size: 16px; font-weight: 750; }
