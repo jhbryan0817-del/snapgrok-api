@@ -3,12 +3,20 @@ import { headers } from "next/headers";
 import { ZenaianClerkProvider } from "./clerk-provider";
 import { MotionEnhancer } from "./motion-enhancer";
 import { SiteFooter } from "./site-footer";
+import { EB_Garamond } from "next/font/google";
 import "./globals.css";
 
 const siteOrigin = configuredSiteOrigin();
-const title = "Zenaian — Ask in silence";
+const title = "Zenaian | AI-Powered Education Tool";
 const description = "Zenaian is a fast, reliable, and private Chrome MCQ assistant with secure website-based account management.";
 const socialImage = `${siteOrigin}/og-zenaian.png`;
+
+const ebGaramond = EB_Garamond({
+  subsets: ["latin"],
+  weight: ["500"],
+  variable: "--font-eb-garamond",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteOrigin),
