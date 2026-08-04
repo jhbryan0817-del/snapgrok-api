@@ -195,9 +195,9 @@ export default function HomePage() {
           <span className="section-kicker">FRONTIER INTELLIGENCE</span>
           <h2 id="frontier-title">Powered by Grok 4.5.</h2>
           <p>
-            Built by SpaceXAI—the combined SpaceX and xAI organization—Grok 4.5
-            brings frontier reasoning to knowledge work. Zenaian uses it to
-            deliver precise answers quickly, keeping every confirmation on pace.
+            Built by xAI and trained by SpaceX, the Grok 4.5 brings
+            frontier reasoning to problems. Zenaian uses it to deliver
+            precise answers quickly, keeping every confirmation on pace.
           </p>
           <small>
             Zenaian is an independent product and is not affiliated with or
