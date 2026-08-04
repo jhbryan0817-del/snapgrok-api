@@ -40,7 +40,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
   }
   return (
     <html lang="en">
-      <body>
+      <body className={ebGaramond.variable}>
         <MotionEnhancer />
         <ZenaianClerkProvider nonce={nonce}>
           {children}
