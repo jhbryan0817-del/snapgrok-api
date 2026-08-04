@@ -77,7 +77,7 @@ export default function AccountPage() {
             <span className="section-kicker">YOUR ZENAIAN ACCOUNT</span>
             <h1>Good to see you, {name}.</h1>
             <p>
-              Manage your profile, passwords, connected sign-in methods, and active sessions from one secure place.
+              Manage your profile, passwords, subscriptions, and active sessions from one secure place.
             </p>
           </div>
           <AccountReadiness />
