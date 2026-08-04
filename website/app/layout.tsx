@@ -7,7 +7,7 @@ import { EB_Garamond } from "next/font/google";
 import "./globals.css";
 
 const siteOrigin = configuredSiteOrigin();
-const title = "Zenaian | AI-Powered Education Tool";
+const title = "zenaian | Effective Learning with AI";
 const description = "Zenaian is a fast, reliable, and private Chrome MCQ assistant with secure website-based account management.";
 const socialImage = `${siteOrigin}/og-zenaian.png`;
 
