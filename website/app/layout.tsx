@@ -6,7 +6,7 @@ import { SiteFooter } from "./site-footer";
 import "./globals.css";
 
 const siteOrigin = configuredSiteOrigin();
-const title = "Zenaian — Ask in silence";
+const title = "zenaian | Enrich Learning Experience";
 const description = "Zenaian is a fast, reliable, and private Chrome MCQ assistant with secure website-based account management.";
 const socialImage = `${siteOrigin}/og-zenaian.png`;
 
