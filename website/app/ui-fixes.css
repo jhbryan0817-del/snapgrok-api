@@ -1,5 +1,0 @@
-/*
-  Legacy compatibility file.
-  The previous broken patch imported this stylesheet separately. All active
-  website styling now lives in globals.css, and layout.tsx does not import this file.
-*/
