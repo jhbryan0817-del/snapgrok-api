@@ -47,7 +47,7 @@ export default function HomePage() {
         <div className="hero-copy reveal reveal-first" data-animate>
           <div className="trust-pill">
             <ShieldCheckIcon />
-            <span>Fast. Reliable. Private.</span>
+            <span>#1 AI MCQ Assistant</span>
           </div>
 
           <h1 id="hero-title">Ask in Silence, Stay Focused</h1>
