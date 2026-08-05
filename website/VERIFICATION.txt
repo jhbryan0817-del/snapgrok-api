@@ -1,0 +1,24 @@
+ZENAIAN WEBSITE V6.9.0 - VERIFICATION
+
+Completed locally:
+- ESLint
+- 42 website/security/copy/pricing-label tests
+- TypeScript production compilation
+- Next.js production build for every route
+- npm dependency audit: 0 known vulnerabilities
+- production Clerk/site/API origin pinning
+- CSP connection restriction to the canonical API and Clerk hosts
+- no credential-shaped secrets in source
+- authenticated Whop checkout, cancellation, and reactivation boundaries
+- one paid plan per Clerk account, with renewal cancellation before any later plan purchase
+- authenticated, sanitized payment-history dropdown
+- cancel/reactivate renewal labels and Expires on state
+- account plan/usage panel and live readiness indicator
+- extension v5.3.0 is unchanged; deploy API v5.8.0 first
+- favicon uses the existing icon; global header logo remains unchanged
+- EB Garamond is bundled locally rather than fetched during the Render build
+- /contact removed; global contact links use a mailto destination
+- Terms and Privacy working drafts updated to cover the current product
+
+Production payment and webhook behavior still requires the live Whop and
+Render tests in the root DEPLOYMENT_GUIDE.md.
