@@ -2112,7 +2112,7 @@ img { display: block; max-width: 100%; }
   top: -70px;
 }
 .hero {
-  padding-top: 16px;
+  padding-top: 32px;
 }
 .trust-pill {
   display: block;
@@ -2140,10 +2140,10 @@ img { display: block; max-width: 100%; }
 }
 
 @media (max-width: 900px) {
-  .hero { padding-top: 32px; }
+  .hero { padding-top: 16px; }
 }
 
 @media (max-width: 600px) {
   .brand .brand-logo > img { width: 166px; left: -30px; top: -76px; }
-  .hero { padding-top: 24px; }
+  .hero { padding-top: 16px; }
 }
