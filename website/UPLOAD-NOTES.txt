@@ -1,0 +1,9 @@
+ZENAIAN WEBSITE V6.10.0 - UPLOAD NOTES
+
+1. Replace the repository website directory with this package.
+2. Keep the path website/app/page.tsx, not website/website/app/page.tsx.
+3. Keep the five public environment variables in .env.example.
+4. Never add server-side secrets to the website service.
+5. Build with Node 22.13.1 and deploy.
+6. API v5.8.1 and extension v5.3.0 remain unchanged and need no redeployment.
+7. Run the post-deployment checks in the repository root DEPLOYMENT_GUIDE.md.
