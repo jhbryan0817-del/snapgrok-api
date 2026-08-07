@@ -61,7 +61,7 @@ export default function HomePage() {
       <section id="features" className="features-panel shell reveal" data-animate aria-labelledby="features-title">
         <div className="features-heading">
           <span className="section-kicker">BUILT AROUND YOUR WORKFLOW</span>
-          <h2 id="features-title">Make Zenaian work your way.</h2>
+          <h2 id="features-title">Comprehensive Customization.</h2>
           <p>Choose how you capture, then add the context that helps the AI reason with you.</p>
         </div>
 
@@ -95,12 +95,11 @@ export default function HomePage() {
       <section className="features-panel study-intelligence-panel shell reveal" data-animate aria-labelledby="study-intelligence-title">
         <div className="features-heading">
           <span className="section-kicker">FASTER STUDY, FRONTIER INTELLIGENCE</span>
-          <h2 id="study-intelligence-title">Simplify studying. Prepare for tests faster.</h2>
+          <h2 id="study-intelligence-title">Accelerate Test Preparation.</h2>
           <p>
-            Zenaian streamlines memorization-heavy study and test preparation by
+            Streamline memorization-heavy multiple-choice test preparation by
             turning a multi-step search into one quiet capture. It uses Grok 4.5,
-            one of the frontier and most capable AI models available, to reason
-            through each question and return a precise answer quickly.
+            one of the frontier and most capable AI models available today.
           </p>
         </div>
 
@@ -108,7 +107,7 @@ export default function HomePage() {
           <article className="feature-card study-speed-card interactive-card">
             <div className="feature-number">03</div>
             <div className="feature-copy">
-              <h3>Fewer steps between a question and understanding.</h3>
+              <h3>Fewer steps to confirm your understanding.</h3>
               <p>
                 Stay in your study flow while Zenaian removes the need to take a
                 screenshot, switch screens, paste the question, and navigate back.
@@ -139,7 +138,7 @@ export default function HomePage() {
             <div className="feature-copy">
               <h3>Powered by Grok 4.5.</h3>
               <p>
-                Grok 4.5 brings advanced reasoning and broad knowledge to every
+                Developed by SpaceXAI, Grok 4.5 brings advanced reasoning and broad knowledge to every
                 capture, helping Zenaian deliver clear, timely confirmations.
               </p>
             </div>
