@@ -1,0 +1,27 @@
+ZENAIAN WEBSITE V6.11.0 - VERIFICATION
+
+Completed locally:
+- ESLint
+- 45 website/security/copy/pricing-label tests
+- TypeScript production compilation
+- Next.js production build for every route
+- npm dependency audit: 0 known vulnerabilities
+- js-yaml patched from 4.3.0 to 4.3.1 for CVE-2026-59870
+- production Clerk/site/API origin pinning
+- CSP connection restriction to the canonical API and Clerk hosts
+- no credential-shaped secrets in source
+- authenticated Whop checkout, cancellation, reactivation, and payment-history boundaries unchanged
+- account plan/usage, readiness, Clerk authentication, and extension pairing logic unchanged
+- extension v5.3.0 and API v5.8.1 unchanged and compatible
+- deployed commit 8d95403 compared with local v6.10.0: only website presentation files changed
+- hero question and compact frame verified at desktop and mobile widths
+- hero toolbar states set to four seconds each, with reduced-motion fallback
+- Receive your answers opens on Processing and exposes the A-and-C multiple-answer tooltip
+- shortcut selectors and context editor verified as local-only, non-persistent previews
+- two-line manual workflow and sourced software-engineering benchmark charts verified
+- Pricing, Use Cases, Careers, Terms, and Privacy share the landing hero typography and card treatment
+- all public routes verified without horizontal overflow at desktop and 390px mobile widths
+
+Production Clerk, Whop, API, and extension behavior should receive a short
+post-deployment smoke test because local visual QA cannot replace live third-
+party integration checks.
