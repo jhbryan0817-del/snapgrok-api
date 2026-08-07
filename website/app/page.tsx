@@ -61,7 +61,7 @@ export default function HomePage() {
       <section id="features" className="features-panel shell reveal" data-animate aria-labelledby="features-title">
         <div className="features-heading">
           <span className="section-kicker">BUILT AROUND YOUR WORKFLOW</span>
-          <h2 id="features-title">Make Zenaian work your way.</h2>
+          <h2 id="features-title">Comprehensive Customizability.</h2>
           <p>Choose how you capture, then add the context that helps the AI reason with you.</p>
         </div>
 
@@ -95,12 +95,11 @@ export default function HomePage() {
       <section className="features-panel study-intelligence-panel shell reveal" data-animate aria-labelledby="study-intelligence-title">
         <div className="features-heading">
           <span className="section-kicker">FASTER STUDY, FRONTIER INTELLIGENCE</span>
-          <h2 id="study-intelligence-title">Simplify studying. Prepare for tests faster.</h2>
+          <h2 id="study-intelligence-title">Accelerate Test Preparation.</h2>
           <p>
             Zenaian streamlines memorization-heavy study and test preparation by
             turning a multi-step search into one quiet capture. It uses Grok 4.5,
-            one of the frontier and most capable AI models available, to reason
-            through each question and return a precise answer quickly.
+            one of the frontier and most capable AI models available.
           </p>
         </div>
 
