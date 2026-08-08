@@ -79,7 +79,7 @@ export default function HomePage() {
         <div className="feature-grid study-intelligence-grid">
           <article className="feature-card study-speed-card interactive-card">
             <div className="feature-copy">
-              <h3>Fewer steps between a question and understanding.</h3>
+              <h3>Accelerate Test Preparation.</h3>
               <p>
                 Capture the question and confirm the answer without switching
                 screens or leaving your study flow.
