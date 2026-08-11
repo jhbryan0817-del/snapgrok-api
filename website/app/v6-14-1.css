@@ -1,0 +1,208 @@
+/* v6.14.1 visual overrides load after the inherited landing-page design. */
+.answer-toolbar-active-icon > img.answer-toolbar-icon-default {
+  inset: 0;
+  width: 58px;
+  max-width: none;
+  height: 58px;
+  border-radius: 16px;
+  object-fit: cover;
+}
+.answer-toolbar-readout.is-default {
+  grid-template-columns: minmax(0, 1fr);
+}
+.answer-toolbar-readout.is-default .answer-toolbar-readout-copy {
+  grid-column: 1;
+}
+
+.study-speed-card {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+.study-speed-card > .feature-copy,
+.study-speed-card > .study-speed-stage {
+  position: relative;
+  z-index: 1;
+}
+.study-speed-stage {
+  grid-template-columns: minmax(330px, 1fr) minmax(185px, 220px) minmax(330px, 1fr);
+  gap: clamp(14px, 1.5vw, 20px);
+}
+.study-speed-stage .flowchart-step {
+  padding-inline: 7px;
+}
+.study-speed-stage .flowchart-step > span {
+  display: none;
+}
+.study-speed-stage .flowchart-step p {
+  display: grid;
+  height: 100%;
+  place-items: center;
+  margin: 0;
+  line-height: 1.2;
+}
+.study-motion-demo {
+  padding: 11px;
+}
+.motion-browser-screen,
+.zenaian-motion-question {
+  height: 300px;
+  min-height: 300px;
+}
+.manual-screen,
+.zenaian-motion-question {
+  gap: 8px;
+  padding: 17px 15px;
+}
+.manual-screen-question,
+.zenaian-motion-question {
+  grid-template-rows: auto auto repeat(4, minmax(34px, 1fr)) auto;
+  align-content: stretch;
+}
+.manual-screen strong,
+.zenaian-motion-question > strong {
+  overflow: hidden;
+  font-size: 12px;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.manual-screen-question span,
+.zenaian-motion-question > span {
+  min-height: 34px;
+  padding: 7px 10px;
+  font-size: 9.5px;
+}
+.manual-screen-question span > b,
+.zenaian-motion-question > span > b {
+  width: 20px;
+  flex-basis: 20px;
+  font-size: 9px;
+}
+.manual-screen-assistant {
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 12px;
+  padding: 17px;
+}
+.manual-assistant-heading b,
+.manual-paste-preview b {
+  width: auto;
+  justify-self: auto;
+  padding: 0;
+  border-radius: 0;
+  color: #202a3b;
+  background: transparent;
+}
+.manual-paste-preview b {
+  color: #3c4657;
+}
+.manual-conversation > .manual-ai-reply {
+  width: fit-content;
+  max-width: 88%;
+  justify-self: start;
+  padding: 8px 10px;
+  border: 1px solid rgba(5, 73, 253, .13);
+  border-radius: 3px 10px 10px 10px;
+  color: #244275;
+  background: #edf3ff;
+  line-height: 1.35;
+}
+.motion-next-question {
+  width: max-content;
+  min-width: 82px;
+  justify-self: end;
+  padding-inline: 10px;
+}
+.zenaian-motion-question > .zenaian-correct-choice {
+  animation: zenaian-workflow-choice var(--mini-workflow-duration) steps(1, end) infinite;
+}
+
+.account-heading-band {
+  grid-template-columns: minmax(0, 1fr) auto;
+  width: min(1120px, calc(100% - 36px));
+  min-height: clamp(108px, 9vw, 128px);
+  align-items: center;
+  padding-inline: 0;
+}
+.account-page-heading {
+  justify-self: start;
+  margin: 0;
+  text-align: left;
+}
+.account-page-heading .page-section-title {
+  white-space: nowrap;
+}
+.account-header-status {
+  width: auto;
+  justify-self: end;
+}
+.account-header-status .account-status-card {
+  width: max-content;
+  min-width: 0;
+  max-width: 100%;
+  white-space: nowrap;
+}
+.account-header-status .account-status-card p {
+  display: none;
+}
+.account-header-status .account-status-kind-ready,
+.account-header-status .account-status-kind-extension,
+.account-header-status .account-status-kind-credit,
+.account-header-status .account-status-kind-system {
+  width: max-content;
+}
+
+.careers-contact-inline {
+  margin-top: 26px;
+  padding: 22px 24px;
+  border-radius: 18px;
+}
+.careers-contact-inline h2 {
+  font-size: clamp(22px, 2.2vw, 29px);
+}
+
+@media (max-width: 1040px) {
+  .study-speed-stage {
+    grid-template-columns: minmax(265px, 1fr) minmax(180px, 210px) minmax(265px, 1fr);
+    gap: 13px;
+  }
+}
+@media (max-width: 880px) {
+  .study-speed-stage {
+    grid-template-columns: 1fr;
+  }
+  .study-motion-demo,
+  .study-speed-card .study-speed-stage .memorization-flow {
+    width: min(540px, 100%);
+  }
+  .account-heading-band {
+    grid-template-columns: 1fr;
+    min-height: 0;
+    gap: 18px;
+    padding-block: 24px;
+  }
+  .account-header-status {
+    justify-self: start;
+  }
+}
+@media (max-width: 600px) {
+  .motion-browser-screen,
+  .zenaian-motion-question {
+    height: 290px;
+    min-height: 290px;
+  }
+  .account-header-status .account-status-kind-ready,
+  .account-header-status .account-status-kind-extension,
+  .account-header-status .account-status-kind-credit,
+  .account-header-status .account-status-kind-system {
+    width: auto;
+    max-width: 100%;
+  }
+  .account-header-status .account-status-card > div {
+    display: flex;
+    white-space: nowrap;
+  }
+  .account-header-status .account-status-card strong {
+    font-size: 11px;
+  }
+}
