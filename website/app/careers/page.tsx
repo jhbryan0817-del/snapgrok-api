@@ -19,11 +19,11 @@ export default function CareersPage() {
 
       <section className="editorial-hero shell" aria-labelledby="careers-title">
         <span className="section-kicker">CAREERS AT ZENAIAN</span>
-        <h1 id="careers-title">Build the future of focused learning.</h1>
+        <h1 id="careers-title">We Keep Moving.</h1>
         <p>
-          Zenaian is a global education SaaS company based in Seoul, Korea.
+          Zenaian is a global education software company based in Seoul, Korea.
           We build reliable, privacy-conscious software that helps learners move
-          through multiple-choice study with less friction.
+          through with less friction.
         </p>
       </section>
 
