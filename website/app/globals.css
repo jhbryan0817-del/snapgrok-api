@@ -3999,10 +3999,12 @@ img { display: block; max-width: 100%; }
   box-shadow: 0 24px 60px rgba(17, 38, 79, .08);
 }
 .careers-openings-heading {
-  max-width: 620px;
+  max-width: 100%;
   margin-bottom: 32px;
 }
-.careers-openings-heading h2,
+.careers-openings-heading h2 {
+  max-width: 620px;
+}
 .careers-contact h2 {
   margin: 10px 0 0;
   color: var(--ink);
@@ -4015,6 +4017,7 @@ img { display: block; max-width: 100%; }
   color: var(--muted);
   font-size: 13px;
   line-height: 1.6;
+  white-space: nowrap;
 }
 .careers-position-list {
   border-top: 1px solid rgba(10, 38, 90, .11);
@@ -4133,6 +4136,9 @@ img { display: block; max-width: 100%; }
   .careers-openings {
     padding: 27px 21px;
     border-radius: 21px;
+  }
+  .careers-openings-heading p {
+    white-space: normal;
   }
   .careers-position-list > a {
     min-height: 74px;
