@@ -24,7 +24,7 @@ export default function HomePage() {
           <h1 id="hero-title">Ask in Silence, Stay Focused</h1>
           <span className="hero-copy-divider" aria-hidden="true" />
           <p className="hero-description">
-            <span>Analyze on-screen multiple-choice questions with Zenaian</span>
+            <span>Analyze on-screen multiple-choice questions with Zenaian.</span>
             <span>Get accurate answers instantly without leaving your tab.</span>
           </p>
         </div>
@@ -84,7 +84,7 @@ export default function HomePage() {
             </div>
             <div className="feature-copy">
               <h3>Accelerate Test Preparation</h3>
-              <p>Eliminate unnecessary steps - maximize your learning efficiency</p>
+              <p>Eliminate unnecessary steps - maximize your learning efficiency.</p>
             </div>
             <div className="study-speed-stage">
               <ManualWorkflowDemo />
@@ -120,7 +120,7 @@ export default function HomePage() {
           <article className="feature-card study-model-card interactive-card">
             <div className="feature-copy">
               <h3>Powered by Grok 4.5</h3>
-              <p>Zenaian promises accurate, instant answers from the highest-grade AI model</p>
+              <p>Zenaian strives for accurate, instant answers from a frontier AI model.</p>
             </div>
             <div className="benchmark-visual benchmark-visual-duo" aria-label="Grok 4.5 software engineering and response-speed comparisons">
               <section className="benchmark-chart benchmark-orb benchmark-swe" aria-labelledby="swe-marathon-title">
@@ -165,12 +165,12 @@ export default function HomePage() {
             <PrivacyItem icon={<TrashIcon />} title="Screenshots are not stored by Zenaian">
               Captured images are processed transiently,
               <br />
-              our application database never stores any of your images
+              our application database never stores any of your images.
             </PrivacyItem>
             <PrivacyItem icon={<EyeOffIcon />} title="A deliberately minimal workflow">
               Zenaian returns the result through the extension icon,
               <br />
-              minimizing unnecessary interface activities
+              minimizing unnecessary interface activities.
             </PrivacyItem>
           </div>
           <div className="privacy-disposal-illustration" aria-hidden="true">
