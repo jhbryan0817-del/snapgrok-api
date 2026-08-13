@@ -129,10 +129,10 @@ test("pricing preview includes all three requested plans", () => {
     "Free",
     "5 questions every day",
     "Plus",
-    "US$5",
+    "US$7",
     "200 questions every month",
     "Ultra",
-    "US$7",
+    "US$10",
     "300 questions every month",
     "Grok 4.5",
   ]) {
