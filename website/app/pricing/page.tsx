@@ -24,7 +24,7 @@ const plans = [
   {
     id: "plus",
     name: "Plus",
-    price: "US$5",
+    price: "US$7",
     cadence: "per month",
     allowance: "200 questions every month",
     reset: "Resets monthly",
@@ -41,7 +41,7 @@ const plans = [
   {
     id: "ultra",
     name: "Ultra",
-    price: "US$7",
+    price: "US$10",
     cadence: "per month",
     allowance: "300 questions every month",
     reset: "Resets monthly",
