@@ -1,0 +1,24 @@
+{
+  "name": "zenaian-api",
+  "version": "6.0.0",
+  "private": true,
+  "description": "Render-ready Zenaian backend with Clerk authentication, strict CORS, rate limiting, and no persistent request-data storage.",
+  "type": "module",
+  "scripts": {
+    "start": "node src/server.js",
+    "start:render": "npm start",
+    "dev": "node --watch src/server.js",
+    "migrate": "node scripts/migrate.js",
+    "privacy:preflight": "node scripts/privacy-preflight.js",
+    "billing:reconcile": "node scripts/reconcile-billing.js",
+    "check": "node --check src/server.js && node --check src/auth.js && node --check src/device-auth.js && node --check src/device-session-store.js && node --check src/analysis-jobs.js && node --check src/rate-limit.js && node --check src/xai.js && node --check src/env.js && node --check src/billing-policy.js && node --check src/billing-service.js && node --check src/whop-billing-store.js && node --check src/whop.js && node --check src/privacy-store.js && node --check src/privacy-service.js && node --check scripts/migrate.js && node --check scripts/privacy-preflight.js && node --check scripts/reconcile-billing.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "@clerk/backend": "^3.11.7",
+    "pg": "8.16.3"
+  },
+  "engines": {
+    "node": ">=20.9.0"
+  }
+}
