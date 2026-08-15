@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Zenaian</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="app-header">
+        <div class="brand-mark" aria-hidden="true"><span>z</span></div>
+        <div class="brand-copy">
+          <h1>Zenaian</h1>
+          <p>MCQ capture assistant</p>
+        </div>
+        <span id="authStatus" class="status-pill checking"><span></span>Checking</span>
+      </header>
+
+      <section id="authLoading" class="auth-card" aria-live="polite">
+        <span class="auth-spinner" aria-hidden="true"></span>
+        <div>
+          <h2>Checking your account</h2>
+          <p>Zenaian is securely restoring your session.</p>
+        </div>
+      </section>
+
+      <section id="signedOutView" class="auth-card signed-out" hidden>
+        <span class="eyebrow">Zenaian account</span>
+        <h2>Sign in to start capturing</h2>
+        <p>Your sign-in and account details are handled on the Zenaian website.</p>
+        <button id="signIn" class="primary-button auth-button" type="button">
+          Log in or sign up
+        </button>
+        <small>The website will open in a new tab. Reopen this popup after signing in.</small>
+      </section>
+
+      <div id="signedInView" hidden>
+        <section class="account-strip" aria-label="Signed-in account">
+          <div>
+            <span class="eyebrow">Signed in</span>
+            <strong id="accountEmail">Zenaian user</strong>
+          </div>
+          <button id="manageAccount" class="ghost-button" type="button">Manage account</button>
+        </section>
+
+      <section class="section-block" aria-labelledby="captureHeading">
+        <div class="section-heading">
+          <div>
+            <span class="eyebrow">Capture</span>
+            <h2 id="captureHeading">Choose how to scan</h2>
+          </div>
+        </div>
+
+        <div class="capture-grid">
+          <article class="capture-card">
+            <div class="capture-icon full-icon" aria-hidden="true"></div>
+            <div class="capture-copy">
+              <h3>Visible tab</h3>
+              <p>Capture the whole visible webpage.</p>
+            </div>
+            <div class="shortcut-control">
+              <div class="shortcut-line">
+                <kbd id="fullShortcut">Loading…</kbd>
+                <button id="assignFull" class="ghost-button" type="button">Change</button>
+              </div>
+              <small id="fullShortcutNote" class="shortcut-note" hidden>
+                Chrome uses Ctrl+Shift+A for Tab Search. Choose another shortcut.
+              </small>
+            </div>
+          </article>
+
+          <article class="capture-card">
+            <div class="capture-icon zone-icon" aria-hidden="true"></div>
+            <div class="capture-copy">
+              <h3>Select area</h3>
+              <p>Drag over only the question you need.</p>
+            </div>
+            <div class="shortcut-line">
+              <kbd id="zoneShortcut">Loading…</kbd>
+              <button id="assignZone" class="ghost-button" type="button">Change</button>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="instruction-card" aria-labelledby="instructionHeading">
+        <div class="instruction-header">
+          <div>
+            <span class="eyebrow">Add Context</span>
+            <h2 id="instructionHeading">Custom Instruction for AI</h2>
+          </div>
+          <button id="editInstruction" class="primary-button" type="button">Edit</button>
+        </div>
+        <p id="instructionPreview" class="instruction-preview">Using Zenaian's default instruction. Add optional context if needed.</p>
+      </section>
+
+      <section class="result-card" aria-labelledby="resultHeading">
+        <div class="section-heading compact">
+          <div>
+            <span class="eyebrow">Toolbar results</span>
+            <h2 id="resultHeading">One glance, no popup</h2>
+          </div>
+        </div>
+        <div class="result-strip">
+          <div class="result-item"><img src="icons/result-a32.png" alt="" /><span>Single answer</span></div>
+          <div class="result-item"><img src="icons/result-multi-232.png" alt="" /><span>Multiple answers</span></div>
+          <div class="result-item"><img src="icons/processing32.png" alt="" /><span>Processing</span></div>
+          <div class="result-item"><img src="icons/result-inconclusive32.png" alt="" /><span>Inconclusive</span></div>
+          <div class="result-item"><img src="icons/result-error32.png" alt="" /><span>Error</span></div>
+        </div>
+      </section>
+
+      </div>
+
+      <footer class="privacy-note" aria-label="AI and privacy notice">
+        <span class="privacy-dot" aria-hidden="true"></span>
+        <div>
+          <p>Zenaian uses generative AI (xAI Grok) to generate proposed answers from submitted screenshots.</p>
+          <p>Screenshots are transmitted only when you initiate a capture; the extension does not save them.</p>
+          <p class="privacy-warning">Do not submit screenshots containing identifiable sensitive personal information or credentials.</p>
+        </div>
+      </footer>
+
+      <p id="message" class="message" role="status"></p>
+    </main>
+
+    <script src="auth-config.js"></script>
+    <script src="settings.js"></script>
+    <script src="popup.js"></script>
+  </body>
+</html>
