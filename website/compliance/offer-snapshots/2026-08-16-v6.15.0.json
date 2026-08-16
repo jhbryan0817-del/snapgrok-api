@@ -1,0 +1,35 @@
+{
+  "capturedAt": "2026-08-16T00:00:00.000Z",
+  "websiteVersion": "6.15.0",
+  "currency": "USD",
+  "plans": [
+    {
+      "id": "free",
+      "price": 0,
+      "cadence": "forever",
+      "allowance": "5 questions every UTC day",
+      "model": "Grok 4.3"
+    },
+    {
+      "id": "plus",
+      "price": 7,
+      "cadence": "monthly automatic renewal",
+      "allowance": "200 questions per subscription period",
+      "model": "Grok 4.3"
+    },
+    {
+      "id": "ultra",
+      "price": 10,
+      "cadence": "monthly automatic renewal",
+      "allowance": "300 questions per subscription period",
+      "model": "Grok 4.5"
+    }
+  ],
+  "sourceFiles": [
+    "app/pricing/page.tsx",
+    "app/terms/page.tsx",
+    "app/privacy/page.tsx",
+    "WHOP_CHECKOUT_TERMS.md"
+  ],
+  "externalCheckoutEvidenceRequired": true
+}
