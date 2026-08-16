@@ -42,9 +42,26 @@ test("deletion clears the Clerk session and preserves a local receipt", () => {
   const panel = read("app/account/privacy-panel.tsx");
   const receipt = read("app/account-deleted/page.tsx");
   assert.match(panel, /zenaianDeletionReceipt/);
+  assert.match(panel, /deletionRedirectFallback/);
+  assert.match(panel, /2_500/);
   assert.match(panel, /signOut\(\{ redirectUrl: "\/account-deleted" \}\)/);
   assert.match(panel, /window\.location\.replace\("\/account-deleted"\)/);
   assert.match(receipt, /signOut\(\{ redirectUrl: "\/account-deleted" \}\)/);
+});
+
+test("Clerk reverification renders above the account deletion confirmation", () => {
+  const provider = read("app/clerk-provider.tsx");
+  const styles = read("app/globals.css");
+  const clerkLayer = Number(
+    /modalBackdrop:\s*\{\s*zIndex:\s*([\d_]+)/.exec(provider)?.[1]
+      ?.replaceAll("_", ""),
+  );
+  const deletionLayer = Number(
+    /\.privacy-modal-backdrop\s*\{[\s\S]*?z-index:\s*(\d+)/.exec(styles)?.[1],
+  );
+  assert.ok(Number.isFinite(clerkLayer));
+  assert.ok(Number.isFinite(deletionLayer));
+  assert.ok(clerkLayer > deletionLayer);
 });
 
 test("account deletion requires four acknowledgements and exact typed DELETE", () => {

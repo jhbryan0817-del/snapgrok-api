@@ -16,6 +16,15 @@ export function ZenaianClerkProvider({
       signInUrl="/sign-in"
       signUpUrl="/sign-up"
       afterSignOutUrl="/"
+      appearance={{
+        elements: {
+          // Account deletion intentionally uses a high application overlay.
+          // Clerk's reverification prompt must remain above it so a server
+          // AUTH_REVERIFICATION_REQUIRED response cannot look like a hung
+          // submission while the verification UI is hidden underneath.
+          modalBackdrop: { zIndex: 30_000 },
+        },
+      }}
     >
       {children}
     </ClerkProvider>

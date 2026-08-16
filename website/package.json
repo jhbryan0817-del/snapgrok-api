@@ -1,6 +1,6 @@
 {
   "name": "zenaian-website",
-  "version": "6.15.1",
+  "version": "6.15.2",
   "private": true,
   "engines": {
     "node": ">=22.13.0 <23"

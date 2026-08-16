@@ -179,14 +179,23 @@ function DeleteAccountModal({
         "zenaianDeletionReceipt",
         JSON.stringify(nextReceipt),
       );
-      await clearExtensionAccessBeforeSignOut(() =>
-        getToken({ skipCache: true }));
+      // The API has already deleted the remote Clerk user at this point. Start
+      // a hard-navigation fallback before asking that now-invalid session for
+      // another token or waiting for Clerk sign-out, because either SDK call
+      // may remain pending after remote deletion.
+      const deletionRedirectFallback = window.setTimeout(
+        () => window.location.replace("/account-deleted"),
+        2_500,
+      );
       try {
+        await clearExtensionAccessBeforeSignOut(() =>
+          getToken({ skipCache: true }));
         await signOut({ redirectUrl: "/account-deleted" });
       } catch {
-        // A deleted remote Clerk user can make the local sign-out request
+        // A deleted remote Clerk user can make token cleanup or local sign-out
         // report an error even though the session must still be discarded.
       } finally {
+        window.clearTimeout(deletionRedirectFallback);
         // Clerk may report an already-deleted remote user while clearing the
         // local session. A hard navigation guarantees that stale account UI
         // cannot trap the user on the authenticated account screen.

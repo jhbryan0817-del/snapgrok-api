@@ -1,5 +1,14 @@
 # Zenaian website changelog
 
+## v6.15.2 - Visible reverification and bounded deletion exit
+
+- Keeps Clerk's identity-reverification dialog above Zenaian's account-deletion
+  confirmation so a recent-authentication challenge is visible and can retry
+  the deletion request instead of leaving the button on “Submitting…”.
+- Starts a bounded hard-navigation fallback as soon as deletion succeeds so an
+  invalidated Clerk session cannot stall extension cleanup or sign-out before
+  the public deletion-receipt page opens.
+
 ## v6.15.1 - Account deletion recovery
 
 - Fixes CSP nonce crashes for missing public assets and other app-rendered 404
