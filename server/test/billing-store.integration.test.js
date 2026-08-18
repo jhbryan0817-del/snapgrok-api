@@ -139,8 +139,11 @@ test(
         await store.close();
       }
     } catch (error) {
+      const nestedPhase = error?.integrationPhase
+        ? ` / ${error.integrationPhase}`
+        : "";
       throw new Error(
-        `Two-database integration failed during ${integrationPhase} ` +
+        `Two-database integration failed during ${integrationPhase}${nestedPhase} ` +
         `(${safeIntegrationCode(error)}).`,
         { cause: error },
       );
@@ -157,6 +160,7 @@ test(
 );
 
 async function verifyTwoDatabaseRecovery({ mainUrl, ledgerUrl }) {
+  let recoveryPhase = "initialize stores";
   const keyOne = randomBytes(32).toString("base64url");
   const keyTwo = randomBytes(32).toString("base64url");
   const requestId = randomUUID();
@@ -178,39 +182,53 @@ async function verifyTwoDatabaseRecovery({ mainUrl, ledgerUrl }) {
   try {
     await ledger.initialize();
     await privacyStore.initialize();
+    recoveryPhase = "record completed deletion";
     await ledger.recordDeletion({ requestId, userId, completedAt });
+    recoveryPhase = "record retention purge marker";
     await ledger.recordRetentionPurge({
       markerId,
       purgeCutoffAt: completedAt,
       completedAt,
     });
+    recoveryPhase = "read completed deletion page";
     const deletionPage = await ledger.listCompletedPage({
       after: restorePoint,
       limit: 1,
     });
     assert.equal(deletionPage.entries.length, 1);
+    recoveryPhase = "establish deletion replay block";
     await privacyStore.recordDeletionReplayBlock(deletionPage.entries[0]);
+    recoveryPhase = "delete restored device rows";
     await privacyStore.deleteDeviceRows(userId);
+    recoveryPhase = "delete restored operational rows";
     await privacyStore.deleteOperationalRows(userId);
+    recoveryPhase = "finish deletion replay";
     await privacyStore.finishDeletionReplay(userId);
+    recoveryPhase = "verify durable deletion block";
     assert.equal(await privacyStore.isDeletionBlocked(userId), "complete");
 
+    recoveryPhase = "read retention purge marker";
     const markerPage = await ledger.listRetentionPurgePage({
       after: restorePoint,
       limit: 1,
     });
     assert.equal(markerPage.entries[0].markerId, markerId);
+    recoveryPhase = "replay retention purge";
     await privacyStore.purgeRetention(
       markerPage.entries[0].purgeCutoffAt,
       500,
     );
 
+    recoveryPhase = "persist ZDR safety latch";
     await privacyStore.recordZdrFailure(3, completedAt);
     await privacyStore.recordZdrFailure(3, completedAt);
     assert.equal(
       (await privacyStore.recordZdrFailure(3, completedAt)).state,
       "disabled",
     );
+  } catch (error) {
+    error.integrationPhase = recoveryPhase;
+    throw error;
   } finally {
     await Promise.allSettled([ledger.close(), privacyStore.close()]);
   }
@@ -228,17 +246,24 @@ async function verifyTwoDatabaseRecovery({ mainUrl, ledgerUrl }) {
     hmacKeyVersion: 1,
   });
   try {
+    recoveryPhase = "initialize rotated ledger";
     await rotatedLedger.initialize();
+    recoveryPhase = "verify deletion idempotency after key rotation";
     assert.equal(await rotatedLedger.recordDeletion({
       requestId,
       userId,
       completedAt,
     }), false);
+    recoveryPhase = "initialize reopened privacy store";
     await reopenedPrivacyStore.initialize();
+    recoveryPhase = "verify persisted ZDR safety latch";
     assert.equal(
       (await reopenedPrivacyStore.getZdrSafetyState()).state,
       "disabled",
     );
+  } catch (error) {
+    error.integrationPhase = recoveryPhase;
+    throw error;
   } finally {
     await Promise.allSettled([
       rotatedLedger.close(),
@@ -971,7 +996,7 @@ function quoteIdentifier(value) {
 }
 
 function safeIntegrationCode(error) {
-  for (const value of [error?.code, error?.databaseCode, error?.cause?.code]) {
+  for (const value of [error?.databaseCode, error?.code, error?.cause?.code]) {
     const code = String(value || "");
     if (/^[A-Z0-9_]{2,64}$/.test(code)) return code;
   }
