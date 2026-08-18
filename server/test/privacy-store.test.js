@@ -522,7 +522,8 @@ test("ZDR safety failures atomically disable the persisted latch", async () => {
   assert.equal(state.consecutiveFailures, 3);
   assert.equal(queries[0][1][0], 3);
   assert.match(queries[0][0], /ON CONFLICT \(latch_name\) DO UPDATE/);
-  assert.match(queries[0][0], /consecutive_failures \+ 1 >= \$1/);
+  assert.match(queries[0][0], /consecutive_failures \+ 1 >= \$1::integer/);
+  assert.match(queries[0][0], /THEN \$2::timestamptz/);
 });
 
 test("deletion maintenance exposes overdue, repeated, and oldest-request state", async () => {

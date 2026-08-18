@@ -884,30 +884,30 @@ export function createPostgresPrivacyStore({
              last_failure_at, updated_at
            ) VALUES (
              'xai_zdr',
-             CASE WHEN 1 >= $1 THEN 'disabled' ELSE 'enabled' END,
+             CASE WHEN 1 >= $1::integer THEN 'disabled' ELSE 'enabled' END,
              1,
-             CASE WHEN 1 >= $1 THEN $2 ELSE NULL END,
-             $2,
-             $2
+             CASE WHEN 1 >= $1::integer THEN $2::timestamptz ELSE NULL END,
+             $2::timestamptz,
+             $2::timestamptz
            )
            ON CONFLICT (latch_name) DO UPDATE SET
              consecutive_failures =
                runtime_safety_latches.consecutive_failures + 1,
              state = CASE
                WHEN runtime_safety_latches.state = 'disabled' OR
-                    runtime_safety_latches.consecutive_failures + 1 >= $1
+                    runtime_safety_latches.consecutive_failures + 1 >= $1::integer
                THEN 'disabled'
                ELSE 'enabled'
              END,
              disabled_at = CASE
                WHEN runtime_safety_latches.state = 'disabled'
                THEN runtime_safety_latches.disabled_at
-               WHEN runtime_safety_latches.consecutive_failures + 1 >= $1
-               THEN $2
+               WHEN runtime_safety_latches.consecutive_failures + 1 >= $1::integer
+               THEN $2::timestamptz
                ELSE NULL
              END,
-             last_failure_at = $2,
-             updated_at = $2
+             last_failure_at = $2::timestamptz,
+             updated_at = $2::timestamptz
            RETURNING state, consecutive_failures, disabled_at,
                      last_failure_at, last_success_at`,
           [boundedThreshold, at],
