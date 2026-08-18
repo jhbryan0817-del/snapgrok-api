@@ -72,10 +72,13 @@ test(
       await resetDisposableDatabase(ledgerAdmin);
       integrationPhase = "apply main migrations";
       for (const migration of migrations) await admin.query(migration);
-      integrationPhase = "apply ledger migrations";
-      for (const migration of ledgerMigrations) {
-        await ledgerAdmin.query(migration);
-      }
+      integrationPhase = "apply first ledger migration";
+      await ledgerAdmin.query(ledgerMigrations[0]);
+      integrationPhase = "seed legacy deletion ledger row";
+      await seedLegacyDeletionLedgerRow(ledgerAdmin);
+      integrationPhase = "backfill live ledger retention migration";
+      await ledgerAdmin.query(ledgerMigrations[1]);
+      await verifyLegacyLedgerRetentionBackfill(ledgerAdmin);
       integrationPhase = "create main runtime role";
       const scopedUrl = await createMainRuntime({
         admin,
@@ -270,6 +273,29 @@ async function verifyTwoDatabaseRecovery({ mainUrl, ledgerUrl }) {
       reopenedPrivacyStore.close(),
     ]);
   }
+}
+
+async function seedLegacyDeletionLedgerRow(database) {
+  await database.query(
+    `INSERT INTO completed_deletion_ledger (
+       request_id, subject_hmac, encryption_key_version,
+       user_id_ciphertext, encryption_nonce, encryption_auth_tag,
+       completed_at
+     ) VALUES (
+       '00000000-0000-4000-8000-000000000001', repeat('a', 64), 1,
+       decode('00', 'hex'), decode(repeat('00', 12), 'hex'),
+       decode(repeat('00', 16), 'hex'), '2020-01-01T00:00:00Z'
+     )`,
+  );
+}
+
+async function verifyLegacyLedgerRetentionBackfill(database) {
+  const result = await database.query(
+    `SELECT purge_after = completed_at + interval '400 days' AS correct
+     FROM completed_deletion_ledger
+     WHERE request_id = '00000000-0000-4000-8000-000000000001'`,
+  );
+  assert.equal(result.rows[0]?.correct, true);
 }
 
 async function verifyAtomicQuota(store) {

@@ -200,6 +200,8 @@ test("ledger migration rejects update and delete operations", async () => {
   assert.match(migration, /BEFORE UPDATE OR DELETE/);
   assert.match(migration, /COMPLETED_DELETION_LEDGER_APPEND_ONLY/);
   assert.match(migration, /interval '400 days'/);
+  assert.match(migration, /DISABLE TRIGGER completed_deletion_ledger_append_only/);
+  assert.match(migration, /ENABLE TRIGGER completed_deletion_ledger_append_only/);
   assert.match(migration, /completed_retention_purge_ledger/);
   assert.match(migration, /REVOKE ALL ON FUNCTION purge_expired_privacy_ledger/);
 });

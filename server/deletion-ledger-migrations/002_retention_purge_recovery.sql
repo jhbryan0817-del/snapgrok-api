@@ -1,9 +1,19 @@
 ALTER TABLE completed_deletion_ledger
   ADD COLUMN purge_after timestamptz;
 
+-- Migration 001 made this table append-only. The DDL owner temporarily
+-- disables that trigger inside the migration transaction solely to backfill
+-- the new retention deadline. ALTER TABLE takes an exclusive lock and is
+-- transactional, so other sessions cannot use this window to mutate rows.
+ALTER TABLE completed_deletion_ledger
+  DISABLE TRIGGER completed_deletion_ledger_append_only;
+
 UPDATE completed_deletion_ledger
 SET purge_after = completed_at + interval '400 days'
 WHERE purge_after IS NULL;
+
+ALTER TABLE completed_deletion_ledger
+  ENABLE TRIGGER completed_deletion_ledger_append_only;
 
 ALTER TABLE completed_deletion_ledger
   ALTER COLUMN purge_after SET NOT NULL;
