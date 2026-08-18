@@ -7,6 +7,7 @@ import {
 import pg from "pg";
 
 const { Pool } = pg;
+const LEDGER_RETENTION_DAYS = 400;
 
 export function createDeletionLedgerStore({
   connectionString,
@@ -51,37 +52,68 @@ export function createDeletionLedgerStore({
 
   return {
     async initialize() {
-      const result = await database.query(
-        `SELECT to_regclass('public.completed_deletion_ledger') IS NOT NULL AS present,
+      for (const table of [
+        "completed_deletion_ledger",
+        "completed_retention_purge_ledger",
+      ]) {
+        const result = await database.query(
+          `SELECT to_regclass($1) IS NOT NULL AS present,
                 has_table_privilege(
                   current_user,
-                  'public.completed_deletion_ledger',
+                  $1,
                   'SELECT'
                 ) AS can_select,
                 has_table_privilege(
                   current_user,
-                  'public.completed_deletion_ledger',
+                  $1,
                   'INSERT'
                 ) AS can_insert,
                 has_table_privilege(
                   current_user,
-                  'public.completed_deletion_ledger',
+                  $1,
                   'UPDATE'
                 ) AS can_update,
                 has_table_privilege(
                   current_user,
-                  'public.completed_deletion_ledger',
+                  $1,
                   'DELETE'
                 ) AS can_delete`,
+          [`public.${table}`],
+        );
+        const state = result.rows[0] || {};
+        if (
+          state.present !== true || state.can_select !== true ||
+          state.can_insert !== true || state.can_update === true ||
+          state.can_delete === true
+        ) {
+          throw new Error(
+            "Deletion-ledger readiness requires SELECT/INSERT-only access to every external append-only table.",
+          );
+        }
+      }
+      const purgePrivilege = await database.query(
+        `SELECT has_function_privilege(
+           current_user,
+           'public.purge_expired_privacy_ledger(timestamp with time zone)',
+           'EXECUTE'
+         ) AS can_purge`,
       );
-      const state = result.rows[0] || {};
-      if (
-        state.present !== true || state.can_select !== true ||
-        state.can_insert !== true || state.can_update === true ||
-        state.can_delete === true
-      ) {
+      if (purgePrivilege.rows[0]?.can_purge === true) {
         throw new Error(
-          "Deletion ledger readiness requires SELECT/INSERT-only access to the external append-only table.",
+          "The deletion-ledger runtime role must not execute the controlled purge function.",
+        );
+      }
+      const versions = await database.query(
+        `SELECT DISTINCT encryption_key_version
+         FROM completed_deletion_ledger
+         WHERE purge_after > now()`,
+      );
+      const missingVersions = versions.rows
+        .map((row) => Number(row.encryption_key_version))
+        .filter((version) => !keyring.has(version));
+      if (missingVersions.length) {
+        throw new Error(
+          `Deletion-ledger encryption key version ${missingVersions[0]} is unavailable.`,
         );
       }
     },
@@ -112,8 +144,8 @@ export function createDeletionLedgerStore({
         `INSERT INTO completed_deletion_ledger (
            request_id, subject_hmac, encryption_key_version,
            user_id_ciphertext, encryption_nonce, encryption_auth_tag,
-           completed_at
-         ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+           completed_at, purge_after
+         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
          ON CONFLICT (request_id) DO NOTHING
          RETURNING request_id`,
         [
@@ -124,37 +156,156 @@ export function createDeletionLedgerStore({
           nonce,
           authTag,
           at,
+          retentionDate(at),
         ],
       );
       if (inserted.rowCount === 1) return true;
       const existing = await database.query(
-        `SELECT subject_hmac
+        `SELECT request_id, encryption_key_version, user_id_ciphertext,
+                encryption_nonce, encryption_auth_tag, completed_at
          FROM completed_deletion_ledger
          WHERE request_id = $1`,
         [requestId],
       );
-      if (String(existing.rows[0]?.subject_hmac || "") !== subjectHmac) {
+      const existingDeletion = existing.rows[0]
+        ? decryptLedgerRow(existing.rows[0], keyring)
+        : null;
+      if (existingDeletion?.userId !== userId) {
         throw new Error("Deletion ledger request identity conflict.");
       }
       return false;
     },
 
     async listCompletedAfter(after, limit = 500) {
+      return (await this.listCompletedPage({ after, limit })).entries;
+    },
+
+    async listCompletedPage({ after, cursor = null, limit = 500 }) {
       const afterDate = validDate(after, "Restore point is invalid.");
       const bounded = Math.max(
         1,
         Math.min(5000, Number.isSafeInteger(limit) ? limit : 500),
       );
+      const pageCursor = validCursor(cursor);
       const result = await database.query(
-        `SELECT request_id, encryption_key_version, user_id_ciphertext,
+        `SELECT ledger_sequence, request_id, encryption_key_version, user_id_ciphertext,
                 encryption_nonce, encryption_auth_tag, completed_at
          FROM completed_deletion_ledger
          WHERE completed_at > $1
+           AND (
+             $2::timestamptz IS NULL OR
+             (completed_at, ledger_sequence) > ($2::timestamptz, $3::bigint)
+           )
          ORDER BY completed_at, ledger_sequence
-         LIMIT $2`,
-        [afterDate, bounded],
+         LIMIT $4`,
+        [
+          afterDate,
+          pageCursor?.completedAt || null,
+          pageCursor?.sequence || null,
+          bounded + 1,
+        ],
       );
-      return result.rows.map((row) => decryptLedgerRow(row, keyring));
+      const pageRows = result.rows.slice(0, bounded);
+      const last = pageRows.at(-1);
+      return {
+        entries: pageRows.map((row) => decryptLedgerRow(row, keyring)),
+        nextCursor: result.rows.length > bounded && last
+          ? {
+              completedAt: validDate(
+                last.completed_at,
+                "Ledger completion time is invalid.",
+              ).toISOString(),
+              sequence: String(last.ledger_sequence),
+            }
+          : null,
+      };
+    },
+
+    async recordRetentionPurge({
+      markerId,
+      purgeCutoffAt,
+      completedAt = new Date(),
+    }) {
+      requireRequestId(markerId);
+      const cutoff = validDate(purgeCutoffAt, "Retention-purge cutoff is invalid.");
+      const completed = validDate(completedAt, "Retention-purge completion time is invalid.");
+      if (cutoff.getTime() > completed.getTime()) {
+        throw new Error("Retention-purge cutoff cannot be after completion.");
+      }
+      const inserted = await database.query(
+        `INSERT INTO completed_retention_purge_ledger (
+           marker_id, purge_cutoff_at, completed_at, purge_after
+         ) VALUES ($1, $2, $3, $4)
+         ON CONFLICT (marker_id) DO NOTHING
+         RETURNING marker_id`,
+        [markerId, cutoff, completed, retentionDate(completed)],
+      );
+      if (inserted.rowCount === 1) return true;
+      const existing = await database.query(
+        `SELECT purge_cutoff_at, completed_at
+         FROM completed_retention_purge_ledger
+         WHERE marker_id = $1`,
+        [markerId],
+      );
+      const row = existing.rows[0];
+      if (
+        !row ||
+        validDate(row.purge_cutoff_at, "Retention marker is invalid.").getTime() !== cutoff.getTime() ||
+        validDate(row.completed_at, "Retention marker is invalid.").getTime() !== completed.getTime()
+      ) {
+        throw new Error("Retention-purge ledger marker conflict.");
+      }
+      return false;
+    },
+
+    async listRetentionPurgePage({ after, cursor = null, limit = 500 }) {
+      const afterDate = validDate(after, "Restore point is invalid.");
+      const bounded = Math.max(
+        1,
+        Math.min(5000, Number.isSafeInteger(limit) ? limit : 500),
+      );
+      const pageCursor = validCursor(cursor);
+      const result = await database.query(
+        `SELECT ledger_sequence, marker_id, purge_cutoff_at, completed_at
+         FROM completed_retention_purge_ledger
+         WHERE completed_at > $1
+           AND (
+             $2::timestamptz IS NULL OR
+             (completed_at, ledger_sequence) > ($2::timestamptz, $3::bigint)
+           )
+         ORDER BY completed_at, ledger_sequence
+         LIMIT $4`,
+        [
+          afterDate,
+          pageCursor?.completedAt || null,
+          pageCursor?.sequence || null,
+          bounded + 1,
+        ],
+      );
+      const pageRows = result.rows.slice(0, bounded);
+      const last = pageRows.at(-1);
+      return {
+        entries: pageRows.map((row) => ({
+          markerId: String(row.marker_id),
+          purgeCutoffAt: validDate(
+            row.purge_cutoff_at,
+            "Retention-purge cutoff is invalid.",
+          ),
+          completedAt: validDate(
+            row.completed_at,
+            "Retention-purge completion time is invalid.",
+          ),
+        })),
+        nextCursor: result.rows.length > bounded && last
+          ? {
+              completedAt: validDate(
+                last.completed_at,
+                "Retention-purge completion time is invalid.",
+              ).toISOString(),
+              sequence: String(last.ledger_sequence),
+            }
+          : null,
+      };
     },
   };
 }
@@ -218,4 +369,18 @@ function validDate(value, message) {
   const date = value instanceof Date ? value : new Date(value);
   if (!Number.isFinite(date.getTime())) throw new Error(message);
   return date;
+}
+
+function retentionDate(completedAt) {
+  return new Date(completedAt.getTime() + LEDGER_RETENTION_DAYS * 24 * 60 * 60 * 1000);
+}
+
+function validCursor(value) {
+  if (value == null) return null;
+  const completedAt = validDate(value.completedAt, "Ledger cursor time is invalid.");
+  const sequence = String(value.sequence || "");
+  if (!/^[1-9][0-9]{0,18}$/.test(sequence)) {
+    throw new Error("Ledger cursor sequence is invalid.");
+  }
+  return { completedAt, sequence };
 }

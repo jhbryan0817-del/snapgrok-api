@@ -6,13 +6,13 @@ import { resolve } from "node:path";
 const root = resolve(import.meta.dirname, "..");
 const read = (path) => readFileSync(resolve(root, path), "utf8");
 
-test("account privacy controls use authenticated export and deletion routes", () => {
+test("account privacy controls summarize the authenticated export and keep file actions together", () => {
   const account = read("app/account/page.tsx");
   const panel = read("app/account/privacy-panel.tsx");
   const api = read("app/privacy-api.ts");
 
   assert.match(account, /<PrivacyPanel \/>/);
-  for (const label of ["Download JSON", "Delete account"]) {
+  for (const label of ["View my data", "Download file", "Delete account"]) {
     assert.match(panel, new RegExp(label));
   }
   for (const path of [
@@ -33,8 +33,16 @@ test("account privacy controls use authenticated export and deletion routes", ()
   assert.match(panel, /error\.reverificationAfterMinutes \|\| 10/);
   assert.match(panel, /Error code: \$\{error\.code\}/);
   assert.match(panel, /Reference: \$\{error\.requestId\}/);
+  assert.match(panel, /className="account-privacy-file-actions"/);
+  assert.match(panel, /<PrivacyExportSummaryView exportData=\{exportData\}/);
+  assert.match(panel, /const serverData = asRecord\(exportData\.serverData\)/);
+  assert.match(panel, /usagePeriods/);
+  assert.match(panel, /paymentHistory/);
+  assert.match(panel, /extensionDeviceSessions/);
+  assert.match(panel, /statutoryTransactionRecords/);
   assert.doesNotMatch(panel, /sign out and sign in again/i);
-  assert.doesNotMatch(panel, /View my data|Hide my data|PrivacySummaryView/);
+  assert.doesNotMatch(panel, /Provider transfers|Information categories/);
+  assert.doesNotMatch(api, /\/api\/privacy\/summary/);
   assert.doesNotMatch(panel, /Why are you deleting|deletion reason|reason for deleting/i);
 });
 

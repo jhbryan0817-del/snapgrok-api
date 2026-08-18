@@ -1,0 +1,81 @@
+name: Release checks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  server:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      main-database:
+        image: postgres:18
+        env:
+          POSTGRES_DB: zenaian_test_main
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d zenaian_test_main"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+      deletion-ledger-database:
+        image: postgres:18
+        env:
+          POSTGRES_DB: zenaian_test_ledger
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d zenaian_test_ledger"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    defaults:
+      run:
+        working-directory: server
+    env:
+      TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/zenaian_test_main
+      TEST_DELETION_LEDGER_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5433/zenaian_test_ledger
+      ALLOW_TEST_DATABASE_RESET: RESET_ZENAIAN_TEST_DATABASES
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.13.1
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+      - run: npm ci --ignore-scripts
+      - run: npm run check
+      - run: npm test
+      - run: npm audit --omit=dev --audit-level=low
+
+  website:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: website
+    env:
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_live_Y2xlcmsuemVuYWlhbi5jb20k
+      NEXT_PUBLIC_CLERK_FRONTEND_API_URL: https://clerk.zenaian.com
+      NEXT_PUBLIC_SITE_URL: https://www.zenaian.com
+      NEXT_PUBLIC_API_URL: https://snapgrok-api.onrender.com
+      NEXT_PUBLIC_EXTENSION_ID: jjgjlopdpefphgappfmkkkpiknpnoijb
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.13.1
+          cache: npm
+          cache-dependency-path: website/package-lock.json
+      - run: npm ci --ignore-scripts
+      - run: npm run check
+      - run: npm audit --omit=dev --audit-level=low

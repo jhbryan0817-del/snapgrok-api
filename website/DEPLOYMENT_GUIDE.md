@@ -1,10 +1,110 @@
-# Zenaian website v6.15.1 deployment
+# Zenaian deployment: step by step
 
-Deploy this website together with API v6.1.0 and the current extension. Deploy and
-verify the API first so the account privacy controls never point at an older
-export implementation.
+Deploy in this order:
 
-Render website settings:
+1. Database
+2. API server
+3. Website
+4. Chrome extension
+
+If a component did not change, you can skip its deployment. Always make sure
+the API is healthy before deploying the website.
+
+## Step 1: Test locally
+
+Use Node `22.13.1`. From the repository root, run:
+
+```powershell
+cd server
+npm.cmd ci --ignore-scripts
+npm.cmd run check
+npm.cmd test
+npm.cmd audit --omit=dev --audit-level=low
+
+cd ..\website
+npm.cmd ci --ignore-scripts
+npm.cmd run check
+npm.cmd audit --omit=dev --audit-level=low
+```
+
+Stop if any command fails. Never use the production database for tests.
+
+## Step 2: Prepare the release commit
+
+1. Run `git status` and review the changed files.
+2. Commit only the intended changes. Never commit `.env` files or secrets.
+3. Do not push yet. The database release must finish before Render can deploy
+   the new API code.
+
+## Step 3: Update and verify both databases
+
+Run database commands from a trusted migration environment, not from the
+long-running Render API service.
+
+Set both databases' short-lived DDL-owner URLs, restricted runtime URLs and
+runtime roles, plus the deletion-ledger encryption keyring, as described in
+[`server/README.md`](../server/README.md). Then run the single ordered release
+command:
+
+```powershell
+cd server
+npm.cmd run release:databases
+```
+
+This migrates and verifies the external deletion ledger first, then the main
+database. Continue only when it ends with:
+
+```json
+{"operation":"release_databases","ready":true}
+```
+
+The main-database preflight must also report these values as `true`:
+
+- `privacyMigrationApplied`
+- `runtimeSafetyMigrationApplied`
+- `privacyTablesPresent`
+- `privacyRuntimeReady`
+- `safeToApplyPrivacyMigration`
+- `safeForConfiguredBillingMode`
+
+Never put either migration/DDL-owner database URL on the Render API service.
+For restore/replay or controlled ledger-retention operations, follow
+[`PRIVACY_RECOVERY_RUNBOOK.md`](../server/PRIVACY_RECOVERY_RUNBOOK.md).
+
+## Step 4: Push and deploy the API server
+
+Push the verified release commit to the branch connected to Render. Automatic
+deploy is safe only now that both database release checks have passed.
+
+Use these Render settings:
+
+```text
+Root Directory: server
+Build Command: npm ci --ignore-scripts
+Start Command: npm start
+Health Check Path: /api/health
+Node version: 22.13.1
+```
+
+Keep the existing server environment variables and deploy the latest commit.
+When Render says the service is live, open:
+
+`https://snapgrok-api.onrender.com/api/health`
+
+Check that:
+
+- the version matches `server/package.json`
+- `privacyControls` is `true`
+- `privacyReady` is `true`
+- `maintenance.status` is `healthy`
+- the deletion backlog is not overdue
+- the ZDR safety latch is enabled
+
+Stop here if the API is unhealthy.
+
+## Step 5: Deploy the website
+
+Use these Render settings:
 
 ```text
 Root Directory: website
@@ -13,7 +113,7 @@ Start Command: npm start
 Node version: 22.13.1
 ```
 
-Public environment:
+Set these public environment variables:
 
 ```text
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_live_Y2xlcmsuemVuYWlhbi5jb20k
@@ -23,19 +123,38 @@ NEXT_PUBLIC_API_URL=https://snapgrok-api.onrender.com
 NEXT_PUBLIC_EXTENSION_ID=jjgjlopdpefphgappfmkkkpiknpnoijb
 ```
 
-Never add `CLERK_SECRET_KEY`, `WHOP_API_KEY`, `WHOP_WEBHOOK_SECRET`,
-`DATABASE_URL`, or `XAI_API_KEY` to the website service.
+Do not add server secrets to the website. Deploy, open
+`https://www.zenaian.com`, and hard-refresh the page.
 
-After deployment, hard-refresh the site and verify the hero's synchronized
-eight-second shortcut, capture, Z, Processing, and B timeline; the processing-first Receive your answers panel; the A-and-C hover
-tooltip, both shortcut selectors, the local-only context Save confirmation,
-the two-row manual flowchart, the enlarged SWE Marathon graph, and one supporting page.
-Then smoke-test sign-in, expand and collapse Your account details, verify
-pricing status, complete Clerk reverification when prompted, and test both
-Download JSON and account deletion with a disposable test account. Confirm the
-deletion receipt signs Clerk out and signed-out navigation returns. Request a
-missing asset such as `/favicon.ico` and confirm its 404 retains a CSP nonce
-without a server-render crash. A server failure includes a safe error code and
-request reference that can be matched to Render logs. Review
-`WHOP_CHECKOUT_TERMS.md` and `LEGAL_REVIEW_NOTES.md` before copying terms into
-Whop.
+## Step 6: Publish the extension
+
+Skip this step if the extension did not change.
+
+1. Confirm `extension/auth-config.js` contains the production website and API.
+2. Increase the version in `extension/manifest.json`.
+3. Zip the contents of `extension`; `manifest.json` must be at the ZIP root.
+4. Upload the ZIP to the Chrome Web Store.
+5. Delete the temporary ZIP after uploading it.
+
+## Step 7: Smoke-test production
+
+Use disposable accounts for payment and deletion tests.
+
+1. While signed out, confirm **Sign up** and **Log in** are visible.
+2. Sign in and confirm the account and subscription details load.
+3. Complete Clerk re-verification, open **View my data**, and use **Download
+   file**. Confirm the summary describes the downloaded user's records.
+4. Start a subscription checkout with a disposable account.
+5. Delete a different disposable account. Confirm the receipt appears and the
+   user is signed out.
+6. Pair the extension, check its hover message, and run one analysis.
+7. Check Render logs for unexpected `5xx`, CSP, webhook, or maintenance errors.
+
+The deployment is complete when every smoke test passes.
+
+## If deployment fails
+
+Stop before deploying the next component. You may roll back application code,
+but do not undo database migrations manually. For a database restore, follow
+[`PRIVACY_RECOVERY_RUNBOOK.md`](../server/PRIVACY_RECOVERY_RUNBOOK.md) before
+reopening traffic.

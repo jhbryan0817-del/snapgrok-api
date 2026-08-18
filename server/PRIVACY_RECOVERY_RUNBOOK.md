@@ -30,7 +30,10 @@ Configure the API runtime with:
   base64url.
 - `PRIVACY_DELETION_LEDGER_ENCRYPTION_KEY_VERSION=1`.
 - `PRIVACY_DELETION_LEDGER_PREVIOUS_ENCRYPTION_KEYS` only during planned key
-  rotation, using comma-separated `version:base64url` entries.
+  rotation, using comma-separated `version:base64url` entries. Keep every
+  previous key configured until all rows using that version have reached the
+  400-day ledger retention boundary and have been purged. Startup fails closed
+  if an unexpired row needs a missing key.
 
 Production startup fails closed if this configuration is absent or if the
 runtime role can mutate ledger rows. A deletion is marked complete in the main
@@ -51,10 +54,12 @@ database only after its Clerk ID has been encrypted into this external ledger.
 
 5. Review the receipt IDs and count. The command intentionally never prints
    decrypted Clerk IDs.
-6. Run the replay without `--dry-run`, using the same timestamp. For every
-   ledger entry, it first restores the durable deletion block, then removes
-   resurrected entitlement, usage, checkout, session, and account rows and
-   clears any restored deletion queue row.
+6. Run the replay without `--dry-run`, using the same timestamp. The command
+   paginates until every deletion is processed, including more than 5,000
+   entries. For every entry, it first restores the durable deletion block,
+   removes resurrected entitlement, usage, checkout, session, and account
+   rows, and clears any restored deletion queue row. It then reapplies the
+   latest successful retention-purge cutoff recorded after the restore point.
 7. Run the same command a second time. It is idempotent and must complete with
    the same receipt set and no error.
 8. Run `npm run privacy:preflight`, billing reconciliation, and the complete
@@ -64,6 +69,24 @@ database only after its Clerk ID has been encrypted into this external ledger.
 
 Do not restore the external deletion ledger to the main database restore
 point. Its purpose is to retain the deletions that happened after that point.
+
+## External ledger retention and key rotation
+
+Deletion receipts and retention-purge markers expire after 400 days. This is
+longer than the privacy-request audit period plus an operational buffer and far
+longer than the current database restore window, without retaining encrypted
+Clerk IDs indefinitely.
+
+The API runtime cannot delete, update, or call the purge function. From the
+trusted migration environment, dispose only rows whose `purge_after` time has
+passed:
+
+`npm run privacy:purge-ledger -- --confirm=PURGE_EXPIRED_PRIVACY_LEDGER`
+
+Record the command output in the maintenance evidence bundle. During key
+rotation, deploy the new key/version together with all still-required previous
+keys. Remove an old key only after the controlled purge has removed every
+unexpired row using that version and a restore dry-run succeeds.
 
 ## ZDR safety latch
 

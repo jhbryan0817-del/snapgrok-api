@@ -1,5 +1,17 @@
 # Zenaian website changelog
 
+## v6.16.0 - User-specific data summary
+
+- Restores **View my data** as a concise summary built from the signed-in
+  user's exact authenticated JSON export rather than generic Zenaian privacy
+  information.
+- Reuses the same fetched export for the on-page summary and complete download,
+  so the two views cannot silently describe different records.
+- Renames **Download JSON** to **Download file** and places it directly beside
+  **View my data** on desktop and mobile.
+- Keeps screenshots, prompts, questions, generated answers, credentials, card
+  data, and other non-retained content out of the summary and export history.
+
 ## v6.15.2 - Visible reverification and bounded deletion exit
 
 - Keeps Clerk's identity-reverification dialog above Zenaian's account-deletion

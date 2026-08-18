@@ -3806,8 +3806,13 @@ img { display: block; max-width: 100%; }
 .account-privacy-actions {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 10px;
   margin-top: 24px;
+}
+.account-privacy-file-actions {
+  display: flex;
+  gap: 10px;
 }
 .account-privacy-actions button,
 .privacy-modal-actions button,
@@ -3911,6 +3916,13 @@ img { display: block; max-width: 100%; }
   font-size: 10px;
   line-height: 1.5;
   overflow-wrap: anywhere;
+}
+.account-privacy-summary-generated {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.5;
 }
 
 .privacy-modal-backdrop {
@@ -4099,6 +4111,10 @@ img { display: block; max-width: 100%; }
   .account-privacy-actions {
     display: grid;
     grid-template-columns: 1fr;
+  }
+  .account-privacy-file-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .account-privacy-actions .account-privacy-delete-button {
     margin-left: 0;

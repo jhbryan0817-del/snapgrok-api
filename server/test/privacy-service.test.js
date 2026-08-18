@@ -153,6 +153,93 @@ test("a failed retention purge remains due for the next maintenance cycle", asyn
   assert.deepEqual(recovered.purged, { privacyAudits: 0 });
 });
 
+test("an incomplete deletion retry degrades maintenance instead of looking healthy", async () => {
+  const calls = [];
+  const store = {
+    async initialize() {},
+    async expireCheckoutSessions() { return 0; },
+    async listDeletionRetries() {
+      return [{ requestId: REQUEST_ID, userId: USER_ID }];
+    },
+    async withDeletionLock() {
+      return { acquired: false, value: null };
+    },
+    async getDeletionBacklog() {
+      return {
+        total: 1,
+        due: 1,
+        overdue: 0,
+        repeatedlyPartial: 0,
+        oldestCreatedAt: NOW.toISOString(),
+        oldestAgeSeconds: 0,
+      };
+    },
+    async getZdrSafetyState() {
+      return { state: "enabled", consecutiveFailures: 0 };
+    },
+    async purgeRetention() { return { privacyAudits: 0 }; },
+  };
+  const service = privacyService({
+    store,
+    clerkClient: clerkStub({ calls }),
+    whopClient: whopStub({ calls }),
+    calls,
+  });
+  await service.initialize();
+
+  await assert.rejects(service.maintenance(), (error) => {
+    assert.equal(error.code, "PRIVACY_MAINTENANCE_INCOMPLETE");
+    assert.deepEqual(error.diagnostics, [{
+      stage: "deletion_retry",
+      code: "PRIVACY_DELETION_RETRY_BLOCKED",
+    }]);
+    return true;
+  });
+});
+
+test("successful retention maintenance records an external recovery marker", async () => {
+  const calls = [];
+  const store = {
+    async initialize() {},
+    async expireCheckoutSessions() { return 0; },
+    async listDeletionRetries() { return []; },
+    async getDeletionBacklog() {
+      return {
+        total: 0,
+        due: 0,
+        overdue: 0,
+        repeatedlyPartial: 0,
+        oldestCreatedAt: null,
+        oldestAgeSeconds: 0,
+      };
+    },
+    async getZdrSafetyState() {
+      return { state: "enabled", consecutiveFailures: 0 };
+    },
+    async purgeRetention() { return { privacyAudits: 0 }; },
+  };
+  const deletionLedger = {
+    async initialize() {},
+    async recordRetentionPurge(marker) {
+      calls.push(["retention-marker", marker]);
+    },
+  };
+  const service = privacyService({
+    store,
+    deletionLedger,
+    clerkClient: clerkStub({ calls }),
+    whopClient: whopStub({ calls }),
+    calls,
+  });
+  await service.initialize();
+  await service.maintenance();
+
+  const marker = calls.find((entry) => entry[0] === "retention-marker")[1];
+  assert.match(marker.markerId, /^[0-9a-f-]{36}$/);
+  assert.equal(marker.purgeCutoffAt.toISOString(), NOW.toISOString());
+  assert.equal(marker.completedAt.toISOString(), NOW.toISOString());
+});
+
 test("repeated ZDR failures use the persisted safety latch", async () => {
   const calls = [];
   const states = [

@@ -1247,40 +1247,6 @@ export function createZenaianServer({
 
         if (
           request.method === "GET" &&
-          url.pathname === "/api/privacy/summary"
-        ) {
-          enforceOrigin(config, request);
-          enforceWebsiteOrigin(config, request);
-          requirePrivacyService(privacyService);
-          const releaseGlobal = globalRequestLimiter.acquire("protected-api");
-          try {
-            const auth = await authenticateRequest(request);
-            const releaseAccount = accountRequestLimiter.acquire(auth.userId);
-            try {
-              requireRecentAuthentication(
-                auth,
-                config.privacyRecentAuthMaxAgeMinutes,
-              );
-              const summary = await privacyService.summary(auth.userId);
-              sendJson(
-                config,
-                request,
-                response,
-                200,
-                { ok: true, ...summary },
-                requestId,
-              );
-            } finally {
-              releaseAccount();
-            }
-          } finally {
-            releaseGlobal();
-          }
-          return;
-        }
-
-        if (
-          request.method === "GET" &&
           url.pathname === "/api/privacy/export"
         ) {
           enforceOrigin(config, request);
@@ -2624,13 +2590,31 @@ function publicErrorCode(error) {
 function safeDeletionBacklog(value) {
   const total = Number(value?.total);
   const due = Number(value?.due);
+  const overdue = Number(value?.overdue);
+  const repeatedlyPartial = Number(value?.repeatedlyPartial);
+  const oldestAgeSeconds = Number(value?.oldestAgeSeconds);
+  const oldestCreatedAt = value?.oldestCreatedAt == null
+    ? null
+    : new Date(String(value.oldestCreatedAt));
   if (
     !Number.isSafeInteger(total) || total < 0 ||
-    !Number.isSafeInteger(due) || due < 0 || due > total
+    !Number.isSafeInteger(due) || due < 0 || due > total ||
+    !Number.isSafeInteger(overdue) || overdue < 0 || overdue > total ||
+    !Number.isSafeInteger(repeatedlyPartial) ||
+    repeatedlyPartial < 0 || repeatedlyPartial > total ||
+    !Number.isSafeInteger(oldestAgeSeconds) || oldestAgeSeconds < 0 ||
+    (oldestCreatedAt && !Number.isFinite(oldestCreatedAt.getTime()))
   ) {
     return null;
   }
-  return { total, due };
+  return {
+    total,
+    due,
+    overdue,
+    repeatedlyPartial,
+    oldestCreatedAt: oldestCreatedAt?.toISOString() || null,
+    oldestAgeSeconds,
+  };
 }
 
 function safeZdrSafety(value) {
@@ -2653,7 +2637,9 @@ function safeZdrSafety(value) {
 function publicPrivacyMaintenance(privacyService, state) {
   if (!privacyService?.maintenance) return { status: "disabled" };
   const degraded = state.consecutiveFailures > 0 ||
-    state.zdrSafety?.state === "disabled";
+    state.zdrSafety?.state === "disabled" ||
+    Number(state.deletionBacklog?.overdue || 0) > 0 ||
+    Number(state.deletionBacklog?.repeatedlyPartial || 0) > 0;
   return {
     status: degraded
       ? "degraded"

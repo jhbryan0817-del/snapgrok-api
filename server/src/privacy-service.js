@@ -1,4 +1,5 @@
 import { createClerkClient } from "@clerk/backend";
+import { randomUUID } from "node:crypto";
 import { normalizeMembership } from "./billing-service.js";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -315,53 +316,6 @@ export function createPrivacyService({
       return locked.value;
     },
 
-    async summary(userId) {
-      const deletionState = await store.isDeletionBlocked(userId);
-      return {
-        categories: [
-          {
-            name: "Account and authentication",
-            details: "Clerk account/profile and security session information used to sign you in.",
-          },
-          {
-            name: "Extension sessions",
-            details: "Device-session and pairing security records; credentials and secrets are never exported.",
-          },
-          {
-            name: "Plan, quota, and billing",
-            details: "Current plan, retained usage summaries, checkout state, membership state, and recent payment history.",
-          },
-          {
-            name: "Question content",
-            details: "Screenshots, prompts, instructions, questions, and answers are not retained as history.",
-          },
-          {
-            name: "Browser-only settings",
-            details: "Custom instructions are stored on this browser/device and are not held in the Zenaian server export.",
-          },
-        ],
-        retention: [
-          { category: "Analysis accounting", period: "30 days after settlement" },
-          { category: "Usage summaries", period: "90 days after the usage period" },
-          { category: "Live payment history", period: "Up to 12 months" },
-          { category: "Contract and payment evidence", period: "5 years where required by Korean law" },
-          { category: "Complaint/dispute evidence", period: "3 years where required by Korean law" },
-          { category: "Privacy request audit", period: "1 year after completion" },
-        ],
-        transfers: [
-          { provider: "Render", location: "United States (Virginia)", purpose: "API, database, security, and transient processing" },
-          { provider: "Clerk", location: "United States and listed subprocessors", purpose: "Authentication and account security" },
-          { provider: "xAI", location: "United States and listed subprocessors", purpose: "Transient generative-AI inference with mandatory ZDR" },
-          { provider: "Whop", location: "United States and payment/tax partners", purpose: "Checkout, subscription, payment, tax, refund, and dispute processing" },
-          { provider: "Google Workspace (planned)", location: "United States for covered data at rest", purpose: "Privacy correspondence" },
-        ],
-        deletion: {
-          available: !deletionState,
-          ...(deletionState ? { state: deletionState } : {}),
-        },
-      };
-    },
-
     async exportData(userId) {
       const locked = await store.withDeletionLock(userId, async () => {
         await assertAllowed(userId);
@@ -476,7 +430,18 @@ export function createPrivacyService({
       for (const retry of retries) {
         try {
           const result = await continueDeletion(retry);
-          if (result.state === "complete") completed += 1;
+          if (result.state === "complete") {
+            completed += 1;
+          } else {
+            diagnostics.push(maintenanceDiagnostic(
+              "deletion_retry",
+              Object.assign(new Error("Deletion retry remains incomplete."), {
+                code: result.state === "blocked"
+                  ? "PRIVACY_DELETION_RETRY_BLOCKED"
+                  : "PRIVACY_DELETION_RETRY_PARTIAL",
+              }),
+            ));
+          }
         } catch (error) {
           diagnostics.push(maintenanceDiagnostic("deletion_retry", error));
         }
@@ -511,9 +476,14 @@ export function createPrivacyService({
             }
             if (Math.max(0, ...Object.values(counts).map(Number)) < 500) break;
           }
+          await deletionLedger?.recordRetentionPurge?.({
+            markerId: randomUUID(),
+            purgeCutoffAt: current,
+            completedAt: now(),
+          });
           // Advance the daily gate only after the complete bounded purge
-          // succeeds. A failed purge remains due and is retried by the next
-          // five-minute maintenance cycle.
+          // and its external recovery marker succeed. A failed operation
+          // remains due and is retried by the next five-minute cycle.
           nextPurgeAt = current.getTime() + purgeIntervalMs;
         } catch (error) {
           diagnostics.push(maintenanceDiagnostic("retention_purge", error));

@@ -19,6 +19,7 @@ if (!Number.isFinite(after.getTime())) {
   );
 }
 const dryRun = process.argv.includes("--dry-run");
+const pageSize = numberArgument("--page-size", 500, 1, 5000);
 const previousKeys = parseVersionedKeys(
   process.env.PRIVACY_DELETION_LEDGER_PREVIOUS_ENCRYPTION_KEYS,
 );
@@ -43,24 +44,100 @@ const store = createPostgresPrivacyStore({
 try {
   await ledger.initialize();
   await store.initialize();
-  const deletions = await ledger.listCompletedAfter(after, 5000);
-  if (!dryRun) {
-    for (const deletion of deletions) {
-      await store.recordDeletionReplayBlock(deletion);
-      await store.deleteDeviceRows(deletion.userId);
-      await store.deleteOperationalRows(deletion.userId);
-      await store.finishDeletionReplay(deletion.userId);
+  let deletionCursor = null;
+  let deletionPages = 0;
+  let deletionCount = 0;
+  const receiptSample = [];
+  let lastReceipt = null;
+  do {
+    const page = await ledger.listCompletedPage({
+      after,
+      cursor: deletionCursor,
+      limit: pageSize,
+    });
+    deletionPages += 1;
+    for (const deletion of page.entries) {
+      deletionCount += 1;
+      lastReceipt = deletion.requestId;
+      if (receiptSample.length < 100) receiptSample.push(deletion.requestId);
+      if (!dryRun) {
+        await store.recordDeletionReplayBlock(deletion);
+        await store.deleteDeviceRows(deletion.userId);
+        await store.deleteOperationalRows(deletion.userId);
+        await store.finishDeletionReplay(deletion.userId);
+      }
     }
-  }
+    deletionCursor = page.nextCursor;
+  } while (deletionCursor);
+
+  let retentionCursor = null;
+  let retentionMarkerPages = 0;
+  let retentionMarkerCount = 0;
+  let latestPurgeCutoff = null;
+  do {
+    const page = await ledger.listRetentionPurgePage({
+      after,
+      cursor: retentionCursor,
+      limit: pageSize,
+    });
+    retentionMarkerPages += 1;
+    for (const marker of page.entries) {
+      retentionMarkerCount += 1;
+      if (
+        !latestPurgeCutoff ||
+        marker.purgeCutoffAt.getTime() > latestPurgeCutoff.getTime()
+      ) {
+        latestPurgeCutoff = marker.purgeCutoffAt;
+      }
+    }
+    retentionCursor = page.nextCursor;
+  } while (retentionCursor);
+
+  const retentionPurged = !dryRun && latestPurgeCutoff
+    ? await replayRetentionPurge(store, latestPurgeCutoff, pageSize)
+    : null;
   console.log(JSON.stringify({
     dryRun,
     restorePoint: after.toISOString(),
-    replayed: dryRun ? 0 : deletions.length,
-    pendingReplay: dryRun ? deletions.length : 0,
-    receipts: deletions.map((entry) => entry.requestId),
+    deletionPages,
+    deletionReceiptsFound: deletionCount,
+    deletionsReplayed: dryRun ? 0 : deletionCount,
+    deletionsPendingReplay: dryRun ? deletionCount : 0,
+    receiptSample,
+    receiptsTruncated: deletionCount > receiptSample.length,
+    lastReceipt,
+    retentionMarkerPages,
+    retentionMarkersFound: retentionMarkerCount,
+    latestRetentionPurgeCutoff: latestPurgeCutoff?.toISOString() || null,
+    retentionPurged,
   }, null, 2));
 } finally {
   await Promise.allSettled([ledger.close(), store.close()]);
+}
+
+async function replayRetentionPurge(store, cutoff, limit) {
+  const totals = {};
+  for (let batch = 0; batch < 100_000; batch += 1) {
+    const counts = await store.purgeRetention(cutoff, limit);
+    for (const [name, count] of Object.entries(counts)) {
+      totals[name] = (totals[name] || 0) + Number(count || 0);
+    }
+    if (Math.max(0, ...Object.values(counts).map(Number)) < limit) {
+      return totals;
+    }
+  }
+  throw new Error("Retention replay exceeded the safe batch limit.");
+}
+
+function numberArgument(name, fallback, minimum, maximum) {
+  const raw = process.argv.find((value) => value.startsWith(`${name}=`))
+    ?.slice(name.length + 1);
+  if (raw == null) return fallback;
+  const parsed = Number(raw);
+  if (!Number.isSafeInteger(parsed) || parsed < minimum || parsed > maximum) {
+    throw new Error(`${name} must be an integer from ${minimum} to ${maximum}.`);
+  }
+  return parsed;
 }
 
 function parseVersionedKeys(value) {

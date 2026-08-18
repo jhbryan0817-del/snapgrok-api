@@ -61,16 +61,46 @@ export function PrivacyPanel() {
       () => getToken({ skipCache: true }),
       getPrivacyExport,
     ));
-  const [activeAction, setActiveAction] = useState<"export" | null>(null);
+  const [exportData, setExportData] = useState<Record<string, unknown> | null>(null);
+  const [dataOpen, setDataOpen] = useState(false);
+  const [activeAction, setActiveAction] = useState<"view" | "export" | null>(null);
   const [error, setError] = useState("");
   const [deleteOpen, setDeleteOpen] = useState(false);
+
+  async function currentExport() {
+    if (exportData) return exportData;
+    const nextExport = await loadPrivacyExport();
+    setExportData(nextExport);
+    return nextExport;
+  }
+
+  async function viewData() {
+    if (dataOpen) {
+      setDataOpen(false);
+      return;
+    }
+    if (exportData) {
+      setDataOpen(true);
+      return;
+    }
+    setError("");
+    setActiveAction("view");
+    try {
+      await currentExport();
+      setDataOpen(true);
+    } catch (nextError) {
+      setError(privacyErrorMessage(nextError));
+    } finally {
+      setActiveAction(null);
+    }
+  }
 
   async function downloadData() {
     setError("");
     setActiveAction("export");
     try {
-      const exportData = await loadPrivacyExport();
-      const blob = new Blob([JSON.stringify(exportData, null, 2)], {
+      const fileData = await currentExport();
+      const blob = new Blob([JSON.stringify(fileData, null, 2)], {
         type: "application/json;charset=utf-8",
       });
       const objectUrl = URL.createObjectURL(blob);
@@ -97,13 +127,18 @@ export function PrivacyPanel() {
           <span className="section-kicker">PRIVACY DETAILS</span>
           <h2 id="account-privacy-title">Your data and account</h2>
         </div>
-        <p>Download a JSON copy of your account data or permanently delete your account.</p>
+        <p>Review a short summary of your account data, download the complete file, or permanently delete your account.</p>
       </div>
 
       <div className="account-privacy-actions">
-        <button type="button" onClick={() => void downloadData()} disabled={activeAction !== null}>
-          {activeAction === "export" ? "Preparing..." : "Download JSON"}
-        </button>
+        <div className="account-privacy-file-actions">
+          <button type="button" onClick={() => void viewData()} disabled={activeAction !== null}>
+            {activeAction === "view" ? "Loading..." : dataOpen ? "Hide my data" : "View my data"}
+          </button>
+          <button type="button" onClick={() => void downloadData()} disabled={activeAction !== null}>
+            {activeAction === "export" ? "Preparing..." : "Download file"}
+          </button>
+        </div>
         <button
           type="button"
           className="account-privacy-delete-button"
@@ -115,6 +150,10 @@ export function PrivacyPanel() {
 
       {error ? <p className="account-privacy-error" role="alert">{error}</p> : null}
 
+      {dataOpen && exportData ? (
+        <PrivacyExportSummaryView exportData={exportData} />
+      ) : null}
+
       {deleteOpen ? (
         <DeleteAccountModal
           onClose={() => setDeleteOpen(false)}
@@ -122,6 +161,192 @@ export function PrivacyPanel() {
       ) : null}
     </section>
   );
+}
+
+function PrivacyExportSummaryView({
+  exportData,
+}: {
+  exportData: Record<string, unknown>;
+}) {
+  const account = asRecord(exportData.account);
+  const serverData = asRecord(exportData.serverData);
+  const usagePeriods = asRows(serverData.usagePeriods);
+  const memberships = asRows(serverData.memberships);
+  const payments = asRows(serverData.paymentHistory);
+  const devices = asRows(serverData.extensionDeviceSessions);
+  const pairings = asRows(serverData.extensionPairings);
+  const notRetained = asStrings(exportData.notRetained);
+  const latestUsage = usagePeriods[0] || {};
+  const latestPayment = payments[0] || {};
+  const exportTime = new Date(stringValue(exportData.generatedAt));
+  const exportTimestamp = Number.isFinite(exportTime.getTime())
+    ? exportTime.getTime()
+    : Date.now();
+  const activeMemberships = memberships.filter((membership) =>
+    stringValue(membership.access_state) === "active");
+  const activeDevices = devices.filter((device) => {
+    const expiresAt = new Date(stringValue(device.access_expires_at));
+    return !stringValue(device.revoked_at) &&
+      Number.isFinite(expiresAt.getTime()) &&
+      expiresAt.getTime() > exportTimestamp;
+  });
+  const remaining = remainingAllowance(latestUsage);
+  const accountName = [account.firstName, account.lastName]
+    .map(stringValue)
+    .filter(Boolean)
+    .join(" ");
+  const retainedRecordCount = [
+    "usagePeriods",
+    "analysisAccounting",
+    "checkoutSessions",
+    "memberships",
+    "paymentHistory",
+    "extensionDeviceSessions",
+    "extensionPairings",
+    "statutoryTransactionRecords",
+  ].reduce((total, key) => total + asRows(serverData[key]).length, 0);
+
+  return (
+    <div className="account-privacy-summary" aria-live="polite">
+      <PrivacySummaryGroup title="Account">
+        <SummaryItem label="Name" value={accountName || "Not provided"} />
+        <SummaryItem label="Email" value={stringValue(account.primaryEmail) || "Not provided"} />
+        <SummaryItem label="Created" value={dateValue(account.createdAt)} />
+      </PrivacySummaryGroup>
+
+      <PrivacySummaryGroup title="Plan and usage">
+        <SummaryItem label="Plan" value={friendlyValue(latestUsage.plan_id)} />
+        <SummaryItem
+          label="Questions used"
+          value={numberValue(latestUsage.consumed)}
+        />
+        <SummaryItem
+          label="Questions remaining"
+          value={remaining == null ? "No current usage period" : String(remaining)}
+        />
+      </PrivacySummaryGroup>
+
+      <PrivacySummaryGroup title="Billing">
+        <SummaryItem label="Active subscriptions" value={String(activeMemberships.length)} />
+        <SummaryItem label="Payment records" value={String(payments.length)} />
+        <SummaryItem
+          label="Latest payment"
+          value={paymentValue(latestPayment)}
+        />
+      </PrivacySummaryGroup>
+
+      <PrivacySummaryGroup title="Extension access">
+        <SummaryItem label="Active devices" value={String(activeDevices.length)} />
+        <SummaryItem label="Pairing records" value={String(pairings.length)} />
+        <SummaryItem
+          label="Last seen"
+          value={dateValue(devices[0]?.last_seen_at)}
+        />
+      </PrivacySummaryGroup>
+
+      <PrivacySummaryGroup title="Records in this file">
+        <SummaryItem label="Total server records" value={String(retainedRecordCount)} />
+        <SummaryItem label="Usage periods" value={String(usagePeriods.length)} />
+        <SummaryItem
+          label="Legal-retention records"
+          value={String(asRows(serverData.statutoryTransactionRecords).length)}
+        />
+      </PrivacySummaryGroup>
+
+      <PrivacySummaryGroup title="Not stored as history">
+        {notRetained.length ? notRetained.map((item) => (
+          <li key={item}><span>{item}</span></li>
+        )) : <li><span>No additional details were returned.</span></li>}
+      </PrivacySummaryGroup>
+
+      <p className="account-privacy-summary-generated">
+        Summary of the export generated {dateValue(exportData.generatedAt)}.
+        The downloaded file contains the complete record.
+      </p>
+    </div>
+  );
+}
+
+function PrivacySummaryGroup({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section>
+      <h3>{title}</h3>
+      <ul>{children}</ul>
+    </section>
+  );
+}
+
+function SummaryItem({ label, value }: { label: string; value: string }) {
+  return (
+    <li>
+      <strong>{label}</strong>
+      <span>{value}</span>
+    </li>
+  );
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
+}
+
+function asRows(value: unknown): Array<Record<string, unknown>> {
+  return Array.isArray(value) ? value.map(asRecord) : [];
+}
+
+function asStrings(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.map(stringValue).filter((item): item is string => Boolean(item))
+    : [];
+}
+
+function stringValue(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function numberValue(value: unknown): string {
+  const number = Number(value);
+  return Number.isFinite(number) ? String(number) : "No current usage period";
+}
+
+function dateValue(value: unknown): string {
+  const text = stringValue(value);
+  if (!text) return "Not available";
+  const date = new Date(text);
+  return Number.isFinite(date.getTime())
+    ? new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(date)
+    : "Not available";
+}
+
+function friendlyValue(value: unknown): string {
+  const text = stringValue(value);
+  if (!text) return "No current plan record";
+  return text.replaceAll(/[_-]+/g, " ").replaceAll(/\b\w/g, (letter) =>
+    letter.toUpperCase());
+}
+
+function remainingAllowance(usage: Record<string, unknown>): number | null {
+  const allowance = Number(usage.allowance);
+  const consumed = Number(usage.consumed);
+  const reserved = Number(usage.reserved);
+  if (![allowance, consumed, reserved].every(Number.isFinite)) return null;
+  return Math.max(0, allowance - consumed - reserved);
+}
+
+function paymentValue(payment: Record<string, unknown>): string {
+  if (!Object.keys(payment).length) return "No payment record";
+  const status = friendlyValue(payment.display_status);
+  const amount = Number(payment.settlement_amount);
+  const currency = stringValue(payment.currency).toUpperCase();
+  if (!Number.isFinite(amount) || !currency) return status;
+  return `${status} · ${amount} ${currency}`;
 }
 
 function DeleteAccountModal({

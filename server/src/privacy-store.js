@@ -823,13 +823,29 @@ export function createPostgresPrivacyStore({
       try {
         const result = await database.query(
           `SELECT count(*)::integer AS total,
-                  count(*) FILTER (WHERE next_retry_at <= $1)::integer AS due
+                  count(*) FILTER (WHERE next_retry_at <= $1)::integer AS due,
+                  count(*) FILTER (
+                    WHERE created_at <= $1::timestamptz - interval '24 hours'
+                  )::integer AS overdue,
+                  count(*) FILTER (
+                    WHERE state = 'partial' AND attempt_count >= 3
+                  )::integer AS repeatedly_partial,
+                  min(created_at) AS oldest_created_at
            FROM privacy_deletion_queue`,
           [at],
         );
+        const oldestCreatedAt = result.rows[0]?.oldest_created_at
+          ? new Date(result.rows[0].oldest_created_at)
+          : null;
         return {
           total: Number(result.rows[0]?.total || 0),
           due: Number(result.rows[0]?.due || 0),
+          overdue: Number(result.rows[0]?.overdue || 0),
+          repeatedlyPartial: Number(result.rows[0]?.repeatedly_partial || 0),
+          oldestCreatedAt: oldestCreatedAt?.toISOString() || null,
+          oldestAgeSeconds: oldestCreatedAt
+            ? Math.max(0, Math.floor((at.getTime() - oldestCreatedAt.getTime()) / 1000))
+            : 0,
         };
       } catch (error) {
         throw normalizePrivacyStoreError(error);

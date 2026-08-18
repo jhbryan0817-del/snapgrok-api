@@ -1,4 +1,4 @@
-# Zenaian API v6.1.0
+# Zenaian API v6.2.0
 
 Render-ready API with production Clerk authentication, exact-origin CORS,
 PostgreSQL quotas, server-created Whop checkout, signed webhook
@@ -21,6 +21,12 @@ restore replay command, a persisted xAI ZDR circuit breaker, observable
 maintenance health/backlog, immediate purge retry after failure, and dynamic
 Clerk re-verification metadata.
 
+v6.2.0 makes deletion and retention recovery fully paginated, records purge
+markers outside the main restore boundary, defines a 400-day ledger-retention
+window with controlled disposal, supports safe encryption-key rotation, and
+degrades health for overdue or repeatedly incomplete deletion work. It also
+adds one ordered migration-and-preflight command for both databases.
+
 ## API routes
 
 | Route | Authentication | Purpose |
@@ -39,7 +45,6 @@ Clerk re-verification metadata.
 | `POST /api/billing/cancel` | Clerk + exact website origin | Cancel renewal at period end |
 | `POST /api/billing/reactivate` | Clerk + exact website origin | Reactivate a canceled renewal while access remains active |
 | `POST /api/billing/webhook` | Standard Webhooks signature | Apply Whop membership, payment, refund, and dispute state |
-| `GET /api/privacy/summary` | Recent Clerk auth + exact website origin | Return current data categories, retention, transfers, and deletion availability |
 | `GET /api/privacy/export` | Recent Clerk auth + exact website origin | Return a JSON account-data export without credentials or content history |
 | `POST /api/privacy/delete-account` | Recent Clerk auth + exact website origin + exact confirmation schema | Start or resume idempotent account deletion |
 | `GET /api/balance` | Clerk admin only | Optional xAI prepaid balance |
@@ -103,12 +108,26 @@ Health Check: /api/health
 Node: 22.13.1
 ```
 
-Migrations are a separate, intentional release step. Never place the
-DDL-capable `MIGRATION_DATABASE_URL` on the long-running Render API service.
-Run `npm run migrate` from a trusted migration environment with both the owner
-URL and a restricted runtime URL, then deploy the API with only the restricted
-runtime `DATABASE_URL`. Migrations are tracked in `schema_migrations` and
-protected by a PostgreSQL advisory lock.
+Migrations are a separate, intentional release step. Never place either
+DDL-capable migration URL on the long-running Render API service. Run the
+ordered command below from a trusted, short-lived migration environment before
+pushing or deploying application code:
+
+```powershell
+npm.cmd run release:databases
+```
+
+The command migrates and verifies the external ledger first, then migrates and
+verifies the main database. It requires:
+
+- `MIGRATION_DATABASE_URL`, `DATABASE_URL`, and `DATABASE_RUNTIME_ROLE`
+- `PRIVACY_DELETION_LEDGER_MIGRATION_DATABASE_URL`
+- `PRIVACY_DELETION_LEDGER_DATABASE_URL`
+- `PRIVACY_DELETION_LEDGER_RUNTIME_ROLE`
+- `PRIVACY_DELETION_LEDGER_ENCRYPTION_KEY` and its configured key version/keyring
+
+Migrations are tracked with advisory locks. Deploy the API with only the two
+restricted runtime URLs and runtime encryption-key configuration.
 
 Production migration requires a separate DDL-capable migration credential, a
 restricted runtime `DATABASE_URL`, and the matching `DATABASE_RUNTIME_ROLE`.
@@ -119,11 +138,11 @@ creation and temporary-table privileges and denies runtime access to
 `schema_migrations`. `REQUIRE_DATABASE_LEAST_PRIVILEGE=true` is forced whenever
 `NODE_ENV=production`.
 
-Run the preflight from the same trusted, short-lived migration environment as
-the migrator. It requires both `MIGRATION_DATABASE_URL` and the restricted
-runtime `DATABASE_URL`; this is necessary because the runtime role is
-deliberately unable to read `schema_migrations`. The probe performs temporary
-audit/archive writes inside a transaction and always rolls them back.
+The main-database preflight can still be run independently from the same
+trusted migration environment. It requires both `MIGRATION_DATABASE_URL` and
+the restricted runtime `DATABASE_URL`; this is necessary because the runtime
+role is deliberately unable to read `schema_migrations`. The probe performs
+temporary audit/archive writes inside a transaction and always rolls them back.
 
 ```powershell
 npm.cmd run privacy:preflight
@@ -143,9 +162,9 @@ Do not deploy until the second result reports all of
 `safeToApplyPrivacyMigration`, and `safeForConfiguredBillingMode` as `true`.
 After deployment, `/api/health` must report the expected version,
 `privacyControls: true`, `privacyReady: true`, and
-`maintenance.status: healthy`. Complete one authenticated Download JSON and
-account-deletion re-verification smoke test before treating the release as
-healthy.
+`maintenance.status: healthy`. Complete one authenticated **View my data**,
+**Download file**, and account-deletion re-verification smoke test before
+treating the release as healthy.
 
 Migration 006 intentionally refuses to drop the three obsolete Lemon Squeezy
 tables if any rows remain. Review/archive real records, or delete only data
@@ -214,9 +233,12 @@ npm.cmd test
 npm.cmd audit --omit=dev --audit-level=low
 ```
 
-The PostgreSQL transaction test skips unless `TEST_DATABASE_URL` is set. Before
-production deployment, point it at a disposable PostgreSQL 16 database and run
-the full suite. Never use the production database as `TEST_DATABASE_URL`.
+The PostgreSQL transaction test skips unless both `TEST_DATABASE_URL` and
+`TEST_DELETION_LEDGER_DATABASE_URL` are set and
+`ALLOW_TEST_DATABASE_RESET=RESET_ZENAIAN_TEST_DATABASES` is explicitly present.
+Before production deployment, point them at two separate disposable PostgreSQL
+databases and run the full suite. The test refuses ordinary/production-looking
+database names and never accepts the same database for both roles.
 
 Normal reconciliation is automatic. The following command is available for an
 operator diagnostic or an intentional one-off run:

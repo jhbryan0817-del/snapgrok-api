@@ -67,14 +67,25 @@ try {
      to_regclass('privacy_deletion_queue') AS deletion_queue,
      to_regclass('privacy_deletion_membership_retries') AS deletion_retries,
      to_regclass('privacy_subject_index') AS subject_index,
-     to_regclass('billing_checkout_tombstones') AS checkout_tombstones`,
+     to_regclass('billing_checkout_tombstones') AS checkout_tombstones,
+     to_regclass('runtime_safety_latches') AS runtime_safety_latches`,
   );
   let privacyMigrationApplied = false;
+  let runtimeSafetyMigrationApplied = false;
   if (migration.rows[0]?.has_ledger) {
     const applied = await migrationClient.query(
-      "SELECT 1 FROM schema_migrations WHERE version = '006_privacy_compliance.sql'",
+      `SELECT version FROM schema_migrations
+       WHERE version = ANY($1::text[])`,
+      [[
+        "006_privacy_compliance.sql",
+        "007_runtime_safety_latches.sql",
+      ]],
     );
-    privacyMigrationApplied = applied.rowCount === 1;
+    const appliedVersions = new Set(applied.rows.map((row) => row.version));
+    privacyMigrationApplied = appliedVersions.has("006_privacy_compliance.sql");
+    runtimeSafetyMigrationApplied = appliedVersions.has(
+      "007_runtime_safety_latches.sql",
+    );
   }
 
   const nonEmptyLegacyTables = Object.entries(legacy)
@@ -114,13 +125,15 @@ try {
   const result = {
     operation: "privacy_preflight",
     privacyMigrationApplied,
+    runtimeSafetyMigrationApplied,
     privacyTablesPresent: Boolean(
       migration.rows[0]?.archive_table &&
       migration.rows[0]?.audit_table &&
       migration.rows[0]?.deletion_queue &&
       migration.rows[0]?.deletion_retries &&
       migration.rows[0]?.subject_index &&
-      migration.rows[0]?.checkout_tombstones
+      migration.rows[0]?.checkout_tombstones &&
+      migration.rows[0]?.runtime_safety_latches
     ),
     privacyRuntimeReady: runtimeReadiness.ready,
     privacyRuntimeCode: runtimeReadiness.code,
@@ -146,6 +159,7 @@ try {
   console.log(JSON.stringify(result));
   if (
     !result.privacyMigrationApplied ||
+    !result.runtimeSafetyMigrationApplied ||
     !result.privacyTablesPresent ||
     !result.privacyRuntimeReady ||
     !result.safeToApplyPrivacyMigration ||

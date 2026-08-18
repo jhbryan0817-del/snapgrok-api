@@ -525,14 +525,32 @@ test("ZDR safety failures atomically disable the persisted latch", async () => {
   assert.match(queries[0][0], /consecutive_failures \+ 1 >= \$1/);
 });
 
-test("deletion maintenance exposes total and due backlog counts", async () => {
+test("deletion maintenance exposes overdue, repeated, and oldest-request state", async () => {
   const pool = scriptedPool((sql) => {
     assert.match(sql, /count\(\*\) FILTER \(WHERE next_retry_at <= \$1\)/);
-    return { rows: [{ total: 7, due: 2 }], rowCount: 1 };
+    assert.match(sql, /interval '24 hours'/);
+    assert.match(sql, /attempt_count >= 3/);
+    return {
+      rows: [{
+        total: 7,
+        due: 2,
+        overdue: 1,
+        repeatedly_partial: 1,
+        oldest_created_at: new Date(NOW.getTime() - 90_000),
+      }],
+      rowCount: 1,
+    };
   });
   const store = privacyStore(pool);
 
-  assert.deepEqual(await store.getDeletionBacklog(NOW), { total: 7, due: 2 });
+  assert.deepEqual(await store.getDeletionBacklog(NOW), {
+    total: 7,
+    due: 2,
+    overdue: 1,
+    repeatedlyPartial: 1,
+    oldestCreatedAt: new Date(NOW.getTime() - 90_000).toISOString(),
+    oldestAgeSeconds: 90,
+  });
 });
 
 function privacyStore(pool) {

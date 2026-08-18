@@ -3,19 +3,49 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import pg from "pg";
+import { createDeletionLedgerStore } from "../src/deletion-ledger-store.js";
 import { createPostgresPrivacyStore } from "../src/privacy-store.js";
 import { createPostgresBillingStore } from "../src/whop-billing-store.js";
 
 const { Pool } = pg;
 const TEST_DATABASE_URL = String(process.env.TEST_DATABASE_URL || "").trim();
+const TEST_DELETION_LEDGER_DATABASE_URL = String(
+  process.env.TEST_DELETION_LEDGER_DATABASE_URL || "",
+).trim();
+const ALLOW_TEST_DATABASE_RESET =
+  process.env.ALLOW_TEST_DATABASE_RESET === "RESET_ZENAIAN_TEST_DATABASES";
 
 test(
-  "PostgreSQL atomically enforces quotas and immutable Whop membership mapping",
-  { skip: !TEST_DATABASE_URL, timeout: 30_000 },
+  "two PostgreSQL databases enforce migrations, billing, privacy recovery, and ZDR persistence",
+  {
+    skip: !TEST_DATABASE_URL ||
+      !TEST_DELETION_LEDGER_DATABASE_URL ||
+      !ALLOW_TEST_DATABASE_RESET,
+    timeout: 90_000,
+  },
   async () => {
-    const schema = `billing_test_${randomBytes(8).toString("hex")}`;
+    assertDisposableDatabase(TEST_DATABASE_URL, "TEST_DATABASE_URL");
+    assertDisposableDatabase(
+      TEST_DELETION_LEDGER_DATABASE_URL,
+      "TEST_DELETION_LEDGER_DATABASE_URL",
+    );
+    assert.notEqual(
+      postgresDatabaseIdentity(TEST_DATABASE_URL),
+      postgresDatabaseIdentity(TEST_DELETION_LEDGER_DATABASE_URL),
+      "the integration test requires two separate PostgreSQL databases",
+    );
+    const suffix = randomBytes(6).toString("hex");
+    const mainRuntimeRole = `zenaian_test_main_${suffix}`;
+    const ledgerRuntimeRole = `zenaian_test_ledger_${suffix}`;
+    const mainRuntimePassword = randomBytes(24).toString("base64url");
+    const ledgerRuntimePassword = randomBytes(24).toString("base64url");
     const admin = new Pool({
       connectionString: TEST_DATABASE_URL,
+      max: 2,
+      connectionTimeoutMillis: 5_000,
+    });
+    const ledgerAdmin = new Pool({
+      connectionString: TEST_DELETION_LEDGER_DATABASE_URL,
       max: 2,
       connectionTimeoutMillis: 5_000,
     });
@@ -26,58 +56,176 @@ test(
       "004_whop_production_lifecycle.sql",
       "005_single_plan_and_payment_history.sql",
       "006_privacy_compliance.sql",
+      "007_runtime_safety_latches.sql",
     ].map((name) => readFile(new URL(`../migrations/${name}`, import.meta.url), "utf8")));
+    const ledgerMigrations = await Promise.all([
+      "001_completed_deletions.sql",
+      "002_retention_purge_recovery.sql",
+    ].map((name) => readFile(
+      new URL(`../deletion-ledger-migrations/${name}`, import.meta.url),
+      "utf8",
+    )));
 
-    await admin.query(`CREATE SCHEMA "${schema}"`);
-    const migrationClient = await admin.connect();
+    await resetDisposableDatabase(admin);
+    await resetDisposableDatabase(ledgerAdmin);
     try {
-      await migrationClient.query(`SET search_path TO "${schema}"`);
-      for (const migration of migrations) await migrationClient.query(migration);
-    } finally {
-      migrationClient.release();
-    }
-
-    const scopedUrl = new URL(TEST_DATABASE_URL);
-    scopedUrl.searchParams.set("options", `-c search_path=${schema}`);
-    const store = createPostgresBillingStore({
-      connectionString: scopedUrl.href,
-      providerMode: "test",
-      poolMax: 12,
-      connectionTimeoutMs: 5_000,
-      statementTimeoutMs: 10_000,
-    });
-
-    try {
-      await store.initialize();
-      await verifyAtomicQuota(store);
-      await verifyCheckoutAndMembershipMapping(store, scopedUrl.href);
-      await verifyDeletedCheckoutTombstone(store, scopedUrl.href);
-      await verifyRetentionPurgeSkipsConcurrentUpdate(scopedUrl.href);
-      await verifyDisputeRetentionUsesLatestEvidence(scopedUrl.href);
-      await verifyArchiveOwnershipConflictFailsClosed(scopedUrl.href);
-      const liveStore = createPostgresBillingStore({
-        connectionString: scopedUrl.href,
-        providerMode: "live",
-        poolMax: 2,
+      for (const migration of migrations) await admin.query(migration);
+      for (const migration of ledgerMigrations) {
+        await ledgerAdmin.query(migration);
+      }
+      const scopedUrl = await createMainRuntime({
+        admin,
+        adminUrl: TEST_DATABASE_URL,
+        role: mainRuntimeRole,
+        password: mainRuntimePassword,
+      });
+      const ledgerRuntimeUrl = await createLedgerRuntime({
+        admin: ledgerAdmin,
+        adminUrl: TEST_DELETION_LEDGER_DATABASE_URL,
+        role: ledgerRuntimeRole,
+        password: ledgerRuntimePassword,
+      });
+      const store = createPostgresBillingStore({
+        connectionString: scopedUrl,
+        providerMode: "test",
+        poolMax: 12,
         connectionTimeoutMs: 5_000,
         statementTimeoutMs: 10_000,
       });
+
       try {
-        await liveStore.initialize();
-        assert.deepEqual(
-          await liveStore.listSubscriptions("user_CheckoutTester123"),
-          [],
-        );
+        await store.initialize();
+        await verifyAtomicQuota(store);
+        await verifyCheckoutAndMembershipMapping(store, scopedUrl);
+        await verifyDeletedCheckoutTombstone(store, scopedUrl);
+        await verifyRetentionPurgeSkipsConcurrentUpdate(scopedUrl);
+        await verifyDisputeRetentionUsesLatestEvidence(scopedUrl);
+        await verifyArchiveOwnershipConflictFailsClosed(scopedUrl);
+        await verifyTwoDatabaseRecovery({
+          mainUrl: scopedUrl,
+          ledgerUrl: ledgerRuntimeUrl,
+        });
+        const liveStore = createPostgresBillingStore({
+          connectionString: scopedUrl,
+          providerMode: "live",
+          poolMax: 2,
+          connectionTimeoutMs: 5_000,
+          statementTimeoutMs: 10_000,
+        });
+        try {
+          await liveStore.initialize();
+          assert.deepEqual(
+            await liveStore.listSubscriptions("user_CheckoutTester123"),
+            [],
+          );
+        } finally {
+          await liveStore.close();
+        }
       } finally {
-        await liveStore.close();
+        await store.close();
       }
     } finally {
-      await store.close();
-      await admin.query(`DROP SCHEMA "${schema}" CASCADE`);
-      await admin.end();
+      await dropRuntimeRole(admin, mainRuntimeRole).catch(() => {});
+      await dropRuntimeRole(ledgerAdmin, ledgerRuntimeRole).catch(() => {});
+      await Promise.allSettled([
+        resetDisposableDatabase(admin),
+        resetDisposableDatabase(ledgerAdmin),
+      ]);
+      await Promise.allSettled([admin.end(), ledgerAdmin.end()]);
     }
   },
 );
+
+async function verifyTwoDatabaseRecovery({ mainUrl, ledgerUrl }) {
+  const keyOne = randomBytes(32).toString("base64url");
+  const keyTwo = randomBytes(32).toString("base64url");
+  const requestId = randomUUID();
+  const markerId = randomUUID();
+  const userId = "user_RecoveryIntegration123";
+  const restorePoint = new Date("2026-08-17T00:00:00.000Z");
+  const completedAt = new Date("2026-08-18T00:00:00.000Z");
+  const ledger = createDeletionLedgerStore({
+    connectionString: ledgerUrl,
+    encryptionKey: keyOne,
+    encryptionKeyVersion: 1,
+  });
+  const privacyStore = createPostgresPrivacyStore({
+    connectionString: mainUrl,
+    providerMode: "test",
+    hmacKey: randomBytes(32).toString("base64url"),
+    hmacKeyVersion: 1,
+  });
+  try {
+    await ledger.initialize();
+    await privacyStore.initialize();
+    await ledger.recordDeletion({ requestId, userId, completedAt });
+    await ledger.recordRetentionPurge({
+      markerId,
+      purgeCutoffAt: completedAt,
+      completedAt,
+    });
+    const deletionPage = await ledger.listCompletedPage({
+      after: restorePoint,
+      limit: 1,
+    });
+    assert.equal(deletionPage.entries.length, 1);
+    await privacyStore.recordDeletionReplayBlock(deletionPage.entries[0]);
+    await privacyStore.deleteDeviceRows(userId);
+    await privacyStore.deleteOperationalRows(userId);
+    await privacyStore.finishDeletionReplay(userId);
+    assert.equal(await privacyStore.isDeletionBlocked(userId), "complete");
+
+    const markerPage = await ledger.listRetentionPurgePage({
+      after: restorePoint,
+      limit: 1,
+    });
+    assert.equal(markerPage.entries[0].markerId, markerId);
+    await privacyStore.purgeRetention(
+      markerPage.entries[0].purgeCutoffAt,
+      500,
+    );
+
+    await privacyStore.recordZdrFailure(3, completedAt);
+    await privacyStore.recordZdrFailure(3, completedAt);
+    assert.equal(
+      (await privacyStore.recordZdrFailure(3, completedAt)).state,
+      "disabled",
+    );
+  } finally {
+    await Promise.allSettled([ledger.close(), privacyStore.close()]);
+  }
+
+  const rotatedLedger = createDeletionLedgerStore({
+    connectionString: ledgerUrl,
+    encryptionKey: keyTwo,
+    encryptionKeyVersion: 2,
+    previousEncryptionKeys: [{ version: 1, key: keyOne }],
+  });
+  const reopenedPrivacyStore = createPostgresPrivacyStore({
+    connectionString: mainUrl,
+    providerMode: "test",
+    hmacKey: randomBytes(32).toString("base64url"),
+    hmacKeyVersion: 1,
+  });
+  try {
+    await rotatedLedger.initialize();
+    assert.equal(await rotatedLedger.recordDeletion({
+      requestId,
+      userId,
+      completedAt,
+    }), false);
+    await reopenedPrivacyStore.initialize();
+    assert.equal(
+      (await reopenedPrivacyStore.getZdrSafetyState()).state,
+      "disabled",
+    );
+  } finally {
+    await Promise.allSettled([
+      rotatedLedger.close(),
+      reopenedPrivacyStore.close(),
+    ]);
+  }
+}
 
 async function verifyAtomicQuota(store) {
   const userId = "user_DatabaseTester123";
@@ -692,4 +840,112 @@ function normalizedMembership(overrides = {}) {
     updatedAt: new Date("2026-07-27T00:00:01.000Z"),
     ...overrides,
   };
+}
+
+function assertDisposableDatabase(value, name) {
+  const url = new URL(value);
+  const database = decodeURIComponent(url.pathname.slice(1));
+  if (
+    !new Set(["postgres:", "postgresql:"]).has(url.protocol) ||
+    !database ||
+    !/zenaian.*test|test.*zenaian/i.test(database)
+  ) {
+    throw new Error(
+      `${name} must target a disposable PostgreSQL database whose name contains both zenaian and test.`,
+    );
+  }
+}
+
+function postgresDatabaseIdentity(value) {
+  const url = new URL(value);
+  return `${url.hostname}:${url.port || "5432"}${url.pathname}`.toLowerCase();
+}
+
+async function resetDisposableDatabase(pool) {
+  const identity = await pool.query("SELECT current_database() AS database");
+  if (!/zenaian.*test|test.*zenaian/i.test(identity.rows[0]?.database || "")) {
+    throw new Error("Refusing to reset a database that is not clearly disposable.");
+  }
+  await pool.query("DROP SCHEMA IF EXISTS legal_retention CASCADE");
+  await pool.query("DROP SCHEMA IF EXISTS public CASCADE");
+  await pool.query("CREATE SCHEMA public");
+}
+
+async function createMainRuntime({ admin, adminUrl, role, password }) {
+  await createRuntimeLogin(admin, role, password);
+  const identifier = quoteIdentifier(role);
+  const database = quoteIdentifier(
+    (await admin.query("SELECT current_database() AS name")).rows[0].name,
+  );
+  await admin.query("REVOKE CREATE ON SCHEMA public, legal_retention FROM PUBLIC");
+  await admin.query(`REVOKE CREATE ON SCHEMA public, legal_retention FROM ${identifier}`);
+  await admin.query(`REVOKE CREATE, TEMPORARY ON DATABASE ${database} FROM PUBLIC`);
+  await admin.query(`REVOKE CREATE, TEMPORARY ON DATABASE ${database} FROM ${identifier}`);
+  await admin.query(`GRANT CONNECT ON DATABASE ${database} TO ${identifier}`);
+  await admin.query(`GRANT USAGE ON SCHEMA public, legal_retention TO ${identifier}`);
+  await admin.query(
+    `GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES
+     IN SCHEMA public, legal_retention TO ${identifier}`,
+  );
+  await admin.query(
+    `GRANT USAGE, SELECT ON ALL SEQUENCES
+     IN SCHEMA public, legal_retention TO ${identifier}`,
+  );
+  return runtimeUrl(adminUrl, role, password);
+}
+
+async function createLedgerRuntime({ admin, adminUrl, role, password }) {
+  await createRuntimeLogin(admin, role, password);
+  const identifier = quoteIdentifier(role);
+  const database = quoteIdentifier(
+    (await admin.query("SELECT current_database() AS name")).rows[0].name,
+  );
+  await admin.query("REVOKE CREATE ON SCHEMA public FROM PUBLIC");
+  await admin.query(`REVOKE CREATE ON SCHEMA public FROM ${identifier}`);
+  await admin.query(`REVOKE CREATE, TEMPORARY ON DATABASE ${database} FROM PUBLIC`);
+  await admin.query(`REVOKE CREATE, TEMPORARY ON DATABASE ${database} FROM ${identifier}`);
+  await admin.query(`GRANT CONNECT ON DATABASE ${database} TO ${identifier}`);
+  await admin.query(`GRANT USAGE ON SCHEMA public TO ${identifier}`);
+  await admin.query(
+    `GRANT SELECT, INSERT ON completed_deletion_ledger,
+       completed_retention_purge_ledger TO ${identifier}`,
+  );
+  await admin.query(
+    `GRANT USAGE, SELECT ON SEQUENCE
+       completed_deletion_ledger_ledger_sequence_seq,
+       completed_retention_purge_ledger_ledger_sequence_seq TO ${identifier}`,
+  );
+  await admin.query(
+    `REVOKE ALL ON FUNCTION purge_expired_privacy_ledger(timestamptz)
+     FROM ${identifier}`,
+  );
+  return runtimeUrl(adminUrl, role, password);
+}
+
+async function createRuntimeLogin(admin, role, password) {
+  const identifier = quoteIdentifier(role);
+  if (!/^[A-Za-z0-9_-]{32}$/.test(password)) {
+    throw new Error("Test role password is invalid.");
+  }
+  await admin.query(`CREATE ROLE ${identifier} LOGIN PASSWORD '${password}'`);
+}
+
+async function dropRuntimeRole(admin, role) {
+  const identifier = quoteIdentifier(role);
+  await admin.query(`DROP OWNED BY ${identifier}`);
+  await admin.query(`DROP ROLE IF EXISTS ${identifier}`);
+}
+
+function runtimeUrl(adminUrl, role, password) {
+  const url = new URL(adminUrl);
+  url.username = role;
+  url.password = password;
+  return url.href;
+}
+
+function quoteIdentifier(value) {
+  if (!/^[A-Za-z_][A-Za-z0-9_]{0,62}$/.test(value)) {
+    throw new Error("Unsafe test PostgreSQL identifier.");
+  }
+  return `"${value}"`;
 }

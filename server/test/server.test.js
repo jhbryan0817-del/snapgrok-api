@@ -107,7 +107,7 @@ test("health endpoint reveals no secret configuration", async () => {
     );
     assert.deepEqual(await response.json(), {
       ok: true,
-      version: "6.1.0",
+      version: "6.2.0",
       service: "zenaian-api",
       authRequired: true,
       persistentRequestStorage: false,
@@ -139,6 +139,35 @@ test("health becomes degraded after privacy maintenance fails", async () => {
     assert.equal(payload.maintenance.consecutiveFailures, 1);
     assert.match(payload.maintenance.lastAttemptAt, /^2026-|^202[7-9]-/);
     assert.equal(payload.maintenance.lastSuccessAt, null);
+  });
+});
+
+test("health degrades for overdue or repeatedly partial deletions", async () => {
+  await withServer({
+    privacy: {
+      ready: true,
+      async maintenance() {
+        return {
+          deletionBacklog: {
+            total: 2,
+            due: 2,
+            overdue: 1,
+            repeatedlyPartial: 1,
+            oldestCreatedAt: "2026-08-17T00:00:00.000Z",
+            oldestAgeSeconds: 86_400,
+          },
+          zdrSafety: { state: "enabled", consecutiveFailures: 0 },
+        };
+      },
+    },
+  }, async (baseUrl, server) => {
+    await server.runPrivacyMaintenance();
+    const response = await fetch(`${baseUrl}/api/health`);
+    const payload = await response.json();
+    assert.equal(response.status, 503);
+    assert.equal(payload.maintenance.status, "degraded");
+    assert.equal(payload.maintenance.deletionBacklog.overdue, 1);
+    assert.equal(payload.maintenance.deletionBacklog.repeatedlyPartial, 1);
   });
 });
 
@@ -228,10 +257,6 @@ test("privacy routes are website-only, authenticated, and require recent auth", 
   });
   const privacy = {
     store: null,
-    async summary(userId) {
-      calls.push(["summary", userId]);
-      return { categories: [], retention: [], transfers: [], deletion: { available: true } };
-    },
     async exportData(userId) {
       calls.push(["export", userId]);
       return { requestId: "export_test" };
@@ -253,10 +278,6 @@ test("privacy routes are website-only, authenticated, and require recent auth", 
     }),
   }, async (baseUrl) => {
     const headers = { Origin: WEBSITE_ORIGIN, Authorization: "Bearer test" };
-    const summary = await fetch(`${baseUrl}/api/privacy/summary`, { headers });
-    assert.equal(summary.status, 200);
-    assert.equal((await summary.json()).deletion.available, true);
-
     const exported = await fetch(`${baseUrl}/api/privacy/export`, { headers });
     assert.equal(exported.status, 200);
     assert.equal((await exported.json()).export.requestId, "export_test");
@@ -274,12 +295,11 @@ test("privacy routes are website-only, authenticated, and require recent auth", 
     });
     assert.equal(deleted.status, 200);
     assert.deepEqual(calls, [
-      ["summary", "user_test"],
       ["export", "user_test"],
       ["delete", "user_test"],
     ]);
 
-    const wrongOrigin = await fetch(`${baseUrl}/api/privacy/summary`, {
+    const wrongOrigin = await fetch(`${baseUrl}/api/privacy/export`, {
       headers: { ...headers, Origin: EXTENSION_ORIGIN },
     });
     assert.equal(wrongOrigin.status, 403);
@@ -294,7 +314,7 @@ test("privacy routes are website-only, authenticated, and require recent auth", 
       factorVerificationAge: [11, -1],
     }),
   }, async (baseUrl) => {
-    for (const pathname of ["/api/privacy/summary", "/api/privacy/export"]) {
+    for (const pathname of ["/api/privacy/export"]) {
       const response = await fetch(`${baseUrl}${pathname}`, {
         headers: { Origin: WEBSITE_ORIGIN, Authorization: "Bearer test" },
       });
