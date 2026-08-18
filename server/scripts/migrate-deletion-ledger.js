@@ -21,6 +21,11 @@ const mainDatabaseUrl = String(process.env.DATABASE_URL || "").trim();
 const runtimeRole = String(
   process.env.PRIVACY_DELETION_LEDGER_RUNTIME_ROLE || "",
 ).trim();
+const bootstrapRuntimeRole = strictBoolean(
+  process.env.MIGRATION_BOOTSTRAP_RUNTIME_ROLES,
+  false,
+  "MIGRATION_BOOTSTRAP_RUNTIME_ROLES",
+);
 
 if (!migrationUrl || !runtimeUrl || !mainDatabaseUrl || !runtimeRole) {
   throw new Error(
@@ -56,18 +61,16 @@ const client = new Client({
 
 try {
   await client.connect();
-  const identity = await client.query(
-    "SELECT current_user AS current_user, session_user AS session_user",
+  const effectiveMigrationRole = await assertMigrationIdentity(
+    client,
+    migrationTarget.username,
   );
-  if (
-    identity.rows[0]?.current_user !== migrationTarget.username ||
-    identity.rows[0]?.session_user !== migrationTarget.username
-  ) {
-    throw new Error(
-      "The ledger migration URL must connect directly as its declared owner.",
-    );
-  }
-  await assertRuntimeRole(client, runtimeRole, migrationTarget.username);
+  await ensureRuntimeRole(client, {
+    runtimeUrl,
+    runtimeRole,
+    bootstrapRuntimeRole,
+  });
+  await assertRuntimeRole(client, runtimeRole, effectiveMigrationRole);
   await client.query(
     `CREATE TABLE IF NOT EXISTS schema_migrations (
        version text PRIMARY KEY,
@@ -132,7 +135,7 @@ try {
   await client.query(
     `REVOKE ALL ON FUNCTION purge_expired_privacy_ledger(timestamptz) FROM ${role}`,
   );
-  await assertRuntimeRole(client, runtimeRole, migrationTarget.username);
+  await assertRuntimeRole(client, runtimeRole, effectiveMigrationRole);
 } finally {
   await client.end();
 }
@@ -155,6 +158,74 @@ function quoteIdentifier(value) {
     throw new Error("Ledger runtime role is invalid.");
   }
   return `"${value}"`;
+}
+
+async function assertMigrationIdentity(client, migrationRole) {
+  const identity = await client.query(
+    `SELECT current_user AS current_user, session_user AS session_user,
+            current_user = $1 AS current_matches_url,
+            session_user = $1 AS session_matches_url,
+            pg_has_role(session_user, current_user, 'MEMBER')
+              AS session_member_of_current,
+            EXISTS (
+              SELECT 1 FROM pg_database
+              WHERE datname = current_database()
+                AND datdba = (
+                  SELECT oid FROM pg_roles WHERE rolname = current_user
+                )
+            ) AS current_owns_database`,
+    [migrationRole],
+  );
+  const role = identity.rows[0];
+  const authenticatedOwner = role?.session_matches_url &&
+    role?.current_owns_database &&
+    (role?.current_matches_url || role?.session_member_of_current);
+  if (!authenticatedOwner) {
+    throw new Error(
+      "The ledger migration URL must authenticate as its URL username and resolve only to the database owner.",
+    );
+  }
+  return String(role.current_user);
+}
+
+async function ensureRuntimeRole(client, {
+  runtimeUrl,
+  runtimeRole,
+  bootstrapRuntimeRole,
+}) {
+  const existing = await client.query(
+    "SELECT 1 FROM pg_roles WHERE rolname = $1",
+    [runtimeRole],
+  );
+  if (existing.rowCount) return;
+  if (!bootstrapRuntimeRole) {
+    throw new Error(
+      "The ledger runtime role must already exist unless the one-time runtime-role bootstrap is enabled.",
+    );
+  }
+  const runtime = new URL(runtimeUrl);
+  const password = decodeURIComponent(runtime.password);
+  if (password.length < 32 || password.length > 256 || /[\u0000\r\n]/.test(password)) {
+    throw new Error(
+      "The ledger runtime URL must contain a strong runtime-role password.",
+    );
+  }
+  const command = await client.query(
+    `SELECT format(
+       'CREATE ROLE %I WITH LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS PASSWORD %L',
+       $1, $2
+     ) AS statement`,
+    [runtimeRole, password],
+  );
+  await client.query(command.rows[0].statement);
+  console.log(`Created isolated ledger runtime role ${runtimeRole}.`);
+}
+
+function strictBoolean(value, fallback, name) {
+  if (value === undefined || value === null || value === "") return fallback;
+  if (value === "true") return true;
+  if (value === "false") return false;
+  throw new Error(`${name} must be exactly true or false.`);
 }
 
 async function assertRuntimeRole(client, runtimeRole, migrationRole) {

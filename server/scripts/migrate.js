@@ -25,6 +25,11 @@ const requireLeastPrivilege = productionRuntime || strictBoolean(
   false,
   "REQUIRE_DATABASE_LEAST_PRIVILEGE",
 );
+const bootstrapRuntimeRole = strictBoolean(
+  process.env.MIGRATION_BOOTSTRAP_RUNTIME_ROLES,
+  false,
+  "MIGRATION_BOOTSTRAP_RUNTIME_ROLES",
+);
 
 if (!connectionString) {
   throw new Error(
@@ -48,12 +53,21 @@ const client = new Client({
 
 try {
   await client.connect();
+  let effectiveMigrationRole = null;
   if (databaseBoundary) {
-    await assertMigrationIdentity(client, databaseBoundary.migrationRole);
+    effectiveMigrationRole = await assertMigrationIdentity(
+      client,
+      databaseBoundary.migrationRole,
+    );
+    await ensureRuntimeRole(client, {
+      runtimeConnectionString,
+      runtimeRole: databaseBoundary.runtimeRole,
+      bootstrapRuntimeRole,
+    });
     await assertRuntimeRole(
       client,
       databaseBoundary.runtimeRole,
-      databaseBoundary.migrationRole,
+      effectiveMigrationRole,
     );
   }
   await client.query(
@@ -106,7 +120,7 @@ try {
     await assertRuntimeRole(
       client,
       databaseBoundary.runtimeRole,
-      databaseBoundary.migrationRole,
+      effectiveMigrationRole,
     );
     await applyRuntimePrivileges(client, databaseBoundary.runtimeRole);
     await verifyRuntimePrivileges(client, databaseBoundary.runtimeRole);
@@ -141,16 +155,61 @@ async function assertNoForeignModeActiveMemberships(client, billingMode) {
 
 async function assertMigrationIdentity(client, migrationRole) {
   const identity = await client.query(
-    "SELECT current_user AS current_user, session_user AS session_user",
+    `SELECT current_user AS current_user, session_user AS session_user,
+            current_user = $1 AS current_matches_url,
+            session_user = $1 AS session_matches_url,
+            pg_has_role(session_user, current_user, 'MEMBER')
+              AS session_member_of_current,
+            EXISTS (
+              SELECT 1 FROM pg_database
+              WHERE datname = current_database()
+                AND datdba = (
+                  SELECT oid FROM pg_roles WHERE rolname = current_user
+                )
+            ) AS current_owns_database`,
+    [migrationRole],
   );
-  if (
-    identity.rows[0]?.current_user !== migrationRole ||
-    identity.rows[0]?.session_user !== migrationRole
-  ) {
+  const role = identity.rows[0];
+  const authenticatedOwner = role?.session_matches_url &&
+    role?.current_owns_database &&
+    (role?.current_matches_url || role?.session_member_of_current);
+  if (!authenticatedOwner) {
     throw new Error(
-      "MIGRATION_DATABASE_URL must connect directly as its declared migration-owner username without role remapping.",
+      "MIGRATION_DATABASE_URL must authenticate as its URL username and resolve only to the database owner.",
     );
   }
+  return String(role.current_user);
+}
+
+async function ensureRuntimeRole(client, {
+  runtimeConnectionString,
+  runtimeRole,
+  bootstrapRuntimeRole,
+}) {
+  const existing = await client.query(
+    "SELECT 1 FROM pg_roles WHERE rolname = $1",
+    [runtimeRole],
+  );
+  if (existing.rowCount) return;
+  if (!bootstrapRuntimeRole) {
+    throw new Error(
+      "DATABASE_RUNTIME_ROLE must already exist unless the one-time runtime-role bootstrap is enabled.",
+    );
+  }
+  const runtime = parsePostgresUrl(runtimeConnectionString, "DATABASE_URL");
+  const password = decodeURIComponent(runtime.password);
+  if (password.length < 32 || password.length > 256 || /[\u0000\r\n]/.test(password)) {
+    throw new Error("DATABASE_URL must contain a strong runtime-role password.");
+  }
+  const command = await client.query(
+    `SELECT format(
+       'CREATE ROLE %I WITH LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS PASSWORD %L',
+       $1, $2
+     ) AS statement`,
+    [runtimeRole, password],
+  );
+  await client.query(command.rows[0].statement);
+  console.log(`Created isolated runtime role ${runtimeRole}.`);
 }
 
 function validateDatabaseBoundary({

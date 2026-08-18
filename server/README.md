@@ -108,10 +108,10 @@ Health Check: /api/health
 Node: 22.13.1
 ```
 
-Migrations are a separate, intentional release step. Never place either
+Migrations are a separate, intentional release step. Never retain either
 DDL-capable migration URL on the long-running Render API service. Run the
-ordered command below from a trusted, short-lived migration environment before
-pushing or deploying application code:
+ordered command below from a trusted, short-lived migration or pre-deploy
+environment before switching application traffic:
 
 ```powershell
 npm.cmd run release:databases
@@ -126,8 +126,21 @@ verifies the main database. It requires:
 - `PRIVACY_DELETION_LEDGER_RUNTIME_ROLE`
 - `PRIVACY_DELETION_LEDGER_ENCRYPTION_KEY` and its configured key version/keyring
 
+For a first release, set `MIGRATION_BOOTSTRAP_RUNTIME_ROLES=true` only when the
+usernames embedded in the two runtime URLs do not exist yet. Each URL must
+contain a strong password. The migration owner creates non-admin, non-inheriting
+login roles, verifies their isolation, and then grants the bounded privileges.
+Remove the bootstrap flag immediately after that successful run. Render-managed
+rotating credentials are suitable for the short-lived migration owner, but the
+long-running app should use these explicitly restricted PostgreSQL roles.
+
 Migrations are tracked with advisory locks. Deploy the API with only the two
 restricted runtime URLs and runtime encryption-key configuration.
+
+If Render's API-service pre-deploy hook is used as the trusted migration
+environment, treat the owner URLs and bootstrap flag as temporary. After the
+gated deploy succeeds, clear the hook, remove those variables, and redeploy the
+same commit once so the long-running process cannot inherit migration secrets.
 
 Production migration requires a separate DDL-capable migration credential, a
 restricted runtime `DATABASE_URL`, and the matching `DATABASE_RUNTIME_ROLE`.

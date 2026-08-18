@@ -55,6 +55,19 @@ jobs:
       - run: npm ci --ignore-scripts
       - run: npm run check
       - run: npm test
+      - name: Verify ordered database release gate
+        run: npm run release:databases
+        env:
+          BILLING_MODE: test
+          MIGRATION_BOOTSTRAP_RUNTIME_ROLES: "true"
+          MIGRATION_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/zenaian_test_main
+          DATABASE_URL: postgresql://zenaian_ci_main_runtime:MainRuntimePasswordForCiOnly1234567890@127.0.0.1:5432/zenaian_test_main
+          DATABASE_RUNTIME_ROLE: zenaian_ci_main_runtime
+          PRIVACY_DELETION_LEDGER_MIGRATION_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5433/zenaian_test_ledger
+          PRIVACY_DELETION_LEDGER_DATABASE_URL: postgresql://zenaian_ci_ledger_runtime:LedgerRuntimePasswordForCiOnly123456789@127.0.0.1:5433/zenaian_test_ledger
+          PRIVACY_DELETION_LEDGER_RUNTIME_ROLE: zenaian_ci_ledger_runtime
+          PRIVACY_DELETION_LEDGER_ENCRYPTION_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+          PRIVACY_DELETION_LEDGER_ENCRYPTION_KEY_VERSION: "1"
       - run: npm audit --omit=dev --audit-level=low
 
   website:

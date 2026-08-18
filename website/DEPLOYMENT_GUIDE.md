@@ -58,6 +58,13 @@ database. Continue only when it ends with:
 {"operation":"release_databases","ready":true}
 ```
 
+For the first release only, `MIGRATION_BOOTSTRAP_RUNTIME_ROLES=true` can create
+the two restricted PostgreSQL login roles from the passwords in their runtime
+URLs. Remove that flag and both migration-owner URLs after the successful gate.
+If the gate ran as the API service's Render pre-deploy command, clear the
+command and redeploy the same commit once more after removing those temporary
+values, so the steady-state process contains runtime credentials only.
+
 The main-database preflight must also report these values as `true`:
 
 - `privacyMigrationApplied`
@@ -67,7 +74,7 @@ The main-database preflight must also report these values as `true`:
 - `safeToApplyPrivacyMigration`
 - `safeForConfiguredBillingMode`
 
-Never put either migration/DDL-owner database URL on the Render API service.
+Never retain either migration/DDL-owner database URL on the Render API service.
 For restore/replay or controlled ledger-retention operations, follow
 [`PRIVACY_RECOVERY_RUNBOOK.md`](../server/PRIVACY_RECOVERY_RUNBOOK.md).
 

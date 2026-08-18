@@ -25,7 +25,10 @@ test("production migration fails closed unless DDL and runtime roles are isolate
   );
 
   assert.match(migrator, /SELECT current_user AS current_user, session_user AS session_user/);
-  assert.match(migrator, /MIGRATION_DATABASE_URL must connect directly/);
+  assert.match(migrator, /session_matches_url/);
+  assert.match(migrator, /current_owns_database/);
+  assert.match(migrator, /MIGRATION_BOOTSTRAP_RUNTIME_ROLES/);
+  assert.match(migrator, /CREATE ROLE %I WITH LOGIN NOSUPERUSER/);
   assert.match(migrator, /pg_has_role\(\$1, \$2, 'MEMBER'\)/);
   assert.match(migrator, /DATABASE_RUNTIME_ROLE must not own or inherit ownership/);
   assert.match(migrator, /REVOKE CREATE, TEMPORARY ON DATABASE/);

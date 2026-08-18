@@ -18,6 +18,11 @@ Configure the trusted migration environment with:
 - `PRIVACY_DELETION_LEDGER_DATABASE_URL` for the ledger runtime role.
 - `PRIVACY_DELETION_LEDGER_RUNTIME_ROLE` matching the runtime URL username.
 
+If the runtime role does not exist yet, provide its strong password in the
+runtime URL and set `MIGRATION_BOOTSTRAP_RUNTIME_ROLES=true` for this one run.
+The migrator creates it without admin attributes or inherited owner access.
+Remove the flag immediately after the migration succeeds.
+
 Run `npm run deletion-ledger:migrate`. The migration creates an append-only
 table with a trigger that rejects update and delete operations, then grants the
 runtime role only append/read access.
