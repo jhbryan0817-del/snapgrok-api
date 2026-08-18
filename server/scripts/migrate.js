@@ -204,7 +204,7 @@ async function ensureRuntimeRole(client, {
   const command = await client.query(
     `SELECT format(
        'CREATE ROLE %I WITH LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS PASSWORD %L',
-       $1, $2
+       $1::text, $2::text
      ) AS statement`,
     [runtimeRole, password],
   );
