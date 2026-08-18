@@ -65,20 +65,25 @@ test(
       new URL(`../deletion-ledger-migrations/${name}`, import.meta.url),
       "utf8",
     )));
+    let integrationPhase = "reset disposable databases";
 
-    await resetDisposableDatabase(admin);
-    await resetDisposableDatabase(ledgerAdmin);
     try {
+      await resetDisposableDatabase(admin);
+      await resetDisposableDatabase(ledgerAdmin);
+      integrationPhase = "apply main migrations";
       for (const migration of migrations) await admin.query(migration);
+      integrationPhase = "apply ledger migrations";
       for (const migration of ledgerMigrations) {
         await ledgerAdmin.query(migration);
       }
+      integrationPhase = "create main runtime role";
       const scopedUrl = await createMainRuntime({
         admin,
         adminUrl: TEST_DATABASE_URL,
         role: mainRuntimeRole,
         password: mainRuntimePassword,
       });
+      integrationPhase = "create ledger runtime role";
       const ledgerRuntimeUrl = await createLedgerRuntime({
         admin: ledgerAdmin,
         adminUrl: TEST_DELETION_LEDGER_DATABASE_URL,
@@ -94,13 +99,21 @@ test(
       });
 
       try {
+        integrationPhase = "initialize restricted billing store";
         await store.initialize();
+        integrationPhase = "verify atomic quota";
         await verifyAtomicQuota(store);
+        integrationPhase = "verify checkout and membership mapping";
         await verifyCheckoutAndMembershipMapping(store, scopedUrl);
+        integrationPhase = "verify deleted checkout tombstone";
         await verifyDeletedCheckoutTombstone(store, scopedUrl);
+        integrationPhase = "verify concurrent retention purge";
         await verifyRetentionPurgeSkipsConcurrentUpdate(scopedUrl);
+        integrationPhase = "verify dispute retention";
         await verifyDisputeRetentionUsesLatestEvidence(scopedUrl);
+        integrationPhase = "verify archive ownership conflict";
         await verifyArchiveOwnershipConflictFailsClosed(scopedUrl);
+        integrationPhase = "verify two-database recovery";
         await verifyTwoDatabaseRecovery({
           mainUrl: scopedUrl,
           ledgerUrl: ledgerRuntimeUrl,
@@ -113,6 +126,7 @@ test(
           statementTimeoutMs: 10_000,
         });
         try {
+          integrationPhase = "reopen live billing store";
           await liveStore.initialize();
           assert.deepEqual(
             await liveStore.listSubscriptions("user_CheckoutTester123"),
@@ -124,6 +138,12 @@ test(
       } finally {
         await store.close();
       }
+    } catch (error) {
+      throw new Error(
+        `Two-database integration failed during ${integrationPhase} ` +
+        `(${safeIntegrationCode(error)}).`,
+        { cause: error },
+      );
     } finally {
       await dropRuntimeRole(admin, mainRuntimeRole).catch(() => {});
       await dropRuntimeRole(ledgerAdmin, ledgerRuntimeRole).catch(() => {});
@@ -948,4 +968,12 @@ function quoteIdentifier(value) {
     throw new Error("Unsafe test PostgreSQL identifier.");
   }
   return `"${value}"`;
+}
+
+function safeIntegrationCode(error) {
+  for (const value of [error?.code, error?.databaseCode, error?.cause?.code]) {
+    const code = String(value || "");
+    if (/^[A-Z0-9_]{2,64}$/.test(code)) return code;
+  }
+  return "UNKNOWN";
 }

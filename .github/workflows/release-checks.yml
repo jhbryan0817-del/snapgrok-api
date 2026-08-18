@@ -46,8 +46,8 @@ jobs:
       TEST_DELETION_LEDGER_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5433/zenaian_test_ledger
       ALLOW_TEST_DATABASE_RESET: RESET_ZENAIAN_TEST_DATABASES
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 22.13.1
           cache: npm
@@ -70,8 +70,8 @@ jobs:
       NEXT_PUBLIC_API_URL: https://snapgrok-api.onrender.com
       NEXT_PUBLIC_EXTENSION_ID: jjgjlopdpefphgappfmkkkpiknpnoijb
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 22.13.1
           cache: npm
