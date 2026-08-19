@@ -34,9 +34,11 @@ button { cursor: pointer; }
 .app-shell { padding: 14px; }
 
 .app-header {
-  display: flex;
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) 28px;
+  column-gap: 10px;
+  row-gap: 2px;
   align-items: center;
-  gap: 10px;
   padding: 3px 2px 14px;
 }
 
@@ -54,6 +56,8 @@ button { cursor: pointer; }
   font-size: 21px;
   font-weight: 800;
   letter-spacing: -.04em;
+  grid-column: 1;
+  grid-row: 1 / span 2;
 }
 .brand-mark span {
   display: block;
@@ -61,7 +65,7 @@ button { cursor: pointer; }
   transform: translateY(-2px);
 }
 
-.brand-copy { min-width: 0; flex: 1; }
+.brand-copy { min-width: 0; grid-column: 2; grid-row: 1; }
 .brand-copy h1 { margin: 0; font-size: 19px; letter-spacing: -.03em; }
 .brand-copy p { margin: 3px 0 0; color: var(--muted); font-size: 12px; white-space: nowrap; }
 
@@ -70,6 +74,9 @@ button { cursor: pointer; }
   width: 28px;
   height: 28px;
   flex: 0 0 28px;
+  grid-column: 3;
+  grid-row: 1 / span 2;
+  justify-self: end;
   border-radius: 50%;
   background: var(--accent-soft);
 }
@@ -109,10 +116,11 @@ button { cursor: pointer; }
 .signed-out p { max-width: 330px; margin: 0 auto; }
 .signed-out small { display: block; margin-top: 12px; color: #8b93a1; font-size: 10px; line-height: 1.45; }
 .auth-button { width: 100%; margin-top: 17px; padding-block: 12px; font-size: 12px; }
-.header-account { display: flex; align-items: center; justify-content: flex-end; gap: 7px; }
-.account-strip { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; color: #8b93a1; font-size: 8px; white-space: nowrap; }
-.account-strip strong { display: inline-block; max-width: 130px; overflow: hidden; color: #667085; font-size: inherit; font-weight: 650; text-overflow: ellipsis; vertical-align: bottom; white-space: nowrap; }
-.account-strip .ghost-button { padding: 0; font-size: 8px; }
+.header-account { display: contents; }
+.account-strip { display: flex; min-width: 0; grid-column: 2; grid-row: 2; align-items: center; gap: 7px; overflow: hidden; color: #8b93a1; font-size: 8px; white-space: nowrap; }
+.account-identity { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.account-strip strong { color: #667085; font-size: inherit; font-weight: 650; }
+.account-strip .ghost-button { flex: 0 0 auto; padding: 0; font-size: 8px; }
 @keyframes auth-spin { to { transform: rotate(360deg); } }
 
 .section-block,
@@ -133,8 +141,9 @@ h2 { margin: 0; font-size: 16px; letter-spacing: -.02em; }
 .capture-grid { display: grid; gap: 8px; }
 .capture-card {
   display: grid;
-  grid-template-columns: 36px minmax(0, 1fr) auto;
-  gap: 7px;
+  grid-template-columns: 36px minmax(0, 1fr);
+  column-gap: 7px;
+  row-gap: 4px;
   align-items: center;
   padding: 10px;
   border: 1px solid var(--line);
@@ -147,6 +156,8 @@ h2 { margin: 0; font-size: 16px; letter-spacing: -.02em; }
   position: relative;
   width: 36px;
   height: 36px;
+  grid-column: 1;
+  grid-row: 1 / span 2;
   border-radius: 12px;
   background: var(--accent-soft);
 }
@@ -183,9 +194,12 @@ h2 { margin: 0; font-size: 16px; letter-spacing: -.02em; }
   font-size: 18px;
   font-weight: 600;
 }
+.capture-copy { min-width: 0; grid-column: 2; grid-row: 1; }
 .capture-copy h3 { margin: 0; font-size: 14px; }
 .capture-copy p { margin: 3px 0 0; color: var(--muted); font-size: 9px; line-height: 1.35; white-space: nowrap; }
 .shortcut-line { display: flex; align-items: center; gap: 7px; }
+.capture-card > .shortcut-line,
+.shortcut-control { min-width: 0; grid-column: 2; grid-row: 2; justify-self: end; }
 .shortcut-control { display: grid; justify-items: end; gap: 5px; }
 .shortcut-note {
   max-width: 142px;
@@ -217,12 +231,13 @@ kbd {
 .ghost-button:hover { background: var(--accent-soft); }
 
 .instruction-card { margin-top: 10px; padding: 14px; }
-.instruction-header { display: flex; align-items: center; justify-content: space-between; }
-.instruction-copy { min-width: 0; }
-.instruction-copy p { margin: 4px 0 0; color: var(--muted); font-size: 7.5px; line-height: 1.35; white-space: nowrap; }
+.instruction-header { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; row-gap: 4px; }
+.instruction-copy { display: contents; }
+.instruction-copy h2 { min-width: 0; grid-column: 1; grid-row: 1; }
+.instruction-copy p { min-width: 0; grid-column: 1 / -1; grid-row: 2; margin: 0; overflow: hidden; color: var(--muted); font-size: 7.5px; line-height: 1.35; white-space: nowrap; }
 .primary-button { padding: 9px 15px; color: white; background: linear-gradient(135deg, #0549fd, #003bd4); box-shadow: 0 6px 16px rgba(5,73,253,.2); font-size: 11px; }
 .primary-button:hover { filter: brightness(.98); }
-.instruction-edit { flex: 0 0 auto; margin-left: 8px; padding: 6px 9px; font-size: 9px; }
+.instruction-edit { grid-column: 2; grid-row: 1; margin-left: 8px; padding: 6px 9px; font-size: 9px; }
 
 .result-card { margin-top: 10px; overflow: hidden; }
 .result-summary {
@@ -281,3 +296,32 @@ kbd {
 .message:empty { display: none; }
 
 button:focus-visible { outline: 3px solid rgba(5,73,253,.22); outline-offset: 2px; }
+
+@media (max-width: 360px) {
+  .app-shell { padding: 10px; }
+  .app-header { grid-template-columns: 34px minmax(0, 1fr) 24px; column-gap: 8px; padding: 2px 1px 11px; }
+  .brand-mark { width: 34px; height: 34px; flex-basis: 34px; border-radius: 11px; font-size: 18px; }
+  .brand-copy h1 { font-size: 17px; }
+  .brand-copy p { margin-top: 2px; font-size: 10px; }
+  .profile-icon { width: 24px; height: 24px; flex-basis: 24px; }
+  .profile-icon::before { top: 4px; left: 8px; }
+  .profile-icon::after { right: 5px; bottom: 4px; left: 5px; height: 7px; }
+  .account-strip { gap: 5px; font-size: 7px; }
+  .account-strip .ghost-button { font-size: 7px; }
+  .section-block { padding: 10px; }
+  .capture-grid { gap: 7px; }
+  .capture-card { padding: 8px; }
+  .capture-copy h3 { font-size: 13px; }
+  .capture-copy p { font-size: 8px; }
+  .shortcut-line { gap: 5px; }
+  kbd { min-width: 66px; padding: 6px; font-size: 9px; }
+  .ghost-button { padding: 6px 7px; font-size: 9px; }
+  .instruction-card { padding: 10px; }
+  .instruction-copy h2 { font-size: 14px; }
+  .instruction-copy p { font-size: 7px; }
+  .instruction-edit { padding: 5px 8px; font-size: 8px; }
+  .result-summary { min-height: 44px; padding-block: 10px; }
+  .result-summary h2 { font-size: 13px; }
+  .privacy-note { font-size: 6.5px; }
+  .copyright { font-size: 7px; }
+}
