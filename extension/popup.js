@@ -2,6 +2,7 @@
 
 const elements = {
   accountEmail: document.querySelector("#accountEmail"),
+  accountStrip: document.querySelector("#accountStrip"),
   assignFull: document.querySelector("#assignFull"),
   assignZone: document.querySelector("#assignZone"),
   authLoading: document.querySelector("#authLoading"),
@@ -71,6 +72,7 @@ async function initializeAuth() {
 async function renderAuth(snapshot) {
   elements.message.textContent = "";
   elements.authLoading.hidden = true;
+  elements.accountStrip.hidden = !snapshot.isSignedIn;
   elements.signedInView.hidden = !snapshot.isSignedIn;
   elements.signedOutView.hidden = snapshot.isSignedIn;
   elements.authStatus.classList.toggle("checking", false);
@@ -153,6 +155,7 @@ async function openWebsite(pathname) {
 function showError(error) {
   console.error(error);
   elements.authLoading.hidden = true;
+  elements.accountStrip.hidden = true;
   elements.signedInView.hidden = true;
   elements.signedOutView.hidden = false;
   elements.authStatus.classList.remove("checking");

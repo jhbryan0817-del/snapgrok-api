@@ -37,10 +37,12 @@ button { cursor: pointer; }
 }
 
 .brand-mark {
-  display: grid;
+  display: flex;
   width: 44px;
   height: 44px;
-  place-items: center;
+  flex: 0 0 44px;
+  align-items: center;
+  justify-content: center;
   border-radius: 14px;
   color: white;
   background: linear-gradient(145deg, #0549fd, #003bd4);
@@ -50,8 +52,9 @@ button { cursor: pointer; }
   letter-spacing: -.04em;
 }
 .brand-mark span {
+  display: block;
   line-height: 1;
-  transform: translateY(-1px);
+  transform: translateY(-2px);
 }
 
 .brand-copy { flex: 1; }
@@ -76,8 +79,7 @@ button { cursor: pointer; }
 .status-pill.signed-out { color: #9a6700; border-color: #f0dfb4; background: #fffaf0; }
 .status-pill.signed-out span { background: #d99a13; box-shadow: 0 0 0 3px rgba(217,154,19,.13); }
 
-.auth-card,
-.account-strip {
+.auth-card {
   border: 1px solid rgba(220,223,230,.95);
   border-radius: 18px;
   background: rgba(255,255,255,.96);
@@ -92,8 +94,11 @@ button { cursor: pointer; }
 .signed-out p { max-width: 330px; margin: 0 auto; }
 .signed-out small { display: block; margin-top: 12px; color: #8b93a1; font-size: 10px; line-height: 1.45; }
 .auth-button { width: 100%; margin-top: 17px; padding-block: 12px; font-size: 12px; }
-.account-strip { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; padding: 13px 15px; }
-.account-strip strong { display: block; max-width: 270px; overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.header-account { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.account-strip { display: flex; align-items: center; justify-content: flex-end; gap: 4px; color: #8b93a1; font-size: 8px; white-space: nowrap; }
+.account-identity { order: 2; }
+.account-strip strong { display: inline-block; max-width: 130px; overflow: hidden; color: #667085; font-size: inherit; font-weight: 650; text-overflow: ellipsis; vertical-align: bottom; white-space: nowrap; }
+.account-strip .ghost-button { order: 1; padding: 0 4px 0 0; font-size: 8px; }
 @keyframes auth-spin { to { transform: rotate(360deg); } }
 
 .section-block,
@@ -114,10 +119,10 @@ h2 { margin: 0; font-size: 16px; letter-spacing: -.02em; }
 .capture-grid { display: grid; gap: 10px; }
 .capture-card {
   display: grid;
-  grid-template-columns: 42px 1fr auto;
-  gap: 11px;
+  grid-template-columns: 38px minmax(0, 1fr) auto;
+  gap: 8px;
   align-items: center;
-  padding: 13px;
+  padding: 11px;
   border: 1px solid var(--line);
   border-radius: 14px;
   background: var(--surface);
@@ -126,8 +131,8 @@ h2 { margin: 0; font-size: 16px; letter-spacing: -.02em; }
 .capture-card:hover { border-color: #b7c8ff; background: #f8faff; transform: translateY(-1px); }
 .capture-icon {
   position: relative;
-  width: 40px;
-  height: 40px;
+  width: 38px;
+  height: 38px;
   border-radius: 12px;
   background: var(--accent-soft);
 }
@@ -165,7 +170,7 @@ h2 { margin: 0; font-size: 16px; letter-spacing: -.02em; }
   font-weight: 600;
 }
 .capture-copy h3 { margin: 0; font-size: 14px; }
-.capture-copy p { margin: 4px 0 0; color: var(--muted); font-size: 11px; line-height: 1.35; }
+.capture-copy p { margin: 3px 0 0; color: var(--muted); font-size: 9px; line-height: 1.35; white-space: nowrap; }
 .shortcut-line { display: flex; align-items: center; gap: 7px; }
 .shortcut-control { display: grid; justify-items: end; gap: 5px; }
 .shortcut-note {
@@ -238,19 +243,12 @@ kbd {
 }
 
 .privacy-note {
-  display: flex;
-  gap: 8px;
-  align-items: flex-start;
   margin-top: 12px;
-  padding: 13px 14px;
-  border: 1px solid #e1e6ef;
-  border-radius: 13px;
-  background: rgba(255,255,255,.78);
+  padding: 5px 3px 1px;
   color: #7a8291;
-  font-size: 10px;
+  font-size: 8px;
   line-height: 1.45;
 }
-.privacy-dot { flex: 0 0 auto; width: 7px; height: 7px; margin-top: 3px; border-radius: 50%; background: #98a2b3; }
 .privacy-note p { margin: 0; }
 .privacy-note p + p { margin-top: 5px; }
 .privacy-note .privacy-warning { color: #8a4b13; font-weight: 700; }

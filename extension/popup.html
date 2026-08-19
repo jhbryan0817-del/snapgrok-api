@@ -14,7 +14,13 @@
           <h1>Zenaian</h1>
           <p>MCQ capture assistant</p>
         </div>
-        <span id="authStatus" class="status-pill checking"><span></span>Checking</span>
+        <div class="header-account">
+          <span id="authStatus" class="status-pill checking"><span></span>Checking</span>
+          <section id="accountStrip" class="account-strip" aria-label="Signed-in account" hidden>
+            <span class="account-identity">Signed in as <strong id="accountEmail">Zenaian user</strong></span>
+            <button id="manageAccount" class="ghost-button" type="button">Manage account</button>
+          </section>
+        </div>
       </header>
 
       <section id="authLoading" class="auth-card" aria-live="polite">
@@ -36,27 +42,12 @@
       </section>
 
       <div id="signedInView" hidden>
-        <section class="account-strip" aria-label="Signed-in account">
-          <div>
-            <span class="eyebrow">Signed in</span>
-            <strong id="accountEmail">Zenaian user</strong>
-          </div>
-          <button id="manageAccount" class="ghost-button" type="button">Manage account</button>
-        </section>
-
-      <section class="section-block" aria-labelledby="captureHeading">
-        <div class="section-heading">
-          <div>
-            <span class="eyebrow">Capture</span>
-            <h2 id="captureHeading">Choose how to scan</h2>
-          </div>
-        </div>
-
+      <section class="section-block" aria-label="Capture options">
         <div class="capture-grid">
           <article class="capture-card">
             <div class="capture-icon full-icon" aria-hidden="true"></div>
             <div class="capture-copy">
-              <h3>Visible tab</h3>
+              <h3>Automatic</h3>
               <p>Capture the whole visible webpage.</p>
             </div>
             <div class="shortcut-control">
@@ -73,7 +64,7 @@
           <article class="capture-card">
             <div class="capture-icon zone-icon" aria-hidden="true"></div>
             <div class="capture-copy">
-              <h3>Select area</h3>
+              <h3>Manual</h3>
               <p>Drag over only the question you need.</p>
             </div>
             <div class="shortcut-line">
@@ -114,7 +105,6 @@
       </div>
 
       <footer class="privacy-note" aria-label="AI and privacy notice">
-        <span class="privacy-dot" aria-hidden="true"></span>
         <div>
           <p>Zenaian uses generative AI (xAI Grok) to generate proposed answers from submitted screenshots.</p>
           <p>Screenshots are transmitted only when you initiate a capture; the extension does not save them.</p>
