@@ -15,13 +15,9 @@
 [hidden] { display: none !important; }
 
 body {
-  width: 420px;
-  max-width: 100vw;
-  max-height: 560px;
+  width: 440px;
   min-height: 0;
   margin: 0;
-  overflow-x: hidden;
-  overflow-y: auto;
   color: var(--ink);
   background:
     radial-gradient(circle at 95% -5%, rgba(5,73,253,.16), transparent 32%),
@@ -31,22 +27,22 @@ body {
 button, kbd { font: inherit; }
 button { cursor: pointer; }
 
-.app-shell { padding: 14px; }
+.app-shell { padding: 18px; }
 
 .app-header {
   display: grid;
-  grid-template-columns: 40px minmax(0, 1fr) 28px;
-  column-gap: 10px;
+  grid-template-columns: 44px minmax(0, 1fr) 28px;
+  column-gap: 12px;
   row-gap: 2px;
   align-items: center;
-  padding: 3px 2px 14px;
+  padding: 4px 2px 20px;
 }
 
 .brand-mark {
   display: flex;
-  width: 40px;
-  height: 40px;
-  flex: 0 0 40px;
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
   align-items: center;
   justify-content: center;
   border-radius: 14px;
@@ -132,20 +128,19 @@ button { cursor: pointer; }
   box-shadow: 0 10px 28px rgba(20,28,45,.055);
 }
 
-.section-block { padding: 14px; }
+.section-block { padding: 17px; }
 .section-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
 .section-heading.compact { margin-bottom: 12px; }
 .eyebrow { display: block; margin-bottom: 4px; color: var(--accent); font-size: 10px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
 h2 { margin: 0; font-size: 16px; letter-spacing: -.02em; }
 
-.capture-grid { display: grid; gap: 8px; }
+.capture-grid { display: grid; gap: 10px; }
 .capture-card {
   display: grid;
-  grid-template-columns: 36px minmax(0, 1fr);
-  column-gap: 7px;
-  row-gap: 4px;
+  grid-template-columns: 38px minmax(0, 1fr) auto;
+  gap: 8px;
   align-items: center;
-  padding: 10px;
+  padding: 11px;
   border: 1px solid var(--line);
   border-radius: 14px;
   background: var(--surface);
@@ -154,10 +149,8 @@ h2 { margin: 0; font-size: 16px; letter-spacing: -.02em; }
 .capture-card:hover { border-color: #b7c8ff; background: #f8faff; transform: translateY(-1px); }
 .capture-icon {
   position: relative;
-  width: 36px;
-  height: 36px;
-  grid-column: 1;
-  grid-row: 1 / span 2;
+  width: 38px;
+  height: 38px;
   border-radius: 12px;
   background: var(--accent-soft);
 }
@@ -194,12 +187,10 @@ h2 { margin: 0; font-size: 16px; letter-spacing: -.02em; }
   font-size: 18px;
   font-weight: 600;
 }
-.capture-copy { min-width: 0; grid-column: 2; grid-row: 1; }
+.capture-copy { min-width: 0; }
 .capture-copy h3 { margin: 0; font-size: 14px; }
 .capture-copy p { margin: 3px 0 0; color: var(--muted); font-size: 9px; line-height: 1.35; white-space: nowrap; }
 .shortcut-line { display: flex; align-items: center; gap: 7px; }
-.capture-card > .shortcut-line,
-.shortcut-control { min-width: 0; grid-column: 2; grid-row: 2; justify-self: end; }
 .shortcut-control { display: grid; justify-items: end; gap: 5px; }
 .shortcut-note {
   max-width: 142px;
@@ -230,7 +221,7 @@ kbd {
 .ghost-button { padding: 7px 9px; color: var(--accent-strong); background: transparent; font-size: 10px; }
 .ghost-button:hover { background: var(--accent-soft); }
 
-.instruction-card { margin-top: 10px; padding: 14px; }
+.instruction-card { margin-top: 12px; padding: 17px; }
 .instruction-header { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; row-gap: 4px; }
 .instruction-copy { display: contents; }
 .instruction-copy h2 { min-width: 0; grid-column: 1; grid-row: 1; }
@@ -239,7 +230,7 @@ kbd {
 .primary-button:hover { filter: brightness(.98); }
 .instruction-edit { grid-column: 2; grid-row: 1; margin-left: 8px; padding: 6px 9px; font-size: 9px; }
 
-.result-card { margin-top: 10px; overflow: hidden; }
+.result-card { margin-top: 12px; overflow: hidden; }
 .result-summary {
   position: relative;
   display: flex;
@@ -281,7 +272,7 @@ kbd {
 .result-item span { line-height: 1.2; }
 
 .privacy-note {
-  margin-top: 10px;
+  margin-top: 12px;
   padding: 5px 3px 1px;
   color: #7a8291;
   font-size: 7px;
@@ -296,32 +287,3 @@ kbd {
 .message:empty { display: none; }
 
 button:focus-visible { outline: 3px solid rgba(5,73,253,.22); outline-offset: 2px; }
-
-@media (max-width: 360px) {
-  .app-shell { padding: 10px; }
-  .app-header { grid-template-columns: 34px minmax(0, 1fr) 24px; column-gap: 8px; padding: 2px 1px 11px; }
-  .brand-mark { width: 34px; height: 34px; flex-basis: 34px; border-radius: 11px; font-size: 18px; }
-  .brand-copy h1 { font-size: 17px; }
-  .brand-copy p { margin-top: 2px; font-size: 10px; }
-  .profile-icon { width: 24px; height: 24px; flex-basis: 24px; }
-  .profile-icon::before { top: 4px; left: 8px; }
-  .profile-icon::after { right: 5px; bottom: 4px; left: 5px; height: 7px; }
-  .account-strip { gap: 5px; font-size: 7px; }
-  .account-strip .ghost-button { font-size: 7px; }
-  .section-block { padding: 10px; }
-  .capture-grid { gap: 7px; }
-  .capture-card { padding: 8px; }
-  .capture-copy h3 { font-size: 13px; }
-  .capture-copy p { font-size: 8px; }
-  .shortcut-line { gap: 5px; }
-  kbd { min-width: 66px; padding: 6px; font-size: 9px; }
-  .ghost-button { padding: 6px 7px; font-size: 9px; }
-  .instruction-card { padding: 10px; }
-  .instruction-copy h2 { font-size: 14px; }
-  .instruction-copy p { font-size: 7px; }
-  .instruction-edit { padding: 5px 8px; font-size: 8px; }
-  .result-summary { min-height: 44px; padding-block: 10px; }
-  .result-summary h2 { font-size: 13px; }
-  .privacy-note { font-size: 6.5px; }
-  .copyright { font-size: 7px; }
-}
