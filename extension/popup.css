@@ -57,27 +57,38 @@ button { cursor: pointer; }
   transform: translateY(-2px);
 }
 
-.brand-copy { flex: 1; }
+.brand-copy { min-width: 0; flex: 1; }
 .brand-copy h1 { margin: 0; font-size: 19px; letter-spacing: -.03em; }
-.brand-copy p { margin: 3px 0 0; color: var(--muted); font-size: 12px; }
+.brand-copy p { margin: 3px 0 0; color: var(--muted); font-size: 12px; white-space: nowrap; }
 
-.status-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 7px 9px;
-  border: 1px solid #dfe9df;
-  border-radius: 999px;
-  color: #287a3f;
-  background: #f5fbf6;
-  font-size: 11px;
-  font-weight: 700;
+.profile-icon {
+  position: relative;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  border-radius: 50%;
+  background: var(--accent-soft);
 }
-.status-pill span { width: 7px; height: 7px; border-radius: 50%; background: #38a95a; box-shadow: 0 0 0 3px rgba(56,169,90,.13); }
-.status-pill.checking { color: #667085; border-color: #e2e5ea; background: #f7f8fa; }
-.status-pill.checking span { background: #98a2b3; box-shadow: 0 0 0 3px rgba(152,162,179,.13); }
-.status-pill.signed-out { color: #9a6700; border-color: #f0dfb4; background: #fffaf0; }
-.status-pill.signed-out span { background: #d99a13; box-shadow: 0 0 0 3px rgba(217,154,19,.13); }
+.profile-icon::before {
+  content: "";
+  position: absolute;
+  top: 5px;
+  left: 10px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+.profile-icon::after {
+  content: "";
+  position: absolute;
+  right: 6px;
+  bottom: 5px;
+  left: 6px;
+  height: 8px;
+  border-radius: 9px 9px 5px 5px;
+  background: var(--accent);
+}
 
 .auth-card {
   border: 1px solid rgba(220,223,230,.95);
@@ -96,9 +107,8 @@ button { cursor: pointer; }
 .auth-button { width: 100%; margin-top: 17px; padding-block: 12px; font-size: 12px; }
 .header-account { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
 .account-strip { display: flex; align-items: center; justify-content: flex-end; gap: 4px; color: #8b93a1; font-size: 8px; white-space: nowrap; }
-.account-identity { order: 2; }
 .account-strip strong { display: inline-block; max-width: 130px; overflow: hidden; color: #667085; font-size: inherit; font-weight: 650; text-overflow: ellipsis; vertical-align: bottom; white-space: nowrap; }
-.account-strip .ghost-button { order: 1; padding: 0 4px 0 0; font-size: 8px; }
+.account-strip .ghost-button { padding: 0 4px 0 0; font-size: 8px; }
 @keyframes auth-spin { to { transform: rotate(360deg); } }
 
 .section-block,
@@ -204,22 +214,13 @@ kbd {
 
 .instruction-card { margin-top: 12px; padding: 17px; }
 .instruction-header { display: flex; align-items: center; justify-content: space-between; }
+.instruction-copy { min-width: 0; }
+.instruction-copy p { max-width: 300px; margin: 5px 0 0; color: var(--muted); font-size: 9px; line-height: 1.4; }
 .primary-button { padding: 9px 15px; color: white; background: linear-gradient(135deg, #0549fd, #003bd4); box-shadow: 0 6px 16px rgba(5,73,253,.2); font-size: 11px; }
 .primary-button:hover { filter: brightness(.98); }
-.instruction-preview {
-  display: -webkit-box;
-  min-height: 44px;
-  margin: 13px 0 0;
-  overflow: hidden;
-  color: #475467;
-  font-size: 12px;
-  line-height: 1.55;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
-}
-.instruction-preview.empty { color: #98a2b3; font-style: italic; }
 
 .result-card { margin-top: 12px; padding: 17px; }
+.result-heading { margin-bottom: 12px; text-align: center; }
 .result-strip { display: grid; grid-template-columns: repeat(5, 1fr); gap: 7px; }
 .result-item {
   display: flex;
@@ -246,12 +247,15 @@ kbd {
   margin-top: 12px;
   padding: 5px 3px 1px;
   color: #7a8291;
-  font-size: 8px;
-  line-height: 1.45;
+  font-size: 7px;
+  line-height: 1.5;
+  text-align: center;
 }
 .privacy-note p { margin: 0; }
-.privacy-note p + p { margin-top: 5px; }
+.privacy-copy p + p { margin-top: 4px; }
 .privacy-note .privacy-warning { color: #8a4b13; font-weight: 700; }
-.message { min-height: 14px; margin: 7px 2px 0; color: #b42318; font-size: 11px; }
+.copyright { margin-top: 8px !important; color: #98a2b3; font-size: 7.5px; letter-spacing: .02em; }
+.message { min-height: 0; margin: 7px 2px 0; color: #b42318; font-size: 11px; text-align: center; }
+.message:empty { display: none; }
 
 button:focus-visible { outline: 3px solid rgba(5,73,253,.22); outline-offset: 2px; }

@@ -12,13 +12,13 @@
         <div class="brand-mark" aria-hidden="true"><span>z</span></div>
         <div class="brand-copy">
           <h1>Zenaian</h1>
-          <p>MCQ capture assistant</p>
+          <p>MCQ Capture Assistant</p>
         </div>
         <div class="header-account">
-          <span id="authStatus" class="status-pill checking"><span></span>Checking</span>
+          <span id="profileIcon" class="profile-icon" aria-hidden="true" hidden></span>
           <section id="accountStrip" class="account-strip" aria-label="Signed-in account" hidden>
-            <span class="account-identity">Signed in as <strong id="accountEmail">Zenaian user</strong></span>
             <button id="manageAccount" class="ghost-button" type="button">Manage account</button>
+            <span class="account-identity">Signed in as <strong id="accountEmail">Zenaian user</strong></span>
           </section>
         </div>
       </header>
@@ -77,22 +77,16 @@
 
       <section class="instruction-card" aria-labelledby="instructionHeading">
         <div class="instruction-header">
-          <div>
-            <span class="eyebrow">Add Context</span>
-            <h2 id="instructionHeading">Custom Instruction for AI</h2>
+          <div class="instruction-copy">
+            <h2 id="instructionHeading">Custom instruction for AI</h2>
+            <p>Add optional contexts if necessary - Zenaian sends it together with our default instruction</p>
           </div>
           <button id="editInstruction" class="primary-button" type="button">Edit</button>
         </div>
-        <p id="instructionPreview" class="instruction-preview">Using Zenaian's default instruction. Add optional context if needed.</p>
       </section>
 
       <section class="result-card" aria-labelledby="resultHeading">
-        <div class="section-heading compact">
-          <div>
-            <span class="eyebrow">Toolbar results</span>
-            <h2 id="resultHeading">One glance, no popup</h2>
-          </div>
-        </div>
+        <h2 id="resultHeading" class="result-heading">Toolbar results</h2>
         <div class="result-strip">
           <div class="result-item"><img src="icons/result-a32.png" alt="" /><span>Single answer</span></div>
           <div class="result-item"><img src="icons/result-multi-232.png" alt="" /><span>Multiple answers</span></div>
@@ -104,15 +98,16 @@
 
       </div>
 
+      <p id="message" class="message" role="status"></p>
+
       <footer class="privacy-note" aria-label="AI and privacy notice">
-        <div>
+        <div class="privacy-copy">
           <p>Zenaian uses generative AI (xAI Grok) to generate proposed answers from submitted screenshots.</p>
           <p>Screenshots are transmitted only when you initiate a capture; the extension does not save them.</p>
           <p class="privacy-warning">Do not submit screenshots containing identifiable sensitive personal information or credentials.</p>
         </div>
+        <p class="copyright">(c) 2026 Zenaian. All rights reserved</p>
       </footer>
-
-      <p id="message" class="message" role="status"></p>
     </main>
 
     <script src="auth-config.js"></script>

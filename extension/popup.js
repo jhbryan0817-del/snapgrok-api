@@ -6,7 +6,6 @@ const elements = {
   assignFull: document.querySelector("#assignFull"),
   assignZone: document.querySelector("#assignZone"),
   authLoading: document.querySelector("#authLoading"),
-  authStatus: document.querySelector("#authStatus"),
   fullShortcut: document.querySelector("#fullShortcut"),
   fullShortcutNote: document.querySelector("#fullShortcutNote"),
   manageAccount: document.querySelector("#manageAccount"),
@@ -15,7 +14,7 @@ const elements = {
   signedOutView: document.querySelector("#signedOutView"),
   zoneShortcut: document.querySelector("#zoneShortcut"),
   editInstruction: document.querySelector("#editInstruction"),
-  instructionPreview: document.querySelector("#instructionPreview"),
+  profileIcon: document.querySelector("#profileIcon"),
   message: document.querySelector("#message"),
 };
 
@@ -31,12 +30,6 @@ chrome.runtime.onMessage.addListener((message) => {
   if (message?.type !== "SNAPGROK_AUTH_STATE_CHANGED" || !message.snapshot) return false;
   void renderAuth(message.snapshot).catch(showError);
   return false;
-});
-
-chrome.storage.onChanged.addListener((changes, areaName) => {
-  if (areaName !== "local" || !changes[SnapGrokSettings.STORAGE_KEY]) return;
-  const settings = SnapGrokSettings.normalizeSettings(changes[SnapGrokSettings.STORAGE_KEY].newValue);
-  renderInstruction(settings.instruction);
 });
 
 initializeAuth().catch(showError);
@@ -73,14 +66,9 @@ async function renderAuth(snapshot) {
   elements.message.textContent = "";
   elements.authLoading.hidden = true;
   elements.accountStrip.hidden = !snapshot.isSignedIn;
+  elements.profileIcon.hidden = !snapshot.isSignedIn;
   elements.signedInView.hidden = !snapshot.isSignedIn;
   elements.signedOutView.hidden = snapshot.isSignedIn;
-  elements.authStatus.classList.toggle("checking", false);
-  elements.authStatus.classList.toggle("signed-out", !snapshot.isSignedIn);
-  elements.authStatus.hidden = !snapshot.isSignedIn;
-  elements.authStatus.innerHTML = snapshot.isSignedIn
-    ? "<span></span>Ready"
-    : "<span></span>Sign in";
 
   if (!snapshot.isSignedIn) {
     settingsInitialized = false;
@@ -99,10 +87,7 @@ function delay(milliseconds) {
 }
 
 async function initializeSettings() {
-  const [settings, commands] = await Promise.all([
-    SnapGrokSettings.getSettings(),
-    chrome.commands.getAll(),
-  ]);
+  const commands = await chrome.commands.getAll();
 
   const commandMap = new Map(commands.map((command) => [command.name, command.shortcut || ""]));
   const fullShortcut = commandMap.get("capture-full-screen") || "";
@@ -113,7 +98,6 @@ async function initializeSettings() {
   elements.zoneShortcut.textContent = compactShortcut(zoneShortcut);
   elements.fullShortcutNote.hidden = !fullShortcutUnavailable;
   elements.assignFull.textContent = fullShortcutUnavailable ? "Assign" : "Change";
-  renderInstruction(settings.instruction);
 }
 
 function compactShortcut(value) {
@@ -121,13 +105,6 @@ function compactShortcut(value) {
     .replace(/Command/gi, "⌘")
     .replace(/Ctrl/gi, "Ctrl")
     .replace(/Shift/gi, "Shift");
-}
-
-function renderInstruction(instruction) {
-  const text = String(instruction || "").trim();
-  elements.instructionPreview.textContent =
-    text || "Using Zenaian's default instruction. Add optional context if needed.";
-  elements.instructionPreview.classList.toggle("empty", !text);
 }
 
 async function openShortcutManager() {
@@ -156,10 +133,8 @@ function showError(error) {
   console.error(error);
   elements.authLoading.hidden = true;
   elements.accountStrip.hidden = true;
+  elements.profileIcon.hidden = true;
   elements.signedInView.hidden = true;
   elements.signedOutView.hidden = false;
-  elements.authStatus.classList.remove("checking");
-  elements.authStatus.classList.add("signed-out");
-  elements.authStatus.hidden = true;
   elements.message.textContent = "Account status could not be loaded. Please reopen Zenaian and try again.";
 }
