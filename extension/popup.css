@@ -15,9 +15,13 @@
 [hidden] { display: none !important; }
 
 body {
-  width: 440px;
+  width: 420px;
+  max-width: 100vw;
+  max-height: 560px;
   min-height: 0;
   margin: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
   color: var(--ink);
   background:
     radial-gradient(circle at 95% -5%, rgba(5,73,253,.16), transparent 32%),
@@ -27,20 +31,20 @@ body {
 button, kbd { font: inherit; }
 button { cursor: pointer; }
 
-.app-shell { padding: 18px; }
+.app-shell { padding: 14px; }
 
 .app-header {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 4px 2px 20px;
+  gap: 10px;
+  padding: 3px 2px 14px;
 }
 
 .brand-mark {
   display: flex;
-  width: 44px;
-  height: 44px;
-  flex: 0 0 44px;
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
   align-items: center;
   justify-content: center;
   border-radius: 14px;
@@ -105,10 +109,10 @@ button { cursor: pointer; }
 .signed-out p { max-width: 330px; margin: 0 auto; }
 .signed-out small { display: block; margin-top: 12px; color: #8b93a1; font-size: 10px; line-height: 1.45; }
 .auth-button { width: 100%; margin-top: 17px; padding-block: 12px; font-size: 12px; }
-.header-account { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
-.account-strip { display: flex; align-items: center; justify-content: flex-end; gap: 4px; color: #8b93a1; font-size: 8px; white-space: nowrap; }
+.header-account { display: flex; align-items: center; justify-content: flex-end; gap: 7px; }
+.account-strip { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; color: #8b93a1; font-size: 8px; white-space: nowrap; }
 .account-strip strong { display: inline-block; max-width: 130px; overflow: hidden; color: #667085; font-size: inherit; font-weight: 650; text-overflow: ellipsis; vertical-align: bottom; white-space: nowrap; }
-.account-strip .ghost-button { padding: 0 4px 0 0; font-size: 8px; }
+.account-strip .ghost-button { padding: 0; font-size: 8px; }
 @keyframes auth-spin { to { transform: rotate(360deg); } }
 
 .section-block,
@@ -120,19 +124,19 @@ button { cursor: pointer; }
   box-shadow: 0 10px 28px rgba(20,28,45,.055);
 }
 
-.section-block { padding: 17px; }
+.section-block { padding: 14px; }
 .section-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
 .section-heading.compact { margin-bottom: 12px; }
 .eyebrow { display: block; margin-bottom: 4px; color: var(--accent); font-size: 10px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
 h2 { margin: 0; font-size: 16px; letter-spacing: -.02em; }
 
-.capture-grid { display: grid; gap: 10px; }
+.capture-grid { display: grid; gap: 8px; }
 .capture-card {
   display: grid;
-  grid-template-columns: 38px minmax(0, 1fr) auto;
-  gap: 8px;
+  grid-template-columns: 36px minmax(0, 1fr) auto;
+  gap: 7px;
   align-items: center;
-  padding: 11px;
+  padding: 10px;
   border: 1px solid var(--line);
   border-radius: 14px;
   background: var(--surface);
@@ -141,8 +145,8 @@ h2 { margin: 0; font-size: 16px; letter-spacing: -.02em; }
 .capture-card:hover { border-color: #b7c8ff; background: #f8faff; transform: translateY(-1px); }
 .capture-icon {
   position: relative;
-  width: 38px;
-  height: 38px;
+  width: 36px;
+  height: 36px;
   border-radius: 12px;
   background: var(--accent-soft);
 }
@@ -212,39 +216,57 @@ kbd {
 .ghost-button { padding: 7px 9px; color: var(--accent-strong); background: transparent; font-size: 10px; }
 .ghost-button:hover { background: var(--accent-soft); }
 
-.instruction-card { margin-top: 12px; padding: 17px; }
+.instruction-card { margin-top: 10px; padding: 14px; }
 .instruction-header { display: flex; align-items: center; justify-content: space-between; }
 .instruction-copy { min-width: 0; }
-.instruction-copy p { max-width: 300px; margin: 5px 0 0; color: var(--muted); font-size: 9px; line-height: 1.4; }
+.instruction-copy p { margin: 4px 0 0; color: var(--muted); font-size: 7.5px; line-height: 1.35; white-space: nowrap; }
 .primary-button { padding: 9px 15px; color: white; background: linear-gradient(135deg, #0549fd, #003bd4); box-shadow: 0 6px 16px rgba(5,73,253,.2); font-size: 11px; }
 .primary-button:hover { filter: brightness(.98); }
+.instruction-edit { flex: 0 0 auto; margin-left: 8px; padding: 6px 9px; font-size: 9px; }
 
-.result-card { margin-top: 12px; padding: 17px; }
-.result-heading { margin-bottom: 12px; text-align: center; }
-.result-strip { display: grid; grid-template-columns: repeat(5, 1fr); gap: 7px; }
+.result-card { margin-top: 10px; overflow: hidden; }
+.result-summary {
+  position: relative;
+  display: flex;
+  min-height: 48px;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 44px;
+  cursor: pointer;
+  list-style: none;
+}
+.result-summary::-webkit-details-marker { display: none; }
+.result-summary h2 { font-size: 14px; text-align: center; }
+.result-summary:hover { background: rgba(234,240,255,.48); }
+.result-summary:focus-visible { outline: 3px solid rgba(5,73,253,.22); outline-offset: -3px; }
+.result-chevron {
+  position: absolute;
+  right: 18px;
+  width: 9px;
+  height: 9px;
+  border-right: 2px solid #8a93a3;
+  border-bottom: 2px solid #8a93a3;
+  transform: rotate(45deg) translateY(-2px);
+  transition: transform .15s ease;
+}
+.result-card[open] .result-chevron { transform: rotate(225deg) translate(-2px, -2px); }
+.result-list { padding: 0 14px 10px; border-top: 1px solid var(--line); }
 .result-item {
   display: flex;
   min-width: 0;
-  flex-direction: column;
   align-items: center;
-  gap: 6px;
-  padding: 9px 4px;
-  border: 1px solid #eceef2;
-  border-radius: 11px;
-  background: #fafbfc;
+  gap: 10px;
+  padding: 7px 3px;
   color: #667085;
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 700;
 }
-.result-item img { width: 28px; height: 28px; }
-.result-item span {
-  min-height: 22px;
-  text-align: center;
-  line-height: 1.2;
-}
+.result-item + .result-item { border-top: 1px solid #eff1f5; }
+.result-item img { width: 24px; height: 24px; }
+.result-item span { line-height: 1.2; }
 
 .privacy-note {
-  margin-top: 12px;
+  margin-top: 10px;
   padding: 5px 3px 1px;
   color: #7a8291;
   font-size: 7px;

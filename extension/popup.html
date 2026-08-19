@@ -15,11 +15,11 @@
           <p>MCQ Capture Assistant</p>
         </div>
         <div class="header-account">
-          <span id="profileIcon" class="profile-icon" aria-hidden="true" hidden></span>
           <section id="accountStrip" class="account-strip" aria-label="Signed-in account" hidden>
-            <button id="manageAccount" class="ghost-button" type="button">Manage account</button>
             <span class="account-identity">Signed in as <strong id="accountEmail">Zenaian user</strong></span>
+            <button id="manageAccount" class="ghost-button" type="button">Manage Account</button>
           </section>
+          <span id="profileIcon" class="profile-icon" aria-hidden="true" hidden></span>
         </div>
       </header>
 
@@ -79,22 +79,25 @@
         <div class="instruction-header">
           <div class="instruction-copy">
             <h2 id="instructionHeading">Custom instruction for AI</h2>
-            <p>Add optional contexts if necessary - Zenaian sends it together with our default instruction</p>
+            <p>Add contexts if necessary - Zenaian sends it together with the default instruction</p>
           </div>
-          <button id="editInstruction" class="primary-button" type="button">Edit</button>
+          <button id="editInstruction" class="primary-button instruction-edit" type="button">Edit</button>
         </div>
       </section>
 
-      <section class="result-card" aria-labelledby="resultHeading">
-        <h2 id="resultHeading" class="result-heading">Toolbar results</h2>
-        <div class="result-strip">
+      <details class="result-card">
+        <summary class="result-summary">
+          <h2>Toolbar Results</h2>
+          <span class="result-chevron" aria-hidden="true"></span>
+        </summary>
+        <div class="result-list">
           <div class="result-item"><img src="icons/result-a32.png" alt="" /><span>Single answer</span></div>
           <div class="result-item"><img src="icons/result-multi-232.png" alt="" /><span>Multiple answers</span></div>
           <div class="result-item"><img src="icons/processing32.png" alt="" /><span>Processing</span></div>
           <div class="result-item"><img src="icons/result-inconclusive32.png" alt="" /><span>Inconclusive</span></div>
           <div class="result-item"><img src="icons/result-error32.png" alt="" /><span>Error</span></div>
         </div>
-      </section>
+      </details>
 
       </div>
 
@@ -106,7 +109,7 @@
           <p>Screenshots are transmitted only when you initiate a capture; the extension does not save them.</p>
           <p class="privacy-warning">Do not submit screenshots containing identifiable sensitive personal information or credentials.</p>
         </div>
-        <p class="copyright">(c) 2026 Zenaian. All rights reserved</p>
+        <p class="copyright">© 2026 Zenaian. All rights reserved</p>
       </footer>
     </main>
 
