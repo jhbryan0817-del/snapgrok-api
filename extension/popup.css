@@ -31,9 +31,8 @@ button { cursor: pointer; }
 
 .app-header {
   display: grid;
-  grid-template-columns: 44px minmax(0, 1fr) 28px;
+  grid-template-columns: 44px minmax(0, 1fr) auto;
   column-gap: 12px;
-  row-gap: 2px;
   align-items: center;
   padding: 4px 2px 20px;
 }
@@ -53,7 +52,7 @@ button { cursor: pointer; }
   font-weight: 800;
   letter-spacing: -.04em;
   grid-column: 1;
-  grid-row: 1 / span 2;
+  grid-row: 1;
 }
 .brand-mark span {
   display: block;
@@ -67,33 +66,30 @@ button { cursor: pointer; }
 
 .profile-icon {
   position: relative;
-  width: 28px;
-  height: 28px;
-  flex: 0 0 28px;
-  grid-column: 3;
-  grid-row: 1 / span 2;
-  justify-self: end;
+  width: 48px;
+  height: 48px;
+  flex: 0 0 48px;
   border-radius: 50%;
   background: var(--accent-soft);
 }
 .profile-icon::before {
   content: "";
   position: absolute;
-  top: 5px;
-  left: 10px;
-  width: 8px;
-  height: 8px;
+  top: 8px;
+  left: 18px;
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
   background: var(--accent);
 }
 .profile-icon::after {
   content: "";
   position: absolute;
-  right: 6px;
-  bottom: 5px;
-  left: 6px;
-  height: 8px;
-  border-radius: 9px 9px 5px 5px;
+  right: 9px;
+  bottom: 8px;
+  left: 9px;
+  height: 14px;
+  border-radius: 16px 16px 8px 8px;
   background: var(--accent);
 }
 
@@ -112,11 +108,11 @@ button { cursor: pointer; }
 .signed-out p { max-width: 330px; margin: 0 auto; }
 .signed-out small { display: block; margin-top: 12px; color: #8b93a1; font-size: 10px; line-height: 1.45; }
 .auth-button { width: 100%; margin-top: 17px; padding-block: 12px; font-size: 12px; }
-.header-account { display: contents; }
-.account-strip { display: flex; min-width: 0; grid-column: 2; grid-row: 2; align-items: center; gap: 7px; overflow: hidden; color: #8b93a1; font-size: 8px; white-space: nowrap; }
-.account-identity { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.account-strip strong { color: #667085; font-size: inherit; font-weight: 650; }
-.account-strip .ghost-button { flex: 0 0 auto; padding: 0; font-size: 8px; }
+.header-account { display: flex; grid-column: 3; grid-row: 1; align-items: center; justify-content: flex-end; gap: 9px; }
+.account-strip { display: flex; min-width: 0; flex-direction: column; align-items: flex-start; gap: 1px; color: #8b93a1; white-space: nowrap; }
+.account-label { font-size: 8px; line-height: 1.2; }
+.account-email { display: block; max-width: 142px; overflow: hidden; color: #475467; font-size: 10px; font-weight: 650; line-height: 1.25; text-overflow: ellipsis; }
+.account-strip .ghost-button { padding: 0; font-size: 8.5px; line-height: 1.25; }
 @keyframes auth-spin { to { transform: rotate(360deg); } }
 
 .section-block,
@@ -225,7 +221,7 @@ kbd {
 .instruction-header { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; row-gap: 4px; }
 .instruction-copy { display: contents; }
 .instruction-copy h2 { min-width: 0; grid-column: 1; grid-row: 1; }
-.instruction-copy p { min-width: 0; grid-column: 1 / -1; grid-row: 2; margin: 0; overflow: hidden; color: var(--muted); font-size: 7.5px; line-height: 1.35; white-space: nowrap; }
+.instruction-copy p { min-width: 0; grid-column: 1 / -1; grid-row: 2; margin: 0; overflow: hidden; color: var(--muted); font-size: 9px; line-height: 1.35; white-space: nowrap; }
 .primary-button { padding: 9px 15px; color: white; background: linear-gradient(135deg, #0549fd, #003bd4); box-shadow: 0 6px 16px rgba(5,73,253,.2); font-size: 11px; }
 .primary-button:hover { filter: brightness(.98); }
 .instruction-edit { grid-column: 2; grid-row: 1; margin-left: 8px; padding: 6px 9px; font-size: 9px; }
