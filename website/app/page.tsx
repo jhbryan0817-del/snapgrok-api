@@ -155,38 +155,40 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section id="privacy" className="privacy-panel privacy-priority-panel shell reveal" data-animate aria-labelledby="privacy-title">
+      <section id="privacy" className="privacy-section shell reveal" data-animate aria-labelledby="privacy-title">
         <div className="privacy-heading">
           <LockIcon />
           <h2 id="privacy-title">Privacy &amp; Security</h2>
         </div>
-        <div className="privacy-priority-grid">
-          <div className="privacy-list">
-            <PrivacyItem icon={<TrashIcon />} title="Screenshots are not stored by Zenaian">
-              Captured images are processed transiently,
-              <br />
-              our application database never stores any of your images.
-            </PrivacyItem>
-            <PrivacyItem icon={<EyeOffIcon />} title="A deliberately minimal workflow">
-              Zenaian returns the result through the extension icon,
-              <br />
-              minimizing unnecessary interface activities.
-            </PrivacyItem>
-          </div>
-          <div className="privacy-disposal-illustration" aria-hidden="true">
-            <div className="privacy-paper">
-              <i /><i /><i />
+        <div className="privacy-priority-panel">
+          <div className="privacy-priority-grid">
+            <div className="privacy-list">
+              <PrivacyItem icon={<TrashIcon />} title="Screenshots are not stored by Zenaian">
+                Captured images are processed transiently,
+                <br />
+                our application database never stores any of your images.
+              </PrivacyItem>
+              <PrivacyItem icon={<EyeOffIcon />} title="A deliberately minimal workflow">
+                Zenaian returns the result through the extension icon,
+                <br />
+                minimizing unnecessary interface activities.
+              </PrivacyItem>
             </div>
-            <div className="privacy-disposal-path"><i /><i /><i /></div>
-            <div className="privacy-bin">
-              <span />
-              <i /><i /><i />
+            <div className="privacy-disposal-illustration" aria-hidden="true">
+              <div className="privacy-paper">
+                <i /><i /><i />
+              </div>
+              <div className="privacy-disposal-path"><i /><i /><i /></div>
+              <div className="privacy-bin">
+                <span />
+                <i /><i /><i />
+              </div>
             </div>
           </div>
+          <p className="privacy-retention-note">
+            <strong>Processing and retention note.</strong> Zenaian does not save captured images to its application database. Screenshots and related request data are processed transiently and released from active processing when a request finishes, ordinarily within a few minutes. Production inference requires xAI Zero Data Retention (ZDR). If ZDR is unavailable or cannot be confirmed, the request fails closed instead of falling back to ordinary-retention inference. <Link href="/privacy">Explore our Privacy Policy</Link>.
+          </p>
         </div>
-        <p className="privacy-retention-note">
-          <strong>Processing and retention note.</strong> Zenaian does not save captured images to its application database. Screenshots and related request data are processed transiently and released from active processing when a request finishes, ordinarily within a few minutes. Production inference requires xAI Zero Data Retention (ZDR). If ZDR is unavailable or cannot be confirmed, the request fails closed instead of falling back to ordinary-retention inference. <Link href="/privacy">Explore our Privacy Policy</Link>.
-        </p>
       </section>
     </main>
   );
