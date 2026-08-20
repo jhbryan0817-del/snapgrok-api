@@ -2,6 +2,7 @@
   "use strict";
 
   const SESSION_KEY = "sneaksolveDeviceSessionV1";
+  const ACCOUNT_STATUS_KEY = "sneaksolveAccountStatusV1";
   const PAIRING_KEY = "sneaksolvePairingNonceV1";
   const PAIRING_TTL_MS = 5 * 60 * 1000;
   const ACCESS_REFRESH_MARGIN_MS = 60 * 1000;
@@ -17,8 +18,9 @@
   async function getAuthSnapshot({ verify = true } = {}) {
     const session = await readSession();
     if (!session) return signedOutSnapshot();
+    const cachedStatus = await readAccountStatus(session.profile.accountId);
 
-    if (!verify) return signedInSnapshot(session.profile);
+    if (!verify) return signedInSnapshot(session.profile, cachedStatus);
 
     try {
       const response = await fetchWithAuth("/api/extension/session/verify", {
@@ -30,8 +32,10 @@
         throw apiError(response.status, payload);
       }
       const profile = normalizeProfile(payload.profile || session.profile);
+      const liveStatus = completeAccountStatus(payload);
       await updateProfile(profile);
-      return signedInSnapshot(profile);
+      if (liveStatus) await writeAccountStatus(profile.accountId, liveStatus);
+      return signedInSnapshot(profile, liveStatus || cachedStatus);
     } catch (error) {
       if (isAuthenticationError(error)) {
         await clearSession();
@@ -57,12 +61,39 @@
   }
 
   async function getAccountStatus() {
-    const response = await fetchWithAuth("/api/extension/account/status");
-    const payload = await readPayload(response);
-    if (!response.ok || !payload?.ok) {
-      throw apiError(response.status, payload);
+    const session = await readSession();
+    if (!session) {
+      throw authError(
+        "DEVICE_SESSION_REQUIRED",
+        "Sign in to Zenaian before loading account status.",
+      );
     }
-    return normalizeAccountStatus(payload);
+    const cachedStatus = await readAccountStatus(session.profile.accountId);
+
+    try {
+      const response = await fetchWithAuth("/api/extension/account/status");
+      const payload = await readPayload(response);
+      if (!response.ok || !payload?.ok) {
+        throw apiError(response.status, payload);
+      }
+      const liveStatus = completeAccountStatus(payload);
+      if (!liveStatus) {
+        throw new Error("Zenaian received an invalid account status.");
+      }
+      await writeAccountStatus(session.profile.accountId, liveStatus);
+      return liveStatus;
+    } catch (statusError) {
+      if (isAuthenticationError(statusError)) throw statusError;
+      try {
+        const verified = await getAuthSnapshot();
+        if (!verified.isSignedIn) throw statusError;
+        if (verified.accountStatus) return verified.accountStatus;
+      } catch (verificationError) {
+        if (isAuthenticationError(verificationError)) throw verificationError;
+      }
+      if (cachedStatus) return cachedStatus;
+      throw statusError;
+    }
   }
 
   async function refreshSession(existingSession = null) {
@@ -192,7 +223,7 @@
   }
 
   async function clearSession() {
-    await chrome.storage.local.remove(SESSION_KEY);
+    await chrome.storage.local.remove([SESSION_KEY, ACCOUNT_STATUS_KEY]);
     await chrome.storage.session.remove(PAIRING_KEY);
   }
 
@@ -298,6 +329,43 @@
     return { nonce: value.nonce, expiresAt: Number(value.expiresAt) };
   }
 
+  async function readAccountStatus(accountId) {
+    const stored = await chrome.storage.local.get(ACCOUNT_STATUS_KEY);
+    const cached = stored[ACCOUNT_STATUS_KEY];
+    if (
+      !cached ||
+      cached.accountId !== accountId ||
+      !Number.isFinite(Number(cached.updatedAt))
+    ) {
+      return null;
+    }
+    return completeAccountStatus({
+      plan: { id: cached.planId },
+      usage: {
+        allowance: cached.allowance,
+        remaining: cached.remaining,
+      },
+    });
+  }
+
+  async function writeAccountStatus(accountId, status) {
+    const normalized = completeAccountStatus({
+      plan: { id: status.planId },
+      usage: {
+        allowance: status.allowance,
+        remaining: status.remaining,
+      },
+    });
+    if (!normalized || !accountId) return;
+    await chrome.storage.local.set({
+      [ACCOUNT_STATUS_KEY]: {
+        accountId,
+        ...normalized,
+        updatedAt: Date.now(),
+      },
+    });
+  }
+
   function normalizeAccountStatus(value) {
     const planId = ["free", "plus", "ultra"].includes(
       String(value?.plan?.id || "").toLowerCase(),
@@ -316,13 +384,20 @@
     };
   }
 
+  function completeAccountStatus(value) {
+    const status = normalizeAccountStatus(value);
+    return status.planId && status.allowance !== null && status.remaining !== null
+      ? status
+      : null;
+  }
+
   function safeNonnegativeInteger(value) {
     if (value === null || value === undefined || value === "") return null;
     const number = Number(value);
     return Number.isSafeInteger(number) && number >= 0 ? number : null;
   }
 
-  function signedInSnapshot(profile) {
+  function signedInSnapshot(profile, accountStatus = null) {
     const normalized = normalizeProfile(profile);
     return {
       isSignedIn: true,
@@ -330,6 +405,7 @@
       accountId: normalized.accountId,
       email: normalized.email,
       displayName: normalized.displayName,
+      accountStatus,
     };
   }
 
@@ -340,6 +416,7 @@
       accountId: "",
       email: "",
       displayName: "",
+      accountStatus: null,
     };
   }
 

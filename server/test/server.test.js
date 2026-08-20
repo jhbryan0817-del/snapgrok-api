@@ -585,7 +585,12 @@ test("website pairing and extension polling routes keep their authentication bou
         body: "{}",
       });
       assert.equal(verified.status, 200);
-      assert.equal((await verified.json()).profile.accountId, "user_test");
+      assert.deepEqual(await verified.json(), {
+        ok: true,
+        profile: { accountId: "user_test" },
+        plan: { id: "free" },
+        usage: { allowance: 5, remaining: 3 },
+      });
 
       const accountStatus = await fetch(
         `${baseUrl}/api/extension/account/status`,

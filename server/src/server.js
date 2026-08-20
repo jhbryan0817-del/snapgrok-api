@@ -1041,13 +1041,16 @@ export function createZenaianServer({
               const body = await readJsonBody(config, request);
               requireEmptyObject(body, "Extension session verification request");
             }
-            const profile = await deviceSessionService.profile(auth.userId);
+            const [profile, status] = await Promise.all([
+              deviceSessionService.profile(auth.userId),
+              billingService.status(auth.userId),
+            ]);
             sendJson(
               config,
               request,
               response,
               200,
-              { ok: true, profile },
+              { ok: true, profile, ...publicExtensionAccountStatus(status) },
               requestId,
             );
           } finally {

@@ -23,6 +23,7 @@ const elements = {
 
 let settingsInitialized = false;
 let accountStatusInitialized = false;
+let accountStatusRendered = false;
 
 elements.assignFull.addEventListener("click", openShortcutManager);
 elements.assignZone.addEventListener("click", openShortcutManager);
@@ -78,14 +79,18 @@ async function renderAuth(snapshot) {
   if (!snapshot.isSignedIn) {
     settingsInitialized = false;
     accountStatusInitialized = false;
+    accountStatusRendered = false;
     return;
   }
 
   elements.accountEmail.textContent = snapshot.email || snapshot.displayName;
+  if (snapshot.accountStatus) renderAccountStatus(snapshot.accountStatus);
   if (!accountStatusInitialized) {
     accountStatusInitialized = true;
-    elements.accountPlan.textContent = "Plan";
-    elements.accountAvailability.textContent = "Checking availability…";
+    if (!accountStatusRendered) {
+      elements.accountPlan.textContent = "Checking…";
+      elements.accountAvailability.textContent = "Loading question balance…";
+    }
     void initializeAccountStatus();
   }
   if (!settingsInitialized) {
@@ -133,8 +138,10 @@ async function initializeAccountStatus() {
   }
 
   console.error(lastError);
-  elements.accountPlan.textContent = "Plan";
-  elements.accountAvailability.textContent = "Availability unavailable";
+  if (!accountStatusRendered) {
+    elements.accountPlan.textContent = "Checking…";
+    elements.accountAvailability.textContent = "Reopen to refresh usage";
+  }
 }
 
 function renderAccountStatus(status) {
@@ -143,10 +150,13 @@ function renderAccountStatus(status) {
   const hasUsage = Number.isSafeInteger(allowance) && allowance >= 0 &&
     Number.isSafeInteger(remaining) && remaining >= 0 && remaining <= allowance;
 
-  elements.accountPlan.textContent = planLabel(status.planId);
-  elements.accountAvailability.textContent = hasUsage
-    ? `${remaining} of ${allowance} Available`
-    : "Availability unavailable";
+  const label = planLabel(status.planId);
+  if (!label || !hasUsage) return false;
+
+  elements.accountPlan.textContent = label;
+  elements.accountAvailability.textContent = `${remaining} of ${allowance} Available`;
+  accountStatusRendered = true;
+  return true;
 }
 
 function planLabel(planId) {
@@ -154,7 +164,7 @@ function planLabel(planId) {
     free: "Free",
     plus: "Plus",
     ultra: "Ultra",
-  }[String(planId || "").toLowerCase()] || "Plan";
+  }[String(planId || "").toLowerCase()] || "";
 }
 
 function compactShortcut(value) {

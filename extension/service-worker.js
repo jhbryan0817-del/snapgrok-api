@@ -253,6 +253,7 @@ function publicAuthSnapshot(snapshot) {
     deviceSessionPresent: snapshot.deviceSessionPresent,
     email: snapshot.email,
     displayName: snapshot.displayName,
+    accountStatus: snapshot.accountStatus || null,
   };
 }
 
@@ -274,6 +275,7 @@ function signedOutSnapshot() {
     accountId: "",
     email: "",
     displayName: "",
+    accountStatus: null,
   };
 }
 
