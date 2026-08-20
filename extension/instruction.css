@@ -1,6 +1,22 @@
+@font-face {
+  font-family: "Aileron";
+  src: url("fonts/Aileron-Regular.otf") format("opentype");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Aileron";
+  src: url("fonts/Aileron-Bold.otf") format("opentype");
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+}
+
 :root {
   color-scheme: light;
-  font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: "Aileron", Arial, sans-serif;
   --ink: #111827;
   --muted: #667085;
   --accent: #0549fd;

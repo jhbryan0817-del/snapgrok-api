@@ -17,7 +17,6 @@ const elements = {
   signedOutView: document.querySelector("#signedOutView"),
   zoneShortcut: document.querySelector("#zoneShortcut"),
   editInstruction: document.querySelector("#editInstruction"),
-  profileButton: document.querySelector("#manageAccount"),
   message: document.querySelector("#message"),
 };
 
@@ -72,7 +71,6 @@ async function renderAuth(snapshot) {
   elements.authLoading.hidden = true;
   elements.accountDivider.hidden = !snapshot.isSignedIn;
   elements.accountStrip.hidden = !snapshot.isSignedIn;
-  elements.profileButton.hidden = !snapshot.isSignedIn;
   elements.signedInView.hidden = !snapshot.isSignedIn;
   elements.signedOutView.hidden = snapshot.isSignedIn;
 
@@ -84,13 +82,11 @@ async function renderAuth(snapshot) {
   }
 
   elements.accountEmail.textContent = snapshot.email || snapshot.displayName;
-  if (snapshot.accountStatus) renderAccountStatus(snapshot.accountStatus);
+  if (snapshot.accountStatus && renderAccountStatus(snapshot.accountStatus)) {
+    accountStatusInitialized = true;
+  }
   if (!accountStatusInitialized) {
     accountStatusInitialized = true;
-    if (!accountStatusRendered) {
-      elements.accountPlan.textContent = "Checking…";
-      elements.accountAvailability.textContent = "Loading question balance…";
-    }
     void initializeAccountStatus();
   }
   if (!settingsInitialized) {
@@ -139,8 +135,8 @@ async function initializeAccountStatus() {
 
   console.error(lastError);
   if (!accountStatusRendered) {
-    elements.accountPlan.textContent = "Checking…";
-    elements.accountAvailability.textContent = "Reopen to refresh usage";
+    elements.accountPlan.textContent = "Refresh needed";
+    elements.accountAvailability.textContent = "Reopen Zenaian";
   }
 }
 
@@ -201,7 +197,6 @@ function showError(error) {
   elements.authLoading.hidden = true;
   elements.accountDivider.hidden = true;
   elements.accountStrip.hidden = true;
-  elements.profileButton.hidden = true;
   elements.signedInView.hidden = true;
   elements.signedOutView.hidden = false;
   elements.message.textContent = "Account status could not be loaded. Please reopen Zenaian and try again.";

@@ -84,13 +84,6 @@
       return liveStatus;
     } catch (statusError) {
       if (isAuthenticationError(statusError)) throw statusError;
-      try {
-        const verified = await getAuthSnapshot();
-        if (!verified.isSignedIn) throw statusError;
-        if (verified.accountStatus) return verified.accountStatus;
-      } catch (verificationError) {
-        if (isAuthenticationError(verificationError)) throw verificationError;
-      }
       if (cachedStatus) return cachedStatus;
       throw statusError;
     }

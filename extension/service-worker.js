@@ -121,23 +121,26 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return false;
     }
 
-    SnapGrokAuth.getAuthSnapshot({ verify: false })
-      .then(async (snapshot) => {
+    SnapGrokAuth.getAuthSnapshot()
+      .then((snapshot) => {
         sendResponse({
           ok: true,
           snapshot: publicAuthSnapshot(snapshot),
         });
-
-        // Pairing already authenticated this device session. Do not make the
-        // popup unusable because a live verification request is slow or
-        // temporarily unavailable. Verification still runs immediately in
-        // the background, and every capture remains server-authorized.
-        if (snapshot.isSignedIn) await verifyAuthSnapshotInBackground();
       })
-      .catch((error) => {
+      .catch(async (error) => {
         trace("AUTH_SNAPSHOT_FAILED", {
           message: String(error?.message || "Unknown authentication error").slice(0, 160),
         });
+        const cachedSnapshot = await SnapGrokAuth.getAuthSnapshot({ verify: false })
+          .catch(() => null);
+        if (cachedSnapshot?.isSignedIn && cachedSnapshot.accountStatus) {
+          sendResponse({
+            ok: true,
+            snapshot: publicAuthSnapshot(cachedSnapshot),
+          });
+          return;
+        }
         sendResponse({ ok: false, error: "AUTH_SNAPSHOT_UNAVAILABLE" });
       });
     return true;
@@ -255,17 +258,6 @@ function publicAuthSnapshot(snapshot) {
     displayName: snapshot.displayName,
     accountStatus: snapshot.accountStatus || null,
   };
-}
-
-async function verifyAuthSnapshotInBackground() {
-  try {
-    const snapshot = await SnapGrokAuth.getAuthSnapshot();
-    await broadcastAuthSnapshot(snapshot);
-  } catch (error) {
-    trace("AUTH_BACKGROUND_VERIFY_FAILED", {
-      message: String(error?.message || "Unknown authentication error").slice(0, 160),
-    });
-  }
 }
 
 function signedOutSnapshot() {

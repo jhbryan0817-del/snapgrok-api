@@ -14,19 +14,19 @@
         </div>
         <span id="accountDivider" class="header-divider" aria-hidden="true" hidden></span>
         <section id="accountStrip" class="account-strip" aria-label="Signed-in account" hidden>
-          <span class="account-label">Signed in as <strong id="accountEmail" class="account-email">Zenaian user</strong></span>
+          <span class="account-identity">
+            <strong id="accountEmail" class="account-email">Zenaian user</strong>
+            <button id="manageAccount" class="manage-account" type="button">Manage account</button>
+          </span>
           <span class="account-meta">
             <svg class="plan-icon" viewBox="0 0 24 24" aria-hidden="true">
               <path d="m3.5 7.5 4.1 3.2L12 4.5l4.4 6.2 4.1-3.2-1.6 10H5.1l-1.6-10Zm2 12h13" />
             </svg>
-            <strong id="accountPlan" class="account-plan">Checking…</strong>
+            <strong id="accountPlan" class="account-plan"></strong>
             <span class="account-dot" aria-hidden="true">•</span>
-            <span id="accountAvailability" class="account-availability">Checking availability…</span>
+            <span id="accountAvailability" class="account-availability"></span>
           </span>
         </section>
-        <button id="manageAccount" class="profile-button" type="button" aria-label="Manage Zenaian account" title="Manage account" hidden>
-          <span class="profile-icon" aria-hidden="true"></span>
-        </button>
       </header>
 
       <section id="authLoading" class="auth-card" aria-live="polite">
@@ -91,19 +91,16 @@
         </div>
       </section>
 
-      <details class="result-card">
-        <summary class="result-summary">
-          <h2>Toolbar Results</h2>
-          <span class="result-chevron" aria-hidden="true"></span>
-        </summary>
-        <div class="result-list">
+      <section class="result-card" aria-labelledby="resultHeading">
+        <h2 id="resultHeading" class="result-heading">Toolbar results</h2>
+        <div class="result-strip">
           <div class="result-item"><img src="icons/result-a32.png" alt="" /><span>Single answer</span></div>
           <div class="result-item"><img src="icons/result-multi-232.png" alt="" /><span>Multiple answers</span></div>
           <div class="result-item"><img src="icons/processing32.png" alt="" /><span>Processing</span></div>
           <div class="result-item"><img src="icons/result-inconclusive32.png" alt="" /><span>Inconclusive</span></div>
           <div class="result-item"><img src="icons/result-error32.png" alt="" /><span>Error</span></div>
         </div>
-      </details>
+      </section>
 
       </div>
 
