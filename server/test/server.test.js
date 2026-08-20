@@ -463,6 +463,7 @@ test("repeated ZDR failures disable subsequent production analysis", async () =>
 
 test("website pairing and extension polling routes keep their authentication boundaries", async () => {
   const calls = [];
+  let accountStatusUserId = "";
   const config = createConfig({
     ...baseEnvironment(),
     ALLOWED_ORIGINS: `${EXTENSION_ORIGIN},${WEBSITE_ORIGIN}`,
@@ -528,6 +529,24 @@ test("website pairing and extension polling routes keep their authentication bou
       config,
       deviceSessions,
       analysisJobs,
+      billing: billingStub({
+        status: async (userId) => {
+          accountStatusUserId = userId;
+          return {
+            billingEnabled: true,
+            mode: "test",
+            plan: { id: "free", allowance: 5, cadence: "day" },
+            usage: {
+              allowance: 5,
+              consumed: 1,
+              reserved: 1,
+              remaining: 3,
+              resetsAt: "2026-08-02T00:00:00.000Z",
+            },
+            subscription: { provider: "private-provider-detail" },
+          };
+        },
+      }),
       authenticate: async () => ({ userId: "user_test", sessionId: "sess_test" }),
     },
     async (baseUrl) => {
@@ -567,6 +586,23 @@ test("website pairing and extension polling routes keep their authentication bou
       });
       assert.equal(verified.status, 200);
       assert.equal((await verified.json()).profile.accountId, "user_test");
+
+      const accountStatus = await fetch(
+        `${baseUrl}/api/extension/account/status`,
+        {
+          headers: {
+            Origin: EXTENSION_ORIGIN,
+            Authorization: "Bearer device-token",
+          },
+        },
+      );
+      assert.equal(accountStatus.status, 200);
+      assert.deepEqual(await accountStatus.json(), {
+        ok: true,
+        plan: { id: "free" },
+        usage: { allowance: 5, remaining: 3 },
+      });
+      assert.equal(accountStatusUserId, "user_test");
 
       const job = await fetch(`${baseUrl}/api/analyze-jobs`, {
         method: "POST",

@@ -1,7 +1,10 @@
 "use strict";
 
 const elements = {
+  accountAvailability: document.querySelector("#accountAvailability"),
+  accountDivider: document.querySelector("#accountDivider"),
   accountEmail: document.querySelector("#accountEmail"),
+  accountPlan: document.querySelector("#accountPlan"),
   accountStrip: document.querySelector("#accountStrip"),
   assignFull: document.querySelector("#assignFull"),
   assignZone: document.querySelector("#assignZone"),
@@ -14,11 +17,12 @@ const elements = {
   signedOutView: document.querySelector("#signedOutView"),
   zoneShortcut: document.querySelector("#zoneShortcut"),
   editInstruction: document.querySelector("#editInstruction"),
-  profileIcon: document.querySelector("#profileIcon"),
+  profileButton: document.querySelector("#manageAccount"),
   message: document.querySelector("#message"),
 };
 
 let settingsInitialized = false;
+let accountStatusInitialized = false;
 
 elements.assignFull.addEventListener("click", openShortcutManager);
 elements.assignZone.addEventListener("click", openShortcutManager);
@@ -65,17 +69,25 @@ async function initializeAuth() {
 async function renderAuth(snapshot) {
   elements.message.textContent = "";
   elements.authLoading.hidden = true;
+  elements.accountDivider.hidden = !snapshot.isSignedIn;
   elements.accountStrip.hidden = !snapshot.isSignedIn;
-  elements.profileIcon.hidden = !snapshot.isSignedIn;
+  elements.profileButton.hidden = !snapshot.isSignedIn;
   elements.signedInView.hidden = !snapshot.isSignedIn;
   elements.signedOutView.hidden = snapshot.isSignedIn;
 
   if (!snapshot.isSignedIn) {
     settingsInitialized = false;
+    accountStatusInitialized = false;
     return;
   }
 
   elements.accountEmail.textContent = snapshot.email || snapshot.displayName;
+  if (!accountStatusInitialized) {
+    accountStatusInitialized = true;
+    elements.accountPlan.textContent = "Plan";
+    elements.accountAvailability.textContent = "Checking availability…";
+    void initializeAccountStatus();
+  }
   if (!settingsInitialized) {
     settingsInitialized = true;
     await initializeSettings();
@@ -98,6 +110,51 @@ async function initializeSettings() {
   elements.zoneShortcut.textContent = compactShortcut(zoneShortcut);
   elements.fullShortcutNote.hidden = !fullShortcutUnavailable;
   elements.assignFull.textContent = fullShortcutUnavailable ? "Assign" : "Change";
+}
+
+async function initializeAccountStatus() {
+  let lastError = null;
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      const response = await chrome.runtime.sendMessage({
+        target: "service-worker",
+        type: "SNAPGROK_GET_ACCOUNT_STATUS",
+      });
+      if (!response?.ok || !response.status) {
+        throw new Error("Zenaian question availability is unavailable.");
+      }
+      renderAccountStatus(response.status);
+      return;
+    } catch (error) {
+      lastError = error;
+      if (attempt < 2) await delay(200 * (attempt + 1));
+    }
+  }
+
+  console.error(lastError);
+  elements.accountPlan.textContent = "Plan";
+  elements.accountAvailability.textContent = "Availability unavailable";
+}
+
+function renderAccountStatus(status) {
+  const allowance = status.allowance;
+  const remaining = status.remaining;
+  const hasUsage = Number.isSafeInteger(allowance) && allowance >= 0 &&
+    Number.isSafeInteger(remaining) && remaining >= 0 && remaining <= allowance;
+
+  elements.accountPlan.textContent = planLabel(status.planId);
+  elements.accountAvailability.textContent = hasUsage
+    ? `${remaining} of ${allowance} Available`
+    : "Availability unavailable";
+}
+
+function planLabel(planId) {
+  return {
+    free: "Free",
+    plus: "Plus",
+    ultra: "Ultra",
+  }[String(planId || "").toLowerCase()] || "Plan";
 }
 
 function compactShortcut(value) {
@@ -132,8 +189,9 @@ async function openWebsite(pathname) {
 function showError(error) {
   console.error(error);
   elements.authLoading.hidden = true;
+  elements.accountDivider.hidden = true;
   elements.accountStrip.hidden = true;
-  elements.profileIcon.hidden = true;
+  elements.profileButton.hidden = true;
   elements.signedInView.hidden = true;
   elements.signedOutView.hidden = false;
   elements.message.textContent = "Account status could not be loaded. Please reopen Zenaian and try again.";

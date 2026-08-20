@@ -22,6 +22,21 @@ test("extension keeps the required generative-AI and sensitive-data notices", as
   );
 });
 
+test("extension header uses the packaged logo and authenticated live availability", async () => {
+  const [popup, popupScript, worker, auth] = await Promise.all([
+    readFile(new URL("popup.html", extensionRoot), "utf8"),
+    readFile(new URL("popup.js", extensionRoot), "utf8"),
+    readFile(new URL("service-worker.js", extensionRoot), "utf8"),
+    readFile(new URL("auth.js", extensionRoot), "utf8"),
+  ]);
+
+  assert.match(popup, /src="icons\/default128\.png"/);
+  assert.match(popup, /Signed in as/);
+  assert.match(popupScript, /\$\{remaining\} of \$\{allowance\} Available/);
+  assert.match(worker, /SnapGrokAuth\.getAccountStatus\(\)/);
+  assert.match(auth, /fetchWithAuth\("\/api\/extension\/account\/status"\)/);
+});
+
 test("every extension result state uses the approved AI-generated action title", async () => {
   const worker = await readFile(
     new URL("service-worker.js", extensionRoot),

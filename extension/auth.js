@@ -56,6 +56,15 @@
     return refreshed?.accessToken || "";
   }
 
+  async function getAccountStatus() {
+    const response = await fetchWithAuth("/api/extension/account/status");
+    const payload = await readPayload(response);
+    if (!response.ok || !payload?.ok) {
+      throw apiError(response.status, payload);
+    }
+    return normalizeAccountStatus(payload);
+  }
+
   async function refreshSession(existingSession = null) {
     if (refreshPromise) return refreshPromise;
     refreshPromise = (async () => {
@@ -289,6 +298,30 @@
     return { nonce: value.nonce, expiresAt: Number(value.expiresAt) };
   }
 
+  function normalizeAccountStatus(value) {
+    const planId = ["free", "plus", "ultra"].includes(
+      String(value?.plan?.id || "").toLowerCase(),
+    )
+      ? String(value.plan.id).toLowerCase()
+      : "";
+    const allowance = safeNonnegativeInteger(value?.usage?.allowance);
+    const remaining = safeNonnegativeInteger(value?.usage?.remaining);
+    return {
+      planId,
+      allowance,
+      remaining:
+        allowance !== null && remaining !== null && remaining <= allowance
+          ? remaining
+          : null,
+    };
+  }
+
+  function safeNonnegativeInteger(value) {
+    if (value === null || value === undefined || value === "") return null;
+    const number = Number(value);
+    return Number.isSafeInteger(number) && number >= 0 ? number : null;
+  }
+
   function signedInSnapshot(profile) {
     const normalized = normalizeProfile(profile);
     return {
@@ -375,6 +408,7 @@
     acceptPairing,
     clearSession,
     fetchWithAuth,
+    getAccountStatus,
     getAccessToken,
     getAuthSnapshot,
     getOrCreatePairingNonce,

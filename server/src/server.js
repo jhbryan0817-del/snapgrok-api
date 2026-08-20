@@ -1090,6 +1090,31 @@ export function createZenaianServer({
         }
 
         if (
+          request.method === "GET" &&
+          url.pathname === "/api/extension/account/status"
+        ) {
+          enforceOrigin(config, request);
+          requireDeviceSessionService(deviceSessionService);
+          const releaseGlobal = globalRequestLimiter.acquire("protected-api");
+          try {
+            const auth = await deviceSessionService.authenticateAccess(request);
+            await privacyService?.assertUserAllowed(auth.userId);
+            const status = await billingService.status(auth.userId);
+            sendJson(
+              config,
+              request,
+              response,
+              200,
+              { ok: true, ...publicExtensionAccountStatus(status) },
+              requestId,
+            );
+          } finally {
+            releaseGlobal();
+          }
+          return;
+        }
+
+        if (
           request.method === "POST" &&
           url.pathname === "/api/extension/sessions/revoke"
         ) {
@@ -2115,6 +2140,32 @@ function setCommonHeaders(config, request, response, requestId) {
     "default-src 'none'; frame-ancestors 'none'; base-uri 'none'",
   );
   if (requestId) response.setHeader("X-Request-ID", requestId);
+}
+
+function publicExtensionAccountStatus(status) {
+  if (!status?.plan || !status?.usage) {
+    return { plan: null, usage: null };
+  }
+  const allowance = Number(status.usage.allowance);
+  const remaining = Number(status.usage.remaining);
+  if (
+    !Number.isSafeInteger(allowance) ||
+    allowance < 0 ||
+    !Number.isSafeInteger(remaining) ||
+    remaining < 0 ||
+    remaining > allowance
+  ) {
+    return { plan: null, usage: null };
+  }
+  return {
+    plan: {
+      id: String(status.plan.id || ""),
+    },
+    usage: {
+      allowance,
+      remaining,
+    },
+  };
 }
 
 function sendJson(config, request, response, status, body, requestId, headers = {}) {

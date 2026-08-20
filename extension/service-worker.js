@@ -143,6 +143,29 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
+  if (
+    message?.target === "service-worker" &&
+    message?.type === "SNAPGROK_GET_ACCOUNT_STATUS"
+  ) {
+    if (!SnapGrokAuth.isTrustedInternalSender(sender)) {
+      sendResponse({ ok: false, error: "ACCOUNT_STATUS_NOT_ALLOWED" });
+      return false;
+    }
+
+    SnapGrokAuth.getAccountStatus()
+      .then((status) => sendResponse({ ok: true, status }))
+      .catch((error) => {
+        trace("ACCOUNT_STATUS_FAILED", {
+          code: String(error?.code || "ACCOUNT_STATUS_UNAVAILABLE").slice(0, 64),
+        });
+        sendResponse({
+          ok: false,
+          error: String(error?.code || "ACCOUNT_STATUS_UNAVAILABLE").slice(0, 64),
+        });
+      });
+    return true;
+  }
+
   if (message?.type === "SNAPGROK_ZONE_SELECTED") {
     sendResponse({ accepted: true });
     void handleZoneSelected(message, sender).catch((error) => {
