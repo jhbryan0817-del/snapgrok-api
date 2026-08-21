@@ -6,9 +6,8 @@ const elements = {
   accountEmail: document.querySelector("#accountEmail"),
   accountPlan: document.querySelector("#accountPlan"),
   accountStrip: document.querySelector("#accountStrip"),
-  assignFull: document.querySelector("#assignFull"),
-  assignZone: document.querySelector("#assignZone"),
   authLoading: document.querySelector("#authLoading"),
+  editShortcuts: document.querySelector("#editShortcuts"),
   fullShortcut: document.querySelector("#fullShortcut"),
   fullShortcutNote: document.querySelector("#fullShortcutNote"),
   manageAccount: document.querySelector("#manageAccount"),
@@ -24,8 +23,7 @@ let settingsInitialized = false;
 let accountStatusInitialized = false;
 let accountStatusRendered = false;
 
-elements.assignFull.addEventListener("click", openShortcutManager);
-elements.assignZone.addEventListener("click", openShortcutManager);
+elements.editShortcuts.addEventListener("click", openShortcutManager);
 elements.editInstruction.addEventListener("click", openInstructionEditor);
 elements.signIn.addEventListener("click", () => openWebsite("/account?mode=sign-in&source=extension"));
 elements.manageAccount.addEventListener("click", () => openWebsite("/account"));
@@ -110,7 +108,6 @@ async function initializeSettings() {
   elements.fullShortcut.textContent = compactShortcut(fullShortcut);
   elements.zoneShortcut.textContent = compactShortcut(zoneShortcut);
   elements.fullShortcutNote.hidden = !fullShortcutUnavailable;
-  elements.assignFull.textContent = fullShortcutUnavailable ? "Assign" : "Change";
 }
 
 async function initializeAccountStatus() {
