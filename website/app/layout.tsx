@@ -6,6 +6,7 @@ import { MotionEnhancer } from "./motion-enhancer";
 import { SiteFooter } from "./site-footer";
 import "./globals.css";
 import "./v6-14-1.css";
+import "./design-refresh.css";
 
 const siteOrigin = configuredSiteOrigin();
 const title = "Zenaian | Study Smarter, Score Higher";
