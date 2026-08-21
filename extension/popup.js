@@ -7,6 +7,7 @@ const elements = {
   accountPlan: document.querySelector("#accountPlan"),
   accountStrip: document.querySelector("#accountStrip"),
   authLoading: document.querySelector("#authLoading"),
+  brandIntro: document.querySelector("#brandIntro"),
   editShortcuts: document.querySelector("#editShortcuts"),
   fullShortcut: document.querySelector("#fullShortcut"),
   fullShortcutNote: document.querySelector("#fullShortcutNote"),
@@ -67,6 +68,7 @@ async function initializeAuth() {
 async function renderAuth(snapshot) {
   elements.message.textContent = "";
   elements.authLoading.hidden = true;
+  elements.brandIntro.hidden = snapshot.isSignedIn;
   elements.accountDivider.hidden = !snapshot.isSignedIn;
   elements.accountStrip.hidden = !snapshot.isSignedIn;
   elements.signedInView.hidden = !snapshot.isSignedIn;
@@ -192,6 +194,7 @@ async function openWebsite(pathname) {
 function showError(error) {
   console.error(error);
   elements.authLoading.hidden = true;
+  elements.brandIntro.hidden = false;
   elements.accountDivider.hidden = true;
   elements.accountStrip.hidden = true;
   elements.signedInView.hidden = true;

@@ -11,6 +11,12 @@ const popupCss = read("popup.css");
 const popupJs = read("popup.js");
 const instructionCss = read("instruction.css");
 
+test("signed-out header fills the account space with the Zenaian product identity", () => {
+  assert.match(popupHtml, /id="brandIntro"[\s\S]*?<h1>Zenaian<\/h1>[\s\S]*?<p>AI MCQ Assistant<\/p>/);
+  assert.match(popupCss, /\.signed-out-brand \{[\s\S]*?grid-column: 3;[\s\S]*?grid-row: 1;/);
+  assert.match(popupJs, /elements\.brandIntro\.hidden = snapshot\.isSignedIn;/);
+});
+
 test("account action is comfortably compact, icon-led, and aligned with the email row", () => {
   const planPosition = popupHtml.indexOf('class="account-meta"');
   const identityPosition = popupHtml.indexOf('class="identity-icon"');
@@ -25,18 +31,26 @@ test("account action is comfortably compact, icon-led, and aligned with the emai
   assert.match(popupCss, /\.account-email \{[\s\S]*?grid-row: 3;[\s\S]*?align-self: center;/);
   assert.match(popupCss, /\.manage-account \{[\s\S]*?min-height: 28px;[\s\S]*?grid-row: 3;[\s\S]*?align-self: center;[\s\S]*?padding: 4px 8px;/);
   assert.match(popupCss, /\.manage-account svg \{[\s\S]*?width: 15px;[\s\S]*?height: 15px;/);
+  assert.match(popupCss, /\.account-prefix \{[^}]*transform: translateY\(5px\);/);
 });
 
 test("capture shortcuts share one edit action and sit on divided white rows", () => {
-  const captureMarkup = popupHtml.match(/<section class="section-block"[\s\S]*?<\/section>/)?.[0] || "";
+  const captureMarkup = popupHtml.match(/<section class="section-block capture-section"[\s\S]*?<\/section>/)?.[0] || "";
 
-  assert.match(captureMarkup, /id="captureHeading">Choose and set how you want to capture</);
   assert.match(captureMarkup, /id="editShortcuts"[\s\S]*>Edit<\/button>/);
+  assert.doesNotMatch(captureMarkup, /Choose and set how you want to capture|id="captureHeading"/);
   assert.doesNotMatch(captureMarkup, /id="assign(?:Full|Zone)"|>Change<\/button>/);
   assert.doesNotMatch(popupJs, /assignFull|assignZone/);
   assert.match(popupJs, /elements\.editShortcuts\.addEventListener\("click", openShortcutManager\)/);
   assert.match(popupCss, /\.capture-card \{[\s\S]*?border: 0;[\s\S]*?background: transparent;/);
+  assert.match(popupCss, /\.capture-card \{[\s\S]*?grid-template-columns: 38px max-content auto;[\s\S]*?justify-content: start;/);
+  assert.match(popupCss, /\.capture-edit \{ position: absolute; top: 10px; right: 14px;/);
   assert.match(popupCss, /\.capture-card \+ \.capture-card \{[\s\S]*?border-top: 1px solid #e4e7ee;/);
+});
+
+test("custom instruction heading matches the capture-label emphasis", () => {
+  assert.match(popupCss, /\.capture-copy h3 \{[^}]*font-weight: 600;/);
+  assert.match(popupCss, /\.instruction-copy h2 \{[^}]*font-weight: 600;/);
 });
 
 test("toolbar legend uses five background-free glyphs", () => {

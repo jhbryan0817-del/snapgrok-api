@@ -12,6 +12,10 @@
         <div class="brand-lockup">
           <img class="brand-mark" src="icons/default128.png" alt="" />
         </div>
+        <div id="brandIntro" class="signed-out-brand">
+          <h1>Zenaian</h1>
+          <p>AI MCQ Assistant</p>
+        </div>
         <span id="accountDivider" class="header-divider" aria-hidden="true" hidden></span>
         <section id="accountStrip" class="account-strip" aria-label="Signed-in account" hidden>
           <span class="account-meta">
@@ -63,11 +67,8 @@
       </section>
 
       <div id="signedInView" hidden>
-      <section class="section-block" aria-labelledby="captureHeading">
-        <div class="capture-header">
-          <h2 id="captureHeading">Choose and set how you want to capture</h2>
-          <button id="editShortcuts" class="primary-button capture-edit" type="button">Edit</button>
-        </div>
+      <section class="section-block capture-section" aria-label="Capture options">
+        <button id="editShortcuts" class="primary-button capture-edit" type="button">Edit</button>
         <div class="capture-grid">
           <article class="capture-card">
             <div class="capture-icon full-icon" aria-hidden="true"></div>
