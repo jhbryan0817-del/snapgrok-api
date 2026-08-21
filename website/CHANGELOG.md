@@ -1,5 +1,10 @@
 # Zenaian website changelog
 
+## v6.16.3 - Cleaner footer navigation
+
+- Removes the vertical separators between footer navigation links while
+  preserving the dividers between desktop business-information entries.
+
 ## v6.16.2 - Right-aligned footer navigation and fuller disclosures
 
 - Moves the footer navigation into the top-right space opposite the Zenaian

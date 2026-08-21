@@ -243,8 +243,10 @@ test("global footer contains navigation, business placeholders, and accurate xAI
   }
   assert.match(css, /\.site-footer-top \{[^}]*justify-content: space-between;/);
   assert.match(css, /\.site-footer \.footer-nav \{[^}]*justify-content: flex-end;/);
+  assert.match(css, /\.site-footer \.footer-nav a \+ a \{[^}]*border-left: 0;/);
   assert.match(css, /\.footer-business-details \{/);
   assert.match(css, /\.footer-business-row \{/);
+  assert.match(css, /\.footer-business-row p \+ p \{[^}]*border-left: 1px solid #cfd5df;/);
   assert.match(footer, /Grok is a trademark of xAI/);
   assert.match(footer, /not affiliated with or endorsed by xAI/);
 });

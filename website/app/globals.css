@@ -3722,7 +3722,7 @@ img { display: block; max-width: 100%; }
 .site-footer .footer-nav a + a {
   margin-left: 18px;
   padding-left: 18px;
-  border-left: 1px solid #cfd5df;
+  border-left: 0;
 }
 .footer-business-details {
   display: grid;
