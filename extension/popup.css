@@ -45,7 +45,7 @@ button { cursor: pointer; }
   box-shadow: 0 8px 24px rgba(20,28,45,.05);
 }
 .app-header.is-signed-out {
-  grid-template-columns: 58px max-content;
+  grid-template-columns: 34px max-content;
   column-gap: 10px;
   min-height: 70px;
   margin-bottom: 4px;
@@ -70,6 +70,12 @@ button { cursor: pointer; }
   height: 56px;
   border-radius: 17px;
   box-shadow: 0 9px 21px rgba(5,73,253,.22);
+}
+.app-header.is-signed-out .brand-mark {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  box-shadow: 0 5px 12px rgba(5,73,253,.2);
 }
 .signed-out-brand {
   display: flex;
