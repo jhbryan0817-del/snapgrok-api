@@ -1814,3 +1814,353 @@ summary:focus-visible {
     text-align: left;
   }
 }
+
+/*
+ * Content-placement reconciliation.
+ *
+ * The visual refresh keeps its flatter surfaces and restrained palette, while
+ * the copy returns to the composition used before the redesign: centered page
+ * introductions, centered feature narratives, and full-width left-aligned
+ * content only where the original information hierarchy called for it.
+ */
+
+.site-header,
+.auth-page > .site-header,
+.account-page > .site-header {
+  grid-template-columns: minmax(180px, 1fr) auto minmax(180px, 1fr);
+}
+
+.site-header .brand {
+  justify-self: start;
+}
+
+.site-header .primary-nav {
+  justify-self: center;
+}
+
+.site-header .account-entry-actions,
+.site-header .account-menu,
+.site-header .account-nav-loading {
+  justify-self: end;
+}
+
+/* Restore the original centered hero flow and sentence widths. */
+.landing-page .hero {
+  min-height: 0;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas:
+    "copy"
+    "demo"
+    "followup";
+  gap: 28px;
+  padding-top: clamp(58px, 6vw, 84px);
+  padding-bottom: clamp(76px, 8vw, 112px);
+}
+
+.landing-page .hero-copy {
+  width: min(1050px, 100%);
+  display: grid;
+  justify-items: center;
+  margin-inline: auto;
+  align-self: auto;
+  text-align: center;
+}
+
+.landing-page .trust-pill {
+  justify-content: center;
+  margin: 0 auto 22px;
+  padding: 0;
+  border: 0;
+  text-align: center;
+}
+
+.landing-page .hero h1 {
+  width: 100%;
+  max-width: 1050px;
+  font-size: clamp(52px, 5vw, 68px);
+  text-align: center;
+  white-space: nowrap;
+}
+
+.landing-page .hero-copy-divider {
+  margin: 30px auto 24px;
+}
+
+.landing-page .hero-description {
+  width: min(820px, 100%);
+  max-width: 820px;
+  display: grid;
+  justify-items: center;
+  margin-inline: auto;
+  text-align: center;
+}
+
+.landing-page .hero-description span {
+  width: auto;
+  max-width: 100%;
+  margin-inline: auto;
+  text-align: center;
+}
+
+.landing-page .hero-browser-demo {
+  width: min(900px, 100%);
+  margin-inline: auto;
+}
+
+.landing-page .hero-followup {
+  width: min(900px, 100%);
+  margin-inline: auto;
+  align-self: auto;
+  text-align: center;
+}
+
+.landing-page .hero-actions,
+.landing-page .quiet-note {
+  justify-content: center;
+}
+
+/* Give all major homepage surfaces one shared centered content edge. */
+.landing-page .answer-toolbar-experience,
+.landing-page .explore-controls-grid,
+.landing-page .study-intelligence-grid,
+.landing-page .privacy-section > .privacy-heading,
+.landing-page .privacy-priority-panel {
+  width: min(1120px, 100%);
+  margin-right: auto;
+  margin-left: auto;
+}
+
+.landing-page .study-speed-card > .feature-copy,
+.landing-page .study-model-card > .feature-copy {
+  width: min(900px, 100%);
+  max-width: 900px;
+  margin-right: auto;
+  margin-left: auto;
+  text-align: center;
+}
+
+.landing-page .study-speed-card .feature-copy h3,
+.landing-page .study-model-card .feature-copy h3,
+.landing-page .study-speed-card .feature-copy p,
+.landing-page .study-model-card .feature-copy p {
+  margin-right: auto;
+  margin-left: auto;
+  text-align: center;
+}
+
+.landing-page .privacy-section > .privacy-heading {
+  justify-content: center !important;
+  margin: 0 auto 36px !important;
+  text-align: center;
+}
+
+.landing-page .privacy-section > .privacy-heading h2 {
+  text-align: center;
+}
+
+/* Pricing introduction returns to its original centered placement. */
+.pricing-page-heading,
+.account-page .account-page-heading {
+  justify-items: center;
+  text-align: center;
+}
+
+.pricing-page-heading .page-section-title,
+.account-page .account-page-heading .page-section-title {
+  text-align: center;
+}
+
+/* Supporting-page introductions remain centered; dense content stays left. */
+.editorial-page .editorial-hero,
+.legal-page-hero {
+  width: min(1040px, calc(100% - 64px));
+  max-width: 1040px;
+  margin-right: auto;
+  margin-left: auto;
+  text-align: center;
+}
+
+.editorial-page .editorial-hero h1,
+.legal-page-hero h1 {
+  width: 100%;
+  max-width: none;
+  text-align: center;
+}
+
+.editorial-page .editorial-hero > p,
+.legal-page-hero > p {
+  max-width: 980px;
+  margin-right: auto;
+  margin-left: auto;
+  text-align: center;
+}
+
+.legal-page-hero > p {
+  max-width: 760px;
+}
+
+.legal-page-hero .policy-meta {
+  width: 100%;
+  justify-content: center;
+  margin: 28px auto 0;
+  text-align: center;
+}
+
+.careers-page .careers-openings {
+  display: block;
+  padding: clamp(58px, 6vw, 78px) 52px clamp(92px, 9vw, 132px);
+}
+
+.careers-page .careers-openings-heading,
+.careers-page .careers-openings-heading h2,
+.careers-page .careers-openings-heading p {
+  width: 100%;
+  max-width: none;
+  text-align: left;
+}
+
+.careers-page .careers-position-list {
+  width: 100%;
+  margin-top: 34px;
+}
+
+.policy-layout {
+  grid-template-columns: 230px minmax(0, 1fr);
+  gap: 54px;
+}
+
+/* Authentication returns to the compact centered stack used before refresh. */
+.auth-simple-layout {
+  width: min(520px, calc(100% - 64px));
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+  margin: clamp(54px, 9vh, 100px) auto 72px;
+  padding: 0;
+}
+
+.auth-simple-welcome {
+  width: 100%;
+  font-size: clamp(28px, 4vw, 42px);
+  text-align: center;
+}
+
+.auth-simple-welcome::after {
+  display: none;
+}
+
+.auth-simple-card {
+  width: 100%;
+  max-width: 520px;
+  justify-self: auto;
+  padding: 18px;
+}
+
+.auth-simple-card .clerk-surface,
+.auth-simple-card .clerk-surface > div,
+.auth-simple-card .clerk-surface [class*="cl-rootBox"] {
+  justify-content: center;
+  margin-inline: auto;
+}
+
+@media (max-width: 900px) {
+  .site-header,
+  .auth-page > .site-header,
+  .account-page > .site-header {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .landing-page .hero {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "copy"
+      "demo"
+      "followup";
+  }
+
+  .landing-page .hero-copy,
+  .landing-page .hero-description,
+  .landing-page .hero-followup {
+    max-width: 100%;
+    text-align: center;
+  }
+
+  .landing-page .hero h1 {
+    white-space: normal;
+  }
+
+  .landing-page .hero-description span {
+    text-align: center;
+  }
+
+  .careers-page .careers-openings {
+    padding-right: 32px;
+    padding-left: 32px;
+  }
+
+  .policy-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 40px;
+  }
+}
+
+@media (max-width: 600px) {
+  .editorial-page .editorial-hero,
+  .legal-page-hero {
+    width: min(100% - 28px, 520px);
+  }
+
+  .landing-page .hero {
+    padding-top: 44px;
+  }
+
+  .landing-page .trust-pill {
+    margin-right: auto;
+    margin-left: auto;
+    padding-left: 0;
+  }
+
+  .landing-page .hero h1,
+  .landing-page .hero-description,
+  .landing-page .hero-followup,
+  .landing-page .quiet-note {
+    text-align: center;
+  }
+
+  .landing-page .hero-actions,
+  .landing-page .quiet-note {
+    justify-content: center;
+  }
+
+  .landing-page .study-speed-card > .feature-copy,
+  .landing-page .study-model-card > .feature-copy,
+  .landing-page .study-speed-card .feature-copy h3,
+  .landing-page .study-model-card .feature-copy h3,
+  .landing-page .study-speed-card .feature-copy p,
+  .landing-page .study-model-card .feature-copy p {
+    text-align: center;
+  }
+
+  .pricing-page-heading,
+  .account-page .account-page-heading,
+  .editorial-page .editorial-hero,
+  .legal-page-hero,
+  .editorial-page .editorial-hero h1,
+  .legal-page-hero h1,
+  .editorial-page .editorial-hero > p,
+  .legal-page-hero > p {
+    text-align: center;
+  }
+
+  .careers-page .careers-openings {
+    padding-right: 20px;
+    padding-left: 20px;
+  }
+
+  .auth-simple-layout {
+    width: min(100% - 28px, 520px);
+    margin-top: 52px;
+  }
+}
