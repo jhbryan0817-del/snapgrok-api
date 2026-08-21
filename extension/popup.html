@@ -15,18 +15,36 @@
         <span id="accountDivider" class="header-divider" aria-hidden="true" hidden></span>
         <section id="accountStrip" class="account-strip" aria-label="Signed-in account" hidden>
           <span class="account-meta">
-            <svg class="plan-icon" viewBox="0 0 24 24" aria-hidden="true">
-              <path d="m3.5 7.5 4.1 3.2L12 4.5l4.4 6.2 4.1-3.2-1.6 10H5.1l-1.6-10Zm2 12h13" />
-            </svg>
-            <strong id="accountPlan" class="account-plan"></strong>
-            <span class="account-dot" aria-hidden="true">•</span>
+            <span class="plan-chip">
+              <svg class="plan-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="m3.5 7.5 4.1 3.2L12 4.5l4.4 6.2 4.1-3.2-1.6 10H5.1l-1.6-10Zm2 12h13" />
+              </svg>
+              <strong id="accountPlan" class="account-plan"></strong>
+            </span>
+            <span class="account-separator" aria-hidden="true"></span>
             <span id="accountAvailability" class="account-availability"></span>
           </span>
           <span class="account-identity">
-            <span class="account-prefix">Signed in as</span>
-            <span id="accountEmail" class="account-email">Zenaian user</span>
-            <button id="manageAccount" class="manage-account" type="button">Manage account</button>
+            <span class="identity-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <rect x="3.5" y="5.5" width="17" height="13" rx="2.25" />
+                <path d="m5 7 7 5.5L19 7" />
+              </svg>
+            </span>
+            <span class="identity-copy">
+              <span class="account-prefix">Signed in as</span>
+              <span id="accountEmail" class="account-email">Zenaian user</span>
+            </span>
           </span>
+          <button id="manageAccount" class="manage-account" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="8.5" cy="7" r="3.25" />
+              <path d="M2.75 18.25c.5-3.15 2.35-4.75 5.75-4.75 1.35 0 2.5.25 3.4.78" />
+              <circle cx="17" cy="16.5" r="2.25" />
+              <path d="M17 12.8v1.1m0 5.2v1.1m3.7-3.7h-1.1m-5.2 0h-1.1m6.32-2.62-.78.78m-3.68 3.68-.78.78m5.25 0-.78-.78m-3.68-3.68-.78-.78" />
+            </svg>
+            <span>Manage account</span>
+          </button>
         </section>
       </header>
 
@@ -94,11 +112,11 @@
 
       <section class="result-card" aria-label="Toolbar result legend">
         <div class="result-strip">
-          <div class="result-item"><img src="icons/result-a32.png" alt="" /><span>Single answer</span></div>
-          <div class="result-item"><img src="icons/result-multi-232.png" alt="" /><span>Multiple answers</span></div>
-          <div class="result-item"><img src="icons/processing32.png" alt="" /><span>Processing</span></div>
-          <div class="result-item"><img src="icons/result-inconclusive32.png" alt="" /><span>Inconclusive</span></div>
-          <div class="result-item"><img src="icons/result-error32.png" alt="" /><span>Error</span></div>
+          <div class="result-item"><span class="result-glyph result-glyph--single" aria-hidden="true">A</span><span>Single answer</span></div>
+          <div class="result-item"><span class="result-glyph result-glyph--multiple" aria-hidden="true">✓2</span><span>Multiple answers</span></div>
+          <div class="result-item"><span class="result-glyph result-glyph--processing" aria-hidden="true">•••</span><span>Processing</span></div>
+          <div class="result-item"><span class="result-glyph result-glyph--inconclusive" aria-hidden="true">?</span><span>Inconclusive</span></div>
+          <div class="result-item"><span class="result-glyph result-glyph--error" aria-hidden="true">!</span><span>Error</span></div>
         </div>
       </section>
 

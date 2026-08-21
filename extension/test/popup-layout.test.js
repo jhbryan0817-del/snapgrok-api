@@ -10,32 +10,39 @@ const popupHtml = read("popup.html");
 const popupCss = read("popup.css");
 const instructionCss = read("instruction.css");
 
-test("account plan appears above the signed-in identity and account link", () => {
+test("account header follows the plan, identity, and bordered action layout", () => {
   const planPosition = popupHtml.indexOf('class="account-meta"');
   const identityPosition = popupHtml.indexOf('class="account-identity"');
+  const actionPosition = popupHtml.indexOf('class="manage-account"');
 
   assert.ok(planPosition >= 0);
   assert.ok(identityPosition > planPosition);
-  assert.match(popupHtml, /Signed in as[\s\S]*id="accountEmail"[\s\S]*id="manageAccount"/);
+  assert.ok(actionPosition > identityPosition);
+  assert.match(popupHtml, /class="plan-chip"[\s\S]*Signed in as[\s\S]*id="accountEmail"/);
+  assert.match(popupHtml, /class="identity-icon"/);
+  assert.match(popupCss, /\.manage-account \{[\s\S]*?border: 1px solid var\(--accent\);/);
 });
 
-test("toolbar legend is titleless and its container is transparent", () => {
+test("toolbar legend uses five background-free glyphs", () => {
+  const resultMarkup = popupHtml.match(/<section class="result-card"[\s\S]*?<\/section>/)?.[0] || "";
+
   assert.doesNotMatch(popupHtml, /Toolbar results/i);
   assert.match(popupHtml, /class="result-card" aria-label="Toolbar result legend"/);
   assert.match(popupCss, /\.result-card \{ margin-top: 8px; padding: 3px 4px 0; \}/);
+  assert.equal((resultMarkup.match(/class="result-glyph/g) || []).length, 5);
+  assert.doesNotMatch(resultMarkup, /<img/);
+  assert.match(popupCss, /\.result-glyph \{[\s\S]*?background: transparent;/);
   assert.doesNotMatch(popupCss, /\.result-heading/);
 });
 
-test("popup is non-scrollable and all extension pages use real Aileron weights", () => {
+test("popup is non-scrollable and extension pages use the technical system font stack", () => {
   assert.match(popupCss, /html \{ overflow: hidden; \}/);
   assert.match(popupCss, /body \{[\s\S]*?overflow: hidden;/);
 
   for (const css of [popupCss, instructionCss]) {
-    assert.match(css, /Aileron-Regular\.otf/);
-    assert.match(css, /Aileron-Bold\.otf/);
-    assert.match(css, /font-family: "Aileron", Arial, sans-serif;/);
+    assert.match(css, /font-family: "Segoe UI Variable", Aptos, "Segoe UI", Arial, sans-serif;/);
     assert.match(css, /font-synthesis: none;/);
-    assert.doesNotMatch(css, /font-weight: (?:600|750|800|900)/);
+    assert.doesNotMatch(css, /Aileron/);
   }
 });
 

@@ -1,22 +1,6 @@
-@font-face {
-  font-family: "Aileron";
-  src: url("fonts/Aileron-Regular.otf") format("opentype");
-  font-style: normal;
-  font-weight: 400;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "Aileron";
-  src: url("fonts/Aileron-Bold.otf") format("opentype");
-  font-style: normal;
-  font-weight: 700;
-  font-display: swap;
-}
-
 :root {
   color-scheme: light;
-  font-family: "Aileron", Arial, sans-serif;
+  font-family: "Segoe UI Variable", Aptos, "Segoe UI", Arial, sans-serif;
   font-synthesis: none;
   --ink: #111827;
   --muted: #667085;
@@ -32,7 +16,7 @@ body {
     radial-gradient(circle at 90% 0%, rgba(5,73,253,.15), transparent 34%),
     #f7f9fc;
 }
-body, button, input, select, textarea { font-family: "Aileron", Arial, sans-serif; }
+body, button, input, select, textarea { font-family: "Segoe UI Variable", Aptos, "Segoe UI", Arial, sans-serif; }
 button, textarea { font-size: inherit; font-style: inherit; font-weight: inherit; line-height: inherit; }
 .editor-shell { max-width: 760px; margin: 0 auto; padding: 24px 34px; }
 .editor-header { display: flex; gap: 16px; align-items: flex-start; }
@@ -54,7 +38,7 @@ button, textarea { font-size: inherit; font-style: inherit; font-weight: inherit
   transform: translateY(-1px);
 }
 .eyebrow { color: var(--accent); font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
-h1 { margin: 5px 0 7px; font-size: 25px; font-weight: 400; letter-spacing: -.02em; }
+h1 { margin: 5px 0 7px; font-size: 25px; font-weight: 600; letter-spacing: -.02em; }
 .editor-header p { max-width: 560px; margin: 0; color: var(--muted); font-size: 13px; line-height: 1.5; }
 .editor-card {
   margin-top: 18px;
@@ -64,7 +48,7 @@ h1 { margin: 5px 0 7px; font-size: 25px; font-weight: 400; letter-spacing: -.02e
   background: white;
   box-shadow: 0 12px 30px rgba(20,28,45,.06);
 }
-label { display: block; margin-bottom: 10px; font-size: 13px; font-weight: 400; }
+label { display: block; margin-bottom: 10px; font-size: 13px; font-weight: 600; }
 textarea {
   width: 100%;
   min-height: 200px;
@@ -84,7 +68,7 @@ textarea:focus { border-color: #6f95ff; background: white; box-shadow: 0 0 0 4px
 .textarea-meta span:first-child { max-width: 520px; color: #8a4b13; font-weight: 400; line-height: 1.4; }
 .actions { display: flex; align-items: center; justify-content: flex-end; gap: 10px; margin-top: 12px; }
 .actions p { flex: 1; min-height: 18px; margin: 0; font-size: 12px; }
-button { padding: 10px 15px; border-radius: 10px; font-size: 12px; font-weight: 400; cursor: pointer; }
+button { padding: 10px 15px; border-radius: 10px; font-size: 12px; font-weight: 600; cursor: pointer; }
 .secondary { border: 1px solid #d7dbe3; color: #344054; background: white; }
 .primary { border: 0; color: white; background: linear-gradient(135deg, #0549fd, #003bd4); box-shadow: 0 7px 18px rgba(5,73,253,.22); }
 button:focus-visible { outline: 3px solid rgba(5,73,253,.2); outline-offset: 2px; }
