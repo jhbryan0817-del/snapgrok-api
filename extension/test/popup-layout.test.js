@@ -12,8 +12,12 @@ const popupJs = read("popup.js");
 const instructionCss = read("instruction.css");
 
 test("signed-out header fills the account space with the Zenaian product identity", () => {
+  assert.match(popupHtml, /<header class="app-header is-signed-out">/);
   assert.match(popupHtml, /id="brandIntro"[\s\S]*?<h1>Zenaian<\/h1>[\s\S]*?<p>AI MCQ Assistant<\/p>/);
   assert.match(popupCss, /\.signed-out-brand \{[\s\S]*?grid-column: 3;[\s\S]*?grid-row: 1;/);
+  assert.match(popupCss, /\.app-header\.is-signed-out \{[\s\S]*?grid-template-columns: 58px minmax\(0, 1fr\);[\s\S]*?column-gap: 8px;[\s\S]*?border-color: transparent;[\s\S]*?background: transparent;[\s\S]*?box-shadow: none;/);
+  assert.match(popupCss, /\.app-header\.is-signed-out \.signed-out-brand \{ grid-column: 2; \}/);
+  assert.match(popupJs, /elements\.appHeader\.classList\.toggle\("is-signed-out", !snapshot\.isSignedIn\);/);
   assert.match(popupJs, /elements\.brandIntro\.hidden = snapshot\.isSignedIn;/);
 });
 
@@ -43,7 +47,7 @@ test("capture shortcuts share one edit action and sit on divided white rows", ()
   assert.doesNotMatch(popupJs, /assignFull|assignZone/);
   assert.match(popupJs, /elements\.editShortcuts\.addEventListener\("click", openShortcutManager\)/);
   assert.match(popupCss, /\.capture-card \{[\s\S]*?border: 0;[\s\S]*?background: transparent;/);
-  assert.match(popupCss, /\.capture-card \{[\s\S]*?grid-template-columns: 38px max-content auto;[\s\S]*?justify-content: start;/);
+  assert.match(popupCss, /\.capture-card \{[\s\S]*?grid-template-columns: 38px 168px auto;[\s\S]*?justify-content: start;[\s\S]*?gap: 14px;/);
   assert.match(popupCss, /\.capture-edit \{ position: absolute; top: 10px; right: 14px;/);
   assert.match(popupCss, /\.capture-card \+ \.capture-card \{[\s\S]*?border-top: 1px solid #e4e7ee;/);
 });

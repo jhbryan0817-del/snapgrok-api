@@ -44,6 +44,14 @@ button { cursor: pointer; }
   background: rgba(255,255,255,.92);
   box-shadow: 0 8px 24px rgba(20,28,45,.05);
 }
+.app-header.is-signed-out {
+  grid-template-columns: 58px minmax(0, 1fr);
+  column-gap: 8px;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+.app-header.is-signed-out .signed-out-brand { grid-column: 2; }
 
 .brand-lockup {
   display: flex;
@@ -196,9 +204,9 @@ h2 { margin: 0; font-size: 15px; font-weight: 400; letter-spacing: 0; }
 .capture-grid { display: grid; gap: 0; }
 .capture-card {
   display: grid;
-  grid-template-columns: 38px max-content auto;
+  grid-template-columns: 38px 168px auto;
   justify-content: start;
-  gap: 8px;
+  gap: 14px;
   align-items: center;
   padding: 10px 0 11px;
   border: 0;

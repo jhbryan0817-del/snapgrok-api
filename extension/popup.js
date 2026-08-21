@@ -6,6 +6,7 @@ const elements = {
   accountEmail: document.querySelector("#accountEmail"),
   accountPlan: document.querySelector("#accountPlan"),
   accountStrip: document.querySelector("#accountStrip"),
+  appHeader: document.querySelector(".app-header"),
   authLoading: document.querySelector("#authLoading"),
   brandIntro: document.querySelector("#brandIntro"),
   editShortcuts: document.querySelector("#editShortcuts"),
@@ -68,6 +69,7 @@ async function initializeAuth() {
 async function renderAuth(snapshot) {
   elements.message.textContent = "";
   elements.authLoading.hidden = true;
+  elements.appHeader.classList.toggle("is-signed-out", !snapshot.isSignedIn);
   elements.brandIntro.hidden = snapshot.isSignedIn;
   elements.accountDivider.hidden = !snapshot.isSignedIn;
   elements.accountStrip.hidden = !snapshot.isSignedIn;
@@ -194,6 +196,7 @@ async function openWebsite(pathname) {
 function showError(error) {
   console.error(error);
   elements.authLoading.hidden = true;
+  elements.appHeader.classList.add("is-signed-out");
   elements.brandIntro.hidden = false;
   elements.accountDivider.hidden = true;
   elements.accountStrip.hidden = true;
