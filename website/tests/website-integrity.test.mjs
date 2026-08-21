@@ -230,10 +230,19 @@ test("global footer contains navigation, business placeholders, and accurate xAI
   assert.match(footer, /href="mailto:sneaksolve@gmail\.com"/);
   assert.doesNotMatch(footer, /Use Cases|href="\/use-cases"/);
   assert.doesNotMatch(footer, /Affiliate Marketing|href="\/affiliate"/);
-  assert.match(footer, /Study smarter\. Stay focused\. Built for learners everywhere\./);
-  for (const placeholder of ["BUSINESS NAME", "CONTACT POINT", "BUSINESS ADDRESS", "BUSINESS ID"]) {
+  assert.doesNotMatch(footer, /Study smarter\. Stay focused\. Built for learners everywhere\./);
+  for (const placeholder of [
+    "BUSINESS NAME",
+    "REPRESENTATIVE NAME",
+    "BUSINESS PHONE / BUSINESS EMAIL",
+    "BUSINESS ADDRESS",
+    "BUSINESS ID",
+    "REPORT NUMBER / FILING AUTHORITY",
+  ]) {
     assert.match(footer, new RegExp(`\\[${placeholder}\\]`));
   }
+  assert.match(css, /\.site-footer-top \{[^}]*justify-content: space-between;/);
+  assert.match(css, /\.site-footer \.footer-nav \{[^}]*justify-content: flex-end;/);
   assert.match(css, /\.footer-business-details \{/);
   assert.match(css, /\.footer-business-row \{/);
   assert.match(footer, /Grok is a trademark of xAI/);

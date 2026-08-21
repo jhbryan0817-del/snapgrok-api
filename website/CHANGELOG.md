@@ -1,5 +1,13 @@
 # Zenaian website changelog
 
+## v6.16.2 - Right-aligned footer navigation and fuller disclosures
+
+- Moves the footer navigation into the top-right space opposite the Zenaian
+  wordmark and removes the promotional footer sentence.
+- Adds placeholders for the representative, business phone and email, and the
+  mail-order report number and filing authority alongside the existing
+  business identity fields.
+
 ## v6.16.1 - Search identity and business footer
 
 - Replaces the padded search-result artwork with an edge-fitted circular

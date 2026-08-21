@@ -5,30 +5,31 @@ export function SiteFooter() {
   return (
     <footer className="site-footer">
       <div className="site-footer-content shell">
-        <div className="footer-intro">
+        <div className="site-footer-top">
           <Link className="footer-brand" href="/" aria-label="Zenaian home">
             <BrandLogo compact />
           </Link>
-          <p>Study smarter. Stay focused. Built for learners everywhere.</p>
-        </div>
 
-        <nav className="footer-nav" aria-label="Footer navigation">
-          <Link href="/pricing">Pricing</Link>
-          <Link href="/careers">Careers</Link>
-          <Link href="/privacy">Privacy Policy</Link>
-          <Link href="/terms">Terms of Service</Link>
-          <a href="mailto:sneaksolve@gmail.com">Contact Us</a>
-          <Link href="/account">Account</Link>
-        </nav>
+          <nav className="footer-nav" aria-label="Footer navigation">
+            <Link href="/pricing">Pricing</Link>
+            <Link href="/careers">Careers</Link>
+            <Link href="/privacy">Privacy Policy</Link>
+            <Link href="/terms">Terms of Service</Link>
+            <a href="mailto:sneaksolve@gmail.com">Contact Us</a>
+            <Link href="/account">Account</Link>
+          </nav>
+        </div>
 
         <div className="footer-business-details" aria-label="Business information">
           <div className="footer-business-row">
             <p><strong>Business name</strong><span>[BUSINESS NAME]</span></p>
-            <p><strong>Contact point</strong><span>[CONTACT POINT]</span></p>
+            <p><strong>Representative</strong><span>[REPRESENTATIVE NAME]</span></p>
+            <p><strong>Contact point</strong><span>[BUSINESS PHONE / BUSINESS EMAIL]</span></p>
           </div>
           <div className="footer-business-row">
             <p><strong>Business address</strong><span>[BUSINESS ADDRESS]</span></p>
             <p><strong>Business ID</strong><span>[BUSINESS ID]</span></p>
+            <p><strong>Mail-order report</strong><span>[REPORT NUMBER / FILING AUTHORITY]</span></p>
           </div>
         </div>
 
