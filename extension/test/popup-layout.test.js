@@ -11,7 +11,7 @@ const popupCss = read("popup.css");
 const popupJs = read("popup.js");
 const instructionCss = read("instruction.css");
 
-test("account action is compact and baseline-aligned with the email row", () => {
+test("account action is comfortably compact, icon-led, and aligned with the email row", () => {
   const planPosition = popupHtml.indexOf('class="account-meta"');
   const identityPosition = popupHtml.indexOf('class="identity-icon"');
   const actionPosition = popupHtml.indexOf('class="manage-account"');
@@ -21,14 +21,16 @@ test("account action is compact and baseline-aligned with the email row", () => 
   assert.ok(actionPosition > identityPosition);
   assert.match(popupHtml, /class="plan-chip"[\s\S]*Signed in as[\s\S]*id="accountEmail"[\s\S]*id="manageAccount"/);
   assert.match(popupHtml, /class="identity-icon"/);
-  assert.match(popupCss, /\.account-email \{[\s\S]*?grid-row: 3;[\s\S]*?align-self: baseline;/);
-  assert.match(popupCss, /\.manage-account \{[\s\S]*?grid-row: 3;[\s\S]*?align-self: baseline;[\s\S]*?padding: 4px 7px 3px;/);
+  assert.match(popupHtml, /id="manageAccount"[\s\S]*?<svg[\s\S]*?<circle[\s\S]*?>Manage account<\/span>/);
+  assert.match(popupCss, /\.account-email \{[\s\S]*?grid-row: 3;[\s\S]*?align-self: center;/);
+  assert.match(popupCss, /\.manage-account \{[\s\S]*?min-height: 28px;[\s\S]*?grid-row: 3;[\s\S]*?align-self: center;[\s\S]*?padding: 4px 8px;/);
+  assert.match(popupCss, /\.manage-account svg \{[\s\S]*?width: 15px;[\s\S]*?height: 15px;/);
 });
 
 test("capture shortcuts share one edit action and sit on divided white rows", () => {
   const captureMarkup = popupHtml.match(/<section class="section-block"[\s\S]*?<\/section>/)?.[0] || "";
 
-  assert.match(captureMarkup, /id="captureHeading">Capture</);
+  assert.match(captureMarkup, /id="captureHeading">Choose and set how you want to capture</);
   assert.match(captureMarkup, /id="editShortcuts"[\s\S]*>Edit<\/button>/);
   assert.doesNotMatch(captureMarkup, /id="assign(?:Full|Zone)"|>Change<\/button>/);
   assert.doesNotMatch(popupJs, /assignFull|assignZone/);
