@@ -50,7 +50,7 @@ button { cursor: pointer; }
   min-height: 70px;
   margin-bottom: 4px;
   padding: 6px 14px;
-  justify-content: center;
+  justify-content: start;
   border-color: transparent;
   background: transparent;
   box-shadow: none;
@@ -153,6 +153,7 @@ button { cursor: pointer; }
   font-size: 9px;
   font-weight: 600;
   line-height: 1;
+  transform: translateY(-1px);
   transition: background .15s ease, box-shadow .15s ease;
 }
 .manage-account svg {

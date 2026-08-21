@@ -15,7 +15,7 @@ test("signed-out header fills the account space with the Zenaian product identit
   assert.match(popupHtml, /<header class="app-header is-signed-out">/);
   assert.match(popupHtml, /id="brandIntro"[\s\S]*?<h1>Zenaian<\/h1>[\s\S]*?<p>AI MCQ Assistant<\/p>/);
   assert.match(popupCss, /\.signed-out-brand \{[\s\S]*?grid-column: 3;[\s\S]*?grid-row: 1;/);
-  assert.match(popupCss, /\.app-header\.is-signed-out \{[\s\S]*?grid-template-columns: 58px max-content;[\s\S]*?column-gap: 6px;[\s\S]*?min-height: 70px;[\s\S]*?margin-bottom: 4px;[\s\S]*?padding: 6px 14px;[\s\S]*?justify-content: center;[\s\S]*?border-color: transparent;[\s\S]*?background: transparent;[\s\S]*?box-shadow: none;/);
+  assert.match(popupCss, /\.app-header\.is-signed-out \{[\s\S]*?grid-template-columns: 58px max-content;[\s\S]*?column-gap: 6px;[\s\S]*?min-height: 70px;[\s\S]*?margin-bottom: 4px;[\s\S]*?padding: 6px 14px;[\s\S]*?justify-content: start;[\s\S]*?border-color: transparent;[\s\S]*?background: transparent;[\s\S]*?box-shadow: none;/);
   assert.match(popupCss, /\.app-header\.is-signed-out \.signed-out-brand \{ grid-column: 2; \}/);
   assert.match(popupJs, /elements\.appHeader\.classList\.toggle\("is-signed-out", !snapshot\.isSignedIn\);/);
   assert.match(popupJs, /elements\.brandIntro\.hidden = snapshot\.isSignedIn;/);
@@ -33,7 +33,7 @@ test("account action is comfortably compact, icon-led, and aligned with the emai
   assert.match(popupHtml, /class="identity-icon"/);
   assert.match(popupHtml, /id="manageAccount"[\s\S]*?<svg[\s\S]*?<circle[\s\S]*?>Manage account<\/span>/);
   assert.match(popupCss, /\.account-email \{[\s\S]*?grid-row: 3;[\s\S]*?align-self: center;/);
-  assert.match(popupCss, /\.manage-account \{[\s\S]*?min-height: 28px;[\s\S]*?grid-row: 3;[\s\S]*?align-self: center;[\s\S]*?padding: 4px 8px;/);
+  assert.match(popupCss, /\.manage-account \{[\s\S]*?min-height: 28px;[\s\S]*?grid-row: 3;[\s\S]*?align-self: center;[\s\S]*?padding: 4px 8px;[\s\S]*?transform: translateY\(-1px\);/);
   assert.match(popupCss, /\.manage-account svg \{[\s\S]*?width: 15px;[\s\S]*?height: 15px;/);
   assert.match(popupCss, /\.account-prefix \{[^}]*transform: translateY\(5px\);/);
   assert.match(popupCss, /\.account-meta \{[^}]*margin-bottom: 1px;/);
