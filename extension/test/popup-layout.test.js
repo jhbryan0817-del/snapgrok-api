@@ -20,6 +20,7 @@ test("signed-out header centers the horizontal Zenaian product identity", () => 
   assert.match(popupCss, /\.app-header\.is-signed-out \.signed-out-brand \{ grid-column: 2; \}/);
   assert.match(popupCss, /\.app-header\.is-signed-out \.brand-mark \{[\s\S]*?width: 32px;[\s\S]*?height: 32px;[\s\S]*?border-radius: 10px;/);
   assert.match(popupCss, /\.signed-out > p \{[^}]*max-width: none;[^}]*font-size: 10\.5px;[^}]*white-space: nowrap;/);
+  assert.match(popupCss, /\.signed-out \{[^}]*width: calc\(100% - 12px\);[^}]*margin: 0 auto;[^}]*padding: 21px;/);
   assert.match(popupJs, /elements\.appHeader\.classList\.toggle\("is-signed-out", !snapshot\.isSignedIn\);/);
   assert.match(popupJs, /elements\.brandIntro\.hidden = snapshot\.isSignedIn;/);
 });
