@@ -11,12 +11,14 @@ const popupCss = read("popup.css");
 const popupJs = read("popup.js");
 const instructionCss = read("instruction.css");
 
-test("signed-out header fills the account space with the Zenaian product identity", () => {
+test("signed-out header centers the horizontal Zenaian product identity", () => {
   assert.match(popupHtml, /<header class="app-header is-signed-out">/);
   assert.match(popupHtml, /id="brandIntro"[\s\S]*?<h1>Zenaian<\/h1>[\s\S]*?<p>AI MCQ Assistant<\/p>/);
-  assert.match(popupCss, /\.signed-out-brand \{[\s\S]*?grid-column: 3;[\s\S]*?grid-row: 1;/);
-  assert.match(popupCss, /\.app-header\.is-signed-out \{[\s\S]*?grid-template-columns: 58px max-content;[\s\S]*?column-gap: 6px;[\s\S]*?min-height: 70px;[\s\S]*?margin-bottom: 4px;[\s\S]*?padding: 6px 14px;[\s\S]*?justify-content: start;[\s\S]*?border-color: transparent;[\s\S]*?background: transparent;[\s\S]*?box-shadow: none;/);
+  assert.match(popupCss, /\.signed-out-brand \{[\s\S]*?display: flex;[\s\S]*?grid-column: 3;[\s\S]*?grid-row: 1;[\s\S]*?align-items: center;[\s\S]*?white-space: nowrap;/);
+  assert.match(popupCss, /\.signed-out-brand p \{[^}]*margin: 0;[^}]*border-left: 1px solid #ccd3df;/);
+  assert.match(popupCss, /\.app-header\.is-signed-out \{[\s\S]*?grid-template-columns: 58px max-content;[\s\S]*?column-gap: 10px;[\s\S]*?min-height: 70px;[\s\S]*?margin-bottom: 4px;[\s\S]*?padding: 6px 14px;[\s\S]*?justify-content: center;[\s\S]*?border-color: transparent;[\s\S]*?background: transparent;[\s\S]*?box-shadow: none;/);
   assert.match(popupCss, /\.app-header\.is-signed-out \.signed-out-brand \{ grid-column: 2; \}/);
+  assert.match(popupCss, /\.signed-out > p \{[^}]*max-width: none;[^}]*font-size: 10\.5px;[^}]*white-space: nowrap;/);
   assert.match(popupJs, /elements\.appHeader\.classList\.toggle\("is-signed-out", !snapshot\.isSignedIn\);/);
   assert.match(popupJs, /elements\.brandIntro\.hidden = snapshot\.isSignedIn;/);
 });
