@@ -14,16 +14,18 @@ const socialImage = `${siteOrigin}/og-zenaian.png`;
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteOrigin),
+  applicationName: "Zenaian",
   title,
   description,
   icons: {
-    icon: [{ url: "/zenaian-search-icon-v2.png", type: "image/png", sizes: "96x96" }],
-    shortcut: "/zenaian-search-icon-v2.png",
+    icon: [{ url: "/favicon.svg", type: "image/svg+xml", sizes: "any" }],
+    shortcut: "/favicon.svg",
     apple: "/zenaian-search-icon-v2.png",
   },
   openGraph: {
     title,
     description,
+    siteName: "Zenaian",
     type: "website",
     url: siteOrigin,
     images: [{ url: socialImage, width: 1536, height: 1024, alt: "Zenaian — Ask in silence. Stay focused." }],

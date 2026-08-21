@@ -1,5 +1,14 @@
 # Zenaian website changelog
 
+## v6.16.1 - Search identity and business footer
+
+- Replaces the padded search-result artwork with an edge-fitted circular
+  favicon and publishes matching application and Open Graph site-name signals.
+- Adds homepage `WebSite` structured data that identifies the preferred site
+  name as **Zenaian** for future search-engine recrawls.
+- Rebuilds the global footer with clearer navigation, business-information
+  rows, and placeholders for the business name, contact point, address, and ID.
+
 ## v6.16.0 - User-specific data summary
 
 - Restores **View my data** as a concise summary built from the signed-in

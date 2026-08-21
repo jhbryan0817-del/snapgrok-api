@@ -219,9 +219,10 @@ test("home, auth and account pages all use the global header", () => {
   assert.match(read("app\/account\/page.tsx"), /<SiteHeader \/>/);
 });
 
-test("global footer contains navigation and accurate xAI trademark attribution", () => {
+test("global footer contains navigation, business placeholders, and accurate xAI attribution", () => {
   const layout = read("app/layout.tsx");
   const footer = read("app/site-footer.tsx");
+  const css = read("app/globals.css");
   assert.match(layout, /<SiteFooter \/>/);
   for (const label of ["Pricing", "Careers", "Privacy Policy", "Terms of Service", "Contact Us", "Account"]) {
     assert.match(footer, new RegExp(`>${label}<`));
@@ -229,8 +230,13 @@ test("global footer contains navigation and accurate xAI trademark attribution",
   assert.match(footer, /href="mailto:sneaksolve@gmail\.com"/);
   assert.doesNotMatch(footer, /Use Cases|href="\/use-cases"/);
   assert.doesNotMatch(footer, /Affiliate Marketing|href="\/affiliate"/);
+  assert.match(footer, /Study smarter\. Stay focused\. Built for learners everywhere\./);
+  for (const placeholder of ["BUSINESS NAME", "CONTACT POINT", "BUSINESS ADDRESS", "BUSINESS ID"]) {
+    assert.match(footer, new RegExp(`\\[${placeholder}\\]`));
+  }
+  assert.match(css, /\.footer-business-details \{/);
+  assert.match(css, /\.footer-business-row \{/);
   assert.match(footer, /Grok is a trademark of xAI/);
-  assert.doesNotMatch(footer, /Stay focused\./);
   assert.match(footer, /not affiliated with or endorsed by xAI/);
 });
 
@@ -397,17 +403,27 @@ test("account plan panel reads server-authoritative status and cancels through t
   assert.doesNotMatch(panel, /variantId|allowance:\s*\d|LEMONSQUEEZY_/);
 });
 
-test("the site uses transparent brand assets for the favicon and header logo", () => {
+test("the site publishes an edge-fitted search favicon and consistent Zenaian site-name signals", () => {
   const layout = read("app/layout.tsx");
+  const home = read("app/page.tsx");
   const headerLogo = read("app/brand-logo.tsx");
-  const searchIcon = readBytes("public/zenaian-search-icon-v2.png");
+  const searchIcon = read("public/favicon.svg");
   const headerLogoImage = readBytes("public/zenaian-logo-user.png");
-  assert.match(layout, /url: "\/zenaian-search-icon-v2\.png"/);
-  assert.match(layout, /sizes: "96x96"/);
+  assert.match(layout, /applicationName: "Zenaian"/);
+  assert.match(layout, /url: "\/favicon\.svg"/);
+  assert.match(layout, /type: "image\/svg\+xml"/);
+  assert.match(layout, /sizes: "any"/);
+  assert.match(layout, /siteName: "Zenaian"/);
   assert.match(layout, /@fontsource\/eb-garamond\/latin-600\.css/);
-  assert.equal(existsSync(resolve(root, "public/zenaian-search-icon-v2.png")), true);
-  assert.equal(searchIcon.readUInt32BE(16), 96);
-  assert.equal(searchIcon.readUInt32BE(20), 96);
+  assert.equal(existsSync(resolve(root, "public/favicon.svg")), true);
+  assert.match(searchIcon, /width="96" height="96"/);
+  assert.match(searchIcon, /viewBox="0 0 96 96"/);
+  assert.match(searchIcon, /<circle cx="48" cy="48" r="48"/);
+  assert.match(home, /"@type": "WebSite"/);
+  assert.match(home, /name: "Zenaian"/);
+  assert.match(home, /url: "https:\/\/www\.zenaian\.com\/"/);
+  assert.match(home, /type="application\/ld\+json"/);
+  assert.match(home, /nonce=\{nonce\}/);
   assert.equal(existsSync(resolve(root, "public/zenaian-logo-user.png")), true);
   assert.equal(headerLogoImage.readUInt32BE(16), 782);
   assert.equal(headerLogoImage.readUInt32BE(20), 207);

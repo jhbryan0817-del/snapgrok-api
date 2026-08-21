@@ -1,14 +1,30 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { headers } from "next/headers";
 import { AnswerToolbarDemo } from "./answer-toolbar-demo";
 import { HeroBrowserDemo } from "./hero-browser-demo";
 import { SiteHeader } from "./site-header";
 import { ManualWorkflowDemo, ZenaianWorkflowDemo } from "./study-workflow-demo";
 import { ContextExperience, ShortcutExperience } from "./workflow-preferences-demo";
 
-export default function HomePage() {
+const websiteStructuredData = {
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  name: "Zenaian",
+  url: "https://www.zenaian.com/",
+};
+
+export default async function HomePage() {
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
+
   return (
     <main id="top" className="landing-page">
+      <script
+        id="zenaian-website-structured-data"
+        type="application/ld+json"
+        nonce={nonce}
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteStructuredData) }}
+      />
       <div className="page-glow page-glow-one" aria-hidden="true" />
       <div className="page-glow page-glow-two" aria-hidden="true" />
       <div className="hero-scene-background" aria-hidden="true" />
