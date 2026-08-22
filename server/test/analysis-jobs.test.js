@@ -102,7 +102,7 @@ test("cancellation aborts inference and releases reserved quota", async () => {
   assert.equal(calls.includes("consume"), false);
 });
 
-test("analysis jobs reuse the single global protected-api limiter bucket", async () => {
+test("analysis jobs use the dedicated analysis limiter bucket", async () => {
   const globalLimiter = new UserRateLimiter({
     windowMs: 60000,
     maxRequests: 20,
@@ -110,8 +110,8 @@ test("analysis jobs reuse the single global protected-api limiter bucket", async
     maxTrackedUsers: 1,
     scope: "global",
   });
-  const releaseEarlierProtectedRequest = globalLimiter.acquire("protected-api");
-  releaseEarlierProtectedRequest();
+  const releaseEarlierAnalysis = globalLimiter.acquire("analysis");
+  releaseEarlierAnalysis();
 
   const manager = createAnalysisJobManager({
     analyze: async () => ({ status: "answered", answers: ["A"] }),
@@ -135,6 +135,45 @@ test("analysis jobs reuse the single global protected-api limiter bucket", async
       return false;
     }
   });
+});
+
+test("performance diagnostics contain timings and sizes but no user content", async () => {
+  const diagnostics = [];
+  const manager = createAnalysisJobManager({
+    analyze: async () => ({ status: "answered", answers: ["A"] }),
+    billingService: billingStub([]),
+    userRateLimiter: limiterStub([], "user"),
+    globalRequestLimiter: limiterStub([], "global"),
+    performanceLogger: (event) => diagnostics.push(event),
+    config: config(),
+    randomUUIDFn: () => "00000000-0000-4000-8000-000000000005",
+  });
+
+  const created = await manager.create({
+    auth: AUTH,
+    body: validBody(),
+    requestId: "performance-request",
+  });
+  await waitFor(() => {
+    try {
+      return manager.get({ jobId: created.jobId, auth: AUTH }).httpStatus === 200;
+    } catch {
+      return false;
+    }
+  });
+
+  assert.equal(diagnostics.length, 1);
+  assert.equal(diagnostics[0].transport, "async-job");
+  assert.equal(diagnostics[0].status, "complete");
+  assert.equal(diagnostics[0].activeAtStart, 1);
+  assert.equal(diagnostics[0].activeAfter, 0);
+  assert.ok(diagnostics[0].requestBytes > 0);
+  for (const metric of ["totalMs", "admissionMs", "accessMs", "xaiMs", "settlementMs"]) {
+    assert.equal(typeof diagnostics[0][metric], "number");
+    assert.ok(diagnostics[0][metric] >= 0);
+    assert.ok(diagnostics[0].totalMs >= diagnostics[0][metric]);
+  }
+  assert.doesNotMatch(JSON.stringify(diagnostics[0]), /user_test|context|data:image/);
 });
 
 test("account deletion immediately removes terminal results and scrubs active request bodies", async () => {

@@ -107,7 +107,7 @@ test("health endpoint reveals no secret configuration", async () => {
     );
     assert.deepEqual(await response.json(), {
       ok: true,
-      version: "6.2.0",
+      version: "6.3.0",
       service: "zenaian-api",
       authRequired: true,
       persistentRequestStorage: false,
@@ -1244,6 +1244,57 @@ test("global admission control runs before authentication", async () => {
   );
 });
 
+test("analysis saturation leaves account control-plane capacity available", async () => {
+  let releaseAnalysis;
+  let analysisStartedResolve;
+  const analysisStarted = new Promise((resolve) => {
+    analysisStartedResolve = resolve;
+  });
+
+  await withServer(
+    {
+      config: createConfig({
+        ...baseEnvironment(),
+        MAX_CONCURRENT_REQUESTS_GLOBAL: "1",
+        CONTROL_PLANE_MAX_CONCURRENT_REQUESTS: "1",
+      }),
+      billing: billingStub(),
+      analyze: async () => {
+        analysisStartedResolve();
+        return new Promise((resolve) => {
+          releaseAnalysis = () => resolve({
+            status: "answered",
+            answers: ["A"],
+            text: "status: answered\nanswers: A",
+            model: "mock-xai",
+          });
+        });
+      },
+    },
+    async (baseUrl) => {
+      const analysisResponsePromise = fetch(
+        `${baseUrl}/api/analyze`,
+        requestOptions(validBody()),
+      );
+      await analysisStarted;
+
+      let controlResponse;
+      try {
+        controlResponse = await fetch(`${baseUrl}/api/billing/status`, {
+          headers: {
+            Origin: EXTENSION_ORIGIN,
+            Authorization: "Bearer test-token",
+          },
+        });
+      } finally {
+        releaseAnalysis?.();
+      }
+      assert.equal(controlResponse.status, 200);
+      assert.equal((await analysisResponsePromise).status, 200);
+    },
+  );
+});
+
 test("analysis model is selected by the server-side access policy", async () => {
   let receivedModel;
   await withServer(
@@ -1330,6 +1381,14 @@ test("security-sensitive configuration fails closed on typos", () => {
   assert.throws(
     () => createConfig({ MAX_REQUEST_MB: "999" }),
     /MAX_REQUEST_MB must be an integer/,
+  );
+  assert.throws(
+    () => createConfig({ CONTROL_PLANE_MAX_CONCURRENT_REQUESTS: "0" }),
+    /CONTROL_PLANE_MAX_CONCURRENT_REQUESTS must be an integer/,
+  );
+  assert.throws(
+    () => createConfig({ PERFORMANCE_LOGS_ENABLED: "maybe" }),
+    /PERFORMANCE_LOGS_ENABLED must be true or false/,
   );
 });
 

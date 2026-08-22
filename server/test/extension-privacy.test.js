@@ -31,14 +31,16 @@ test("extension header uses the packaged logo and authenticated live availabilit
   ]);
 
   assert.match(popup, /src="icons\/default128\.png"/);
-  assert.doesNotMatch(popup, /<h1>Zenaian<\/h1>/);
+  assert.match(popup, /<h1>Zenaian<\/h1>/);
+  assert.match(popup, /<p>AI MCQ Assistant<\/p>/);
   assert.doesNotMatch(popup, /AI Answers\. Quietly\./);
   assert.match(popup, /Signed in as/);
   assert.match(popup, /default instruction\.<\/p>/);
   assert.match(popupScript, /\$\{remaining\} of \$\{allowance\} Available/);
   assert.match(worker, /SnapGrokAuth\.getAccountStatus\(\)/);
+  assert.match(worker, /SnapGrokImageOptimization\.optimizeCapture\(/);
   assert.match(auth, /fetchWithAuth\("\/api\/extension\/account\/status"\)/);
-  assert.match(auth, /getAuthSnapshot\(\)/);
+  assert.match(auth, /getAuthSnapshot\(\{ verify = true \} = \{\}\)/);
 });
 
 test("every extension result state uses the approved AI-generated action title", async () => {
