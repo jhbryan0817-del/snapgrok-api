@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Zenaian MCQ Assistant",
-  "version": "5.7.10",
+  "version": "5.8.0",
   "description": "Capture visible or selected multiple-choice questions and receive proposed answers generated with xAI Grok.",
   "minimum_chrome_version": "109",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAvHmfxNHhTBY+sriO5tNsX8dPlk1rwsxfDb3XPI2eqkCCUYlIPgx0PGDpFzU6lWakIbP/hesqUrcdC6LCgzT3k9Gs4XnXrgtt8VBTG0a7ADnXH+mDKv+Bt0m0NGqe0HR+0XRcSLzbifpeDrGnb2hDWMmjeH335Uns0OmFAcW2oM4jHiZdbb4uaVPRL6kzwJ2Xz4yyYjdQE101nhI2N9qDV+jMX8PvzratnAn6qObs2/YtLq+BJDBpfN+yqlOiVrjn9cANokdKhhXsyXki0uWNaqsS7Oa+1rY/7+rpjNJqQUKR2316ahQ3+2em9VrYiKZY5jGh9caRpnf54HuIsKvG6wIDAQAB",

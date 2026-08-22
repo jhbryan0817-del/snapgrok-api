@@ -1,4 +1,10 @@
-importScripts("auth-config.js", "auth.js", "settings.js", "protocol.js");
+importScripts(
+  "auth-config.js",
+  "auth.js",
+  "settings.js",
+  "protocol.js",
+  "image-optimization.js",
+);
 
 "use strict";
 
@@ -10,6 +16,7 @@ const STANDARD_RESULT_DISPLAY_MS = 4000;
 const MULTIPLE_RESULT_DISPLAY_MS = 6000;
 const SELECTION_TTL_MS = 90000;
 const PROCESSING_TTL_MS = 150000;
+const CAPTURE_JPEG_QUALITY = 82;
 const PROCESSING_ALARM_PREFIX = "snapgrok-processing-";
 const JOB_POLL_ALARM_PREFIX = "snapgrok-job-poll-";
 const OPERATION_KEY = "snapgrokOperation";
@@ -335,10 +342,13 @@ async function handleCommand(command) {
     }
 
     if (command === COMMAND_FULL) {
-      const imageDataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, {
+      const capturedImageDataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, {
         format: "jpeg",
-        quality: 88,
+        quality: CAPTURE_JPEG_QUALITY,
       });
+      const preparedCapture = await SnapGrokImageOptimization.optimizeCapture(
+        capturedImageDataUrl,
+      );
 
       await updateOperation(operation.id, {
         phase: "processing",
@@ -346,8 +356,13 @@ async function handleCommand(command) {
       });
       await setProcessingIndicator(operation.id);
 
-      trace("FULL_CAPTURE_COMPLETED", { operationId: shortId(operation.id) });
-      await analyzeAndDisplay(operation.id, imageDataUrl, settings.instruction, authToken);
+      traceCapturePerformance("full", operation.id, preparedCapture.stats);
+      await analyzeAndDisplay(
+        operation.id,
+        preparedCapture.imageDataUrl,
+        settings.instruction,
+        authToken,
+      );
       return;
     }
 
@@ -474,15 +489,21 @@ async function handleZoneSelected(message, sender) {
 
     const fullImageDataUrl = await chrome.tabs.captureVisibleTab(operation.windowId, {
       format: "jpeg",
-      quality: 88,
+      quality: CAPTURE_JPEG_QUALITY,
     });
-
-    const croppedImageDataUrl = await cropScreenshot(fullImageDataUrl, rectangle);
+    const preparedCapture = await SnapGrokImageOptimization.optimizeCapture(
+      fullImageDataUrl,
+      { crop: rectangle },
+    );
     await setProcessingIndicator(operation.id);
-    trace("ZONE_CAPTURE_COMPLETED", { operationId: shortId(operation.id) });
+    traceCapturePerformance("zone", operation.id, preparedCapture.stats);
 
     const settings = await SnapGrokSettings.getSettings();
-    await analyzeAndDisplay(operation.id, croppedImageDataUrl, settings.instruction);
+    await analyzeAndDisplay(
+      operation.id,
+      preparedCapture.imageDataUrl,
+      settings.instruction,
+    );
   } catch (error) {
     await displayOutcome(operation.id, errorOutcome(), error);
   }
@@ -523,16 +544,24 @@ async function analyzeAndDisplay(operationId, imageDataUrl, userInstruction, exi
       throw new Error("Your Zenaian session expired. Open the extension and sign in again.");
     }
 
-    const response = await SnapGrokAuth.fetchWithAuth("/api/analyze-jobs", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${authToken}` },
-      body: JSON.stringify({
-        operationId,
-        imageDataUrl,
-        instruction: SnapGrokProtocol.buildInstruction(userInstruction),
-        maxWords: MAX_WORDS,
-      }),
+    const requestStartedAt = monotonicNow();
+    let requestBody = JSON.stringify({
+      operationId,
+      imageDataUrl,
+      instruction: SnapGrokProtocol.buildInstruction(userInstruction),
+      maxWords: MAX_WORDS,
     });
+    imageDataUrl = "";
+    let response;
+    try {
+      response = await SnapGrokAuth.fetchWithAuth("/api/analyze-jobs", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${authToken}` },
+        body: requestBody,
+      });
+    } finally {
+      requestBody = "";
+    }
     const payload = await readApiPayload(response);
     if (!response.ok || !payload?.ok || !isUuid(payload.jobId)) {
       throw apiResponseError(response.status, payload);
@@ -541,10 +570,12 @@ async function analyzeAndDisplay(operationId, imageDataUrl, userInstruction, exi
     await updateOperation(operationId, {
       jobId: payload.jobId,
       pollAfterMs: normalizePollDelay(payload.pollAfterMs),
+      jobAcceptedAt: Date.now(),
     });
     trace("ANALYSIS_JOB_ACCEPTED", {
       operationId: shortId(operationId),
       jobId: shortId(payload.jobId),
+      admissionMs: Math.max(0, Math.round(monotonicNow() - requestStartedAt)),
     });
     await pollAnalysisJob(operationId);
   } catch (error) {
@@ -597,6 +628,12 @@ async function pollAnalysisJob(operationId) {
       operationId: shortId(operationId),
       resultType: outcome.status,
       answerCount: outcome.answers?.length || 0,
+      serverProcessingMs: Number.isFinite(operation.jobAcceptedAt)
+        ? Math.max(0, Date.now() - operation.jobAcceptedAt)
+        : undefined,
+      endToEndMs: Number.isFinite(operation.startedAt)
+        ? Math.max(0, Date.now() - operation.startedAt)
+        : undefined,
     });
     await displayOutcome(operationId, outcome);
   } catch (error) {
@@ -1017,45 +1054,28 @@ function normalizeRectangle(rectangle, viewport) {
   };
 }
 
-async function cropScreenshot(imageDataUrl, rectangle) {
-  const sourceBlob = await (await fetch(imageDataUrl)).blob();
-  const bitmap = await createImageBitmap(sourceBlob);
-
-  try {
-    const scaleX = bitmap.width / rectangle.viewportWidth;
-    const scaleY = bitmap.height / rectangle.viewportHeight;
-
-    const sx = clamp(Math.round(rectangle.x * scaleX), 0, Math.max(0, bitmap.width - 1));
-    const sy = clamp(Math.round(rectangle.y * scaleY), 0, Math.max(0, bitmap.height - 1));
-    const sw = clamp(Math.round(rectangle.width * scaleX), 1, bitmap.width - sx);
-    const sh = clamp(Math.round(rectangle.height * scaleY), 1, bitmap.height - sy);
-
-    const canvas = new OffscreenCanvas(sw, sh);
-    const context = canvas.getContext("2d", { alpha: false });
-    if (!context) throw new Error("Chrome could not create the screenshot crop canvas.");
-
-    context.drawImage(bitmap, sx, sy, sw, sh, 0, 0, sw, sh);
-    const croppedBlob = await canvas.convertToBlob({ type: "image/jpeg", quality: 0.9 });
-    return blobToDataUrl(croppedBlob);
-  } finally {
-    bitmap.close();
-  }
+function traceCapturePerformance(mode, operationId, stats) {
+  const sourceBytes = stats?.sourceBytes || 0;
+  const outputBytes = stats?.outputBytes || 0;
+  trace("CAPTURE_PREPARED", {
+    mode,
+    operationId: shortId(operationId),
+    sourceBytes,
+    outputBytes,
+    reductionPercent: sourceBytes > 0
+      ? Math.max(0, Math.round((1 - outputBytes / sourceBytes) * 100))
+      : 0,
+    sourceDimensions: `${stats?.sourceWidth || 0}x${stats?.sourceHeight || 0}`,
+    outputDimensions: `${stats?.outputWidth || 0}x${stats?.outputHeight || 0}`,
+    optimized: stats?.optimized === true,
+    preparationMs: stats?.durationMs || 0,
+  });
 }
 
-async function blobToDataUrl(blob) {
-  const bytes = new Uint8Array(await blob.arrayBuffer());
-  const chunkSize = 0x8000;
-  let binary = "";
-
-  for (let offset = 0; offset < bytes.length; offset += chunkSize) {
-    binary += String.fromCharCode(...bytes.subarray(offset, offset + chunkSize));
-  }
-
-  return `data:${blob.type || "image/jpeg"};base64,${btoa(binary)}`;
-}
-
-function clamp(value, minimum, maximum) {
-  return Math.min(Math.max(value, minimum), maximum);
+function monotonicNow() {
+  return typeof performance !== "undefined" && typeof performance.now === "function"
+    ? performance.now()
+    : Date.now();
 }
 
 function shortId(value) {
