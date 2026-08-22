@@ -226,6 +226,25 @@ export function createConfig(environment = process.env) {
       1,
       200,
     ),
+    controlPlaneRateLimitMaxRequests: boundedInteger(
+      environment,
+      "CONTROL_PLANE_RATE_LIMIT_MAX_REQUESTS",
+      3000,
+      1,
+      100000,
+    ),
+    controlPlaneMaxConcurrentRequests: boundedInteger(
+      environment,
+      "CONTROL_PLANE_MAX_CONCURRENT_REQUESTS",
+      20,
+      1,
+      200,
+    ),
+    performanceLogsEnabled: strictBooleanFrom(
+      environment,
+      "PERFORMANCE_LOGS_ENABLED",
+      productionRuntime,
+    ),
     maxTrackedRateLimitUsers: boundedInteger(
       environment,
       "MAX_TRACKED_RATE_LIMIT_USERS",
@@ -698,6 +717,7 @@ export function createZenaianServer({
   getBalance = getPrepaidBalance,
   limiter,
   globalLimiter,
+  controlGlobalLimiter,
   resolveAnalysisAccess,
   billing,
   deviceSessions,
@@ -724,12 +744,21 @@ export function createZenaianServer({
       maxTrackedUsers: config.maxTrackedRateLimitUsers,
       scope: "user",
     });
-  const globalRequestLimiter =
+  const analysisGlobalRequestLimiter =
     globalLimiter ||
     new UserRateLimiter({
       windowMs: config.rateLimitWindowMs,
       maxRequests: config.globalRateLimitMaxRequests,
       maxConcurrent: config.maxConcurrentRequestsGlobal,
+      maxTrackedUsers: 1,
+      scope: "global",
+    });
+  const controlGlobalRequestLimiter =
+    controlGlobalLimiter ||
+    new UserRateLimiter({
+      windowMs: config.rateLimitWindowMs,
+      maxRequests: config.controlPlaneRateLimitMaxRequests,
+      maxConcurrent: config.controlPlaneMaxConcurrentRequests,
       maxTrackedUsers: 1,
       scope: "global",
     });
@@ -788,7 +817,8 @@ export function createZenaianServer({
           analyze: analyzeWithZdrSafety,
           billingService,
           userRateLimiter,
-          globalRequestLimiter,
+          globalRequestLimiter: analysisGlobalRequestLimiter,
+          performanceLogger: createAnalysisPerformanceLogger(config),
           resolveAnalysisAccess,
           config,
         })
@@ -844,7 +874,8 @@ export function createZenaianServer({
   const cleanupTimer = setInterval(
     () => {
       userRateLimiter.cleanupExpired?.();
-      globalRequestLimiter.cleanupExpired?.();
+      analysisGlobalRequestLimiter.cleanupExpired?.();
+      controlGlobalRequestLimiter.cleanupExpired?.();
       accountRequestLimiter.cleanupExpired?.();
       analysisJobManager?.cleanup();
       void deviceSessionService?.maintenance?.().catch((error) => {
@@ -943,7 +974,7 @@ export function createZenaianServer({
           enforceOrigin(config, request);
           enforceWebsiteOrigin(config, request);
           requireDeviceSessionService(deviceSessionService);
-          const releaseGlobal = globalRequestLimiter.acquire("protected-api");
+          const releaseGlobal = controlGlobalRequestLimiter.acquire("control-plane");
           try {
             const auth = await authenticateRequest(request);
             await privacyService?.assertUserAllowed(auth.userId);
@@ -975,7 +1006,7 @@ export function createZenaianServer({
         ) {
           enforceOrigin(config, request);
           requireDeviceSessionService(deviceSessionService);
-          const releaseGlobal = globalRequestLimiter.acquire("protected-api");
+          const releaseGlobal = controlGlobalRequestLimiter.acquire("control-plane");
           try {
             const body = await readJsonBody(config, request);
             validatePairingExchangeRequest(body);
@@ -1004,7 +1035,7 @@ export function createZenaianServer({
         ) {
           enforceOrigin(config, request);
           requireDeviceSessionService(deviceSessionService);
-          const releaseGlobal = globalRequestLimiter.acquire("protected-api");
+          const releaseGlobal = controlGlobalRequestLimiter.acquire("control-plane");
           try {
             const body = await readJsonBody(config, request);
             validateRefreshRequest(body);
@@ -1034,7 +1065,7 @@ export function createZenaianServer({
         ) {
           enforceOrigin(config, request);
           requireDeviceSessionService(deviceSessionService);
-          const releaseGlobal = globalRequestLimiter.acquire("protected-api");
+          const releaseGlobal = controlGlobalRequestLimiter.acquire("control-plane");
           try {
             const auth = await deviceSessionService.authenticateAccess(request);
             if (request.method === "POST") {
@@ -1067,7 +1098,7 @@ export function createZenaianServer({
         ) {
           enforceOrigin(config, request);
           requireDeviceSessionService(deviceSessionService);
-          const releaseGlobal = globalRequestLimiter.acquire("protected-api");
+          const releaseGlobal = controlGlobalRequestLimiter.acquire("control-plane");
           try {
             const auth = await deviceSessionService.authenticateAccess(request);
             if (request.method === "POST") {
@@ -1098,7 +1129,7 @@ export function createZenaianServer({
         ) {
           enforceOrigin(config, request);
           requireDeviceSessionService(deviceSessionService);
-          const releaseGlobal = globalRequestLimiter.acquire("protected-api");
+          const releaseGlobal = controlGlobalRequestLimiter.acquire("control-plane");
           try {
             const auth = await deviceSessionService.authenticateAccess(request);
             await privacyService?.assertUserAllowed(auth.userId);
@@ -1124,7 +1155,7 @@ export function createZenaianServer({
           enforceOrigin(config, request);
           enforceWebsiteOrigin(config, request);
           requireDeviceSessionService(deviceSessionService);
-          const releaseGlobal = globalRequestLimiter.acquire("protected-api");
+          const releaseGlobal = controlGlobalRequestLimiter.acquire("control-plane");
           try {
             const auth = await authenticateRequest(request);
             const body = await readJsonBody(config, request);
@@ -1280,7 +1311,7 @@ export function createZenaianServer({
           enforceOrigin(config, request);
           enforceWebsiteOrigin(config, request);
           requirePrivacyService(privacyService);
-          const releaseGlobal = globalRequestLimiter.acquire("protected-api");
+          const releaseGlobal = controlGlobalRequestLimiter.acquire("control-plane");
           try {
             const auth = await authenticateRequest(request);
             const releaseAccount = accountRequestLimiter.acquire(auth.userId);
@@ -1314,7 +1345,7 @@ export function createZenaianServer({
           enforceOrigin(config, request);
           enforceWebsiteOrigin(config, request);
           requirePrivacyService(privacyService);
-          const releaseGlobal = globalRequestLimiter.acquire("protected-api");
+          const releaseGlobal = controlGlobalRequestLimiter.acquire("control-plane");
           try {
             const auth = await authenticateRequest(request);
             const releaseAccount = accountRequestLimiter.acquire(auth.userId);
@@ -1379,7 +1410,7 @@ export function createZenaianServer({
         ) {
           enforceOrigin(config, request);
           const releaseGlobalLimit =
-            globalRequestLimiter.acquire("protected-api");
+            controlGlobalRequestLimiter.acquire("control-plane");
           try {
             const auth = await authenticateRequest(request);
             if (privacyService?.seedSubjectIdentity) {
@@ -1409,7 +1440,7 @@ export function createZenaianServer({
           enforceOrigin(config, request);
           enforceBillingWebsiteOrigin(config, request);
           const releaseGlobalLimit =
-            globalRequestLimiter.acquire("protected-api");
+            controlGlobalRequestLimiter.acquire("control-plane");
           try {
             const auth = await authenticateRequest(request);
             await privacyService?.assertUserAllowed(auth.userId);
@@ -1435,7 +1466,7 @@ export function createZenaianServer({
           enforceOrigin(config, request);
           enforceBillingWebsiteOrigin(config, request);
           const releaseGlobalLimit =
-            globalRequestLimiter.acquire("protected-api");
+            controlGlobalRequestLimiter.acquire("control-plane");
           try {
             const auth = await authenticateRequest(request);
             const releaseAccount = accountRequestLimiter.acquire(auth.userId);
@@ -1477,7 +1508,7 @@ export function createZenaianServer({
           enforceOrigin(config, request);
           enforceBillingWebsiteOrigin(config, request);
           const releaseGlobalLimit =
-            globalRequestLimiter.acquire("protected-api");
+            controlGlobalRequestLimiter.acquire("control-plane");
           try {
             const auth = await authenticateRequest(request);
             const releaseAccount = accountRequestLimiter.acquire(auth.userId);
@@ -1513,7 +1544,7 @@ export function createZenaianServer({
           enforceOrigin(config, request);
           enforceBillingWebsiteOrigin(config, request);
           const releaseGlobalLimit =
-            globalRequestLimiter.acquire("protected-api");
+            controlGlobalRequestLimiter.acquire("control-plane");
           try {
             const auth = await authenticateRequest(request);
             const releaseAccount = accountRequestLimiter.acquire(auth.userId);
@@ -1544,7 +1575,7 @@ export function createZenaianServer({
 
         if (request.method === "GET" && url.pathname === "/api/balance") {
           enforceOrigin(config, request);
-          const releaseGlobalLimit = globalRequestLimiter.acquire("protected-api");
+          const releaseGlobalLimit = controlGlobalRequestLimiter.acquire("control-plane");
           try {
             const auth = await authenticateRequest(request);
 
@@ -1568,7 +1599,7 @@ export function createZenaianServer({
 
         if (request.method === "POST" && url.pathname === "/api/analyze") {
           enforceOrigin(config, request);
-          const releaseGlobalLimit = globalRequestLimiter.acquire("protected-api");
+          const releaseGlobalLimit = analysisGlobalRequestLimiter.acquire("analysis");
           try {
             const auth = await authenticateRequest(request);
             await privacyService?.assertUserAllowed(auth.userId);
@@ -2095,6 +2126,40 @@ function strictBooleanFrom(environment, name, fallback) {
   if (/^(1|true|yes|on)$/i.test(value)) return true;
   if (/^(0|false|no|off)$/i.test(value)) return false;
   throw new Error(`${name} must be true or false.`);
+}
+
+function createAnalysisPerformanceLogger(config) {
+  if (!config.performanceLogsEnabled) return null;
+  return (metrics) => {
+    try {
+      const totalMs = safePerformanceMetric(metrics?.totalMs);
+      const xaiMs = safePerformanceMetric(metrics?.xaiMs);
+      console.log(JSON.stringify({
+        timestamp: new Date().toISOString(),
+        event: "analysis_performance",
+        transport: metrics?.transport === "async-job" ? "async-job" : "unknown",
+        status: ["complete", "failed", "cancelled"].includes(metrics?.status)
+          ? metrics.status
+          : "unknown",
+        totalMs,
+        nonXaiMs: Math.max(0, totalMs - xaiMs),
+        admissionMs: safePerformanceMetric(metrics?.admissionMs),
+        accessMs: safePerformanceMetric(metrics?.accessMs),
+        xaiMs,
+        settlementMs: safePerformanceMetric(metrics?.settlementMs),
+        requestBytes: safePerformanceMetric(metrics?.requestBytes),
+        activeAtStart: safePerformanceMetric(metrics?.activeAtStart),
+        activeAfter: safePerformanceMetric(metrics?.activeAfter),
+      }));
+    } catch {
+      // Performance diagnostics must never affect request processing.
+    }
+  };
+}
+
+function safePerformanceMetric(value) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? Math.max(0, Math.round(numeric)) : 0;
 }
 
 function safeDeploymentRevision(value) {
@@ -2789,6 +2854,13 @@ async function startServer() {
     console.log(`Allowed origins configured: ${config.allowedOrigins.size}`);
     console.log(
       `Per-user rate limit: ${config.rateLimitMaxRequests} requests per ${config.rateLimitWindowMs} ms`,
+    );
+    console.log(
+      `Analysis capacity: ${config.maxConcurrentRequestsGlobal} concurrent; ` +
+      `control-plane capacity: ${config.controlPlaneMaxConcurrentRequests} concurrent`,
+    );
+    console.log(
+      `Content-free performance logs: ${config.performanceLogsEnabled ? "enabled" : "disabled"}`,
     );
     console.log(`Billing mode: ${config.billingMode}`);
     console.log(
