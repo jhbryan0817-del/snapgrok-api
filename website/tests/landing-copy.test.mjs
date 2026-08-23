@@ -100,6 +100,20 @@ test("approved landing copy is present", () => {
   assert.match(page, /request fails closed instead of falling back to ordinary-retention inference/);
   assert.doesNotMatch(page, /may retain API inputs and outputs for up to 30 days/);
   assert.match(page, /href="\/privacy">Explore our Privacy Policy/);
+  assert.match(page, /id="faq"[\s\S]*Frequently Asked Questions/);
+  assert.match(page, /faqItems\.map/);
+  assert.match(page, /name="zenaian-faq"/);
+  assert.match(page, /Why should I install Zenaian\?/);
+  assert.match(page, /Is Zenaian free\?/);
+  assert.match(page, /I installed the extension\. How do I get started\?/);
+  assert.match(page, /What types of questions can I solve with Zenaian\?/);
+  assert.match(page, /Zenaian keeps returning “Inconclusive\.”/);
+  assert.match(page, /Which languages are supported\?/);
+  assert.match(page, /"@type": "FAQPage"/);
+  assert.ok(
+    page.indexOf('id="privacy"') < page.indexOf('id="faq"'),
+    "The FAQ section must be the final landing-page section after privacy.",
+  );
   assert.match(page, /study-intelligence-panel[\s\S]*study-speed-card[\s\S]*study-model-card/);
   assert.match(page, /SWE Marathon/);
   assert.match(page, /benchmark-visual benchmark-visual-duo/);

@@ -14,6 +14,52 @@ const websiteStructuredData = {
   url: "https://www.zenaian.com/",
 };
 
+const faqItems = [
+  {
+    question: "Why should I install Zenaian?",
+    answer:
+      "Zenaian removes the need to switch tabs, search manually, or copy a question into a separate AI tool. Press your chosen shortcut once, and Zenaian handles the rest. When questions pile up during exam season, the time saved on each one adds up—helping you study more efficiently.",
+  },
+  {
+    question: "Is Zenaian free?",
+    answer:
+      "Yes. Zenaian offers a free plan with a limited daily allowance. Plus and Ultra plans provide higher usage limits and access to enhanced AI reasoning.",
+  },
+  {
+    question: "I installed the extension. How do I get started?",
+    answer:
+      "Select the Extensions icon in the upper-right corner of Chrome, then pin Zenaian. Its icon will remain visible in your Chrome toolbar, giving you quick access whenever you need it.",
+  },
+  {
+    question: "What types of questions can I solve with Zenaian?",
+    answer:
+      "Zenaian is designed exclusively for multiple-choice questions with up to five answer choices. Choices are interpreted by position: the first is A and the fifth is E, regardless of how they are labeled. Questions that cannot be resolved to a single A–E answer, such as open-ended questions, return “Inconclusive.” Response time varies with question complexity.",
+  },
+  {
+    question: "I supplied a screenshot, but Zenaian keeps returning “Inconclusive.”",
+    answer:
+      "Make sure the capture includes the full question and every answer choice, and that only one question appears in the selected area. If a correctly formatted question still returns “Inconclusive,” the image may not contain a clearly identifiable valid answer choice.",
+  },
+  {
+    question: "Which languages are supported?",
+    answer:
+      "Zenaian can analyze questions written in any language. The most extensive testing has been conducted in English, Chinese, Spanish, and Korean.",
+  },
+] as const;
+
+const faqStructuredData = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  mainEntity: faqItems.map(({ question, answer }) => ({
+    "@type": "Question",
+    name: question,
+    acceptedAnswer: {
+      "@type": "Answer",
+      text: answer,
+    },
+  })),
+};
+
 export default async function HomePage() {
   const nonce = (await headers()).get("x-nonce") ?? undefined;
 
@@ -24,6 +70,12 @@ export default async function HomePage() {
         type="application/ld+json"
         nonce={nonce}
         dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteStructuredData) }}
+      />
+      <script
+        id="zenaian-faq-structured-data"
+        type="application/ld+json"
+        nonce={nonce}
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqStructuredData) }}
       />
       <div className="page-glow page-glow-one" aria-hidden="true" />
       <div className="page-glow page-glow-two" aria-hidden="true" />
@@ -206,6 +258,28 @@ export default async function HomePage() {
           </p>
         </div>
       </section>
+
+      <section id="faq" className="faq-section shell reveal" data-animate aria-labelledby="faq-title">
+        <div className="faq-heading">
+          <span className="faq-kicker">FAQ</span>
+          <h2 id="faq-title">Frequently Asked Questions</h2>
+          <p>Everything you need to know before getting started with Zenaian.</p>
+        </div>
+
+        <div className="faq-list">
+          {faqItems.map(({ question, answer }) => (
+            <details className="faq-item" key={question} name="zenaian-faq">
+              <summary>
+                <span>{question}</span>
+                <ChevronDownIcon />
+              </summary>
+              <div className="faq-answer">
+                <p>{answer}</p>
+              </div>
+            </details>
+          ))}
+        </div>
+      </section>
     </main>
   );
 }
@@ -239,4 +313,7 @@ function TrashIcon() {
 }
 function LightningIcon() {
   return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m13 2-8 12h7l-1 8 8-12h-7l1-8Z"/></svg>;
+}
+function ChevronDownIcon() {
+  return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>;
 }

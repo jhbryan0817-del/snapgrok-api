@@ -5956,6 +5956,161 @@ img { display: block; max-width: 100%; }
   }
 }
 
+/* Landing-page FAQ: reference-inspired accordion in the Zenaian visual system. */
+.faq-section {
+  margin-top: clamp(120px, 11vw, 158px);
+  scroll-margin-top: 112px;
+}
+.faq-heading {
+  width: min(1120px, calc(100% - 28px));
+  margin-inline: auto;
+}
+.faq-kicker {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 0 12px;
+  border: 1px solid rgba(5, 73, 253, .14);
+  border-radius: 999px;
+  color: var(--blue);
+  background: rgba(238, 244, 255, .72);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .12em;
+}
+.faq-heading h2 {
+  margin: 18px 0 0;
+  color: var(--ink);
+  font-size: clamp(36px, 4vw, 52px);
+  font-weight: 650;
+  line-height: 1.08;
+  letter-spacing: -.04em !important;
+}
+.faq-heading p {
+  margin: 16px 0 0;
+  color: #758095;
+  font-size: 15px;
+  line-height: 1.65;
+}
+.faq-list {
+  width: min(1120px, calc(100% - 28px));
+  margin: clamp(36px, 4.5vw, 54px) auto 0;
+  padding: 0 clamp(26px, 4vw, 52px);
+  border: 1px solid rgba(10, 38, 90, .1);
+  border-radius: 28px;
+  background:
+    radial-gradient(circle at 92% 0%, rgba(5, 73, 253, .07), transparent 25%),
+    rgba(255, 255, 255, .88);
+  box-shadow: 0 24px 64px rgba(16, 35, 68, .08);
+}
+.faq-item {
+  border-bottom: 1px solid rgba(10, 38, 90, .11);
+}
+.faq-item:last-child {
+  border-bottom: 0;
+}
+.faq-item summary {
+  min-height: 88px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 28px;
+  padding: 24px 2px;
+  color: #171b24;
+  cursor: pointer;
+  list-style: none;
+  font-size: clamp(17px, 1.6vw, 20px);
+  font-weight: 650;
+  line-height: 1.35;
+  transition: color .18s ease;
+}
+.faq-item summary::-webkit-details-marker {
+  display: none;
+}
+.faq-item summary:hover,
+.faq-item[open] summary {
+  color: var(--blue);
+}
+.faq-item summary:focus-visible {
+  outline: 3px solid rgba(5, 73, 253, .18);
+  outline-offset: 5px;
+  border-radius: 10px;
+}
+.faq-item summary svg {
+  width: 22px;
+  height: 22px;
+  color: #77808e;
+  transition: color .18s ease, transform .22s ease;
+}
+.faq-item[open] summary svg {
+  color: var(--blue);
+  transform: rotate(180deg);
+}
+.faq-answer {
+  padding: 0 clamp(42px, 5vw, 70px) 27px 2px;
+}
+.faq-answer p {
+  max-width: 880px;
+  margin: 0;
+  color: #687386;
+  font-size: 14px;
+  line-height: 1.75;
+}
+
+@media (max-width: 900px) {
+  .faq-section {
+    margin-top: 98px;
+  }
+}
+
+@media (max-width: 600px) {
+  .faq-section {
+    margin-top: 88px;
+  }
+  .faq-heading {
+    width: 100%;
+    padding-inline: 4px;
+  }
+  .faq-heading h2 {
+    max-width: 330px;
+    font-size: 32px;
+  }
+  .faq-heading p {
+    max-width: 330px;
+    font-size: 13px;
+  }
+  .faq-list {
+    width: 100%;
+    margin-top: 30px;
+    padding: 0 20px;
+    border-radius: 22px;
+  }
+  .faq-item summary {
+    min-height: 76px;
+    gap: 18px;
+    padding: 21px 0;
+    font-size: 16px;
+  }
+  .faq-item summary svg {
+    width: 20px;
+    height: 20px;
+  }
+  .faq-answer {
+    padding: 0 32px 23px 0;
+  }
+  .faq-answer p {
+    font-size: 13px;
+    line-height: 1.7;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .faq-item summary,
+  .faq-item summary svg {
+    transition: none;
+  }
+}
+
 /* v6.14.1 final cascade lock: these rules intentionally follow inherited design layers. */
 .answer-toolbar-active-icon > img.answer-toolbar-icon-default {
   inset: 0;
