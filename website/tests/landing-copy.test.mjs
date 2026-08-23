@@ -101,6 +101,7 @@ test("approved landing copy is present", () => {
   assert.doesNotMatch(page, /may retain API inputs and outputs for up to 30 days/);
   assert.match(page, /href="\/privacy">Explore our Privacy Policy/);
   assert.match(page, /id="faq"[\s\S]*Frequently Asked Questions/);
+  assert.doesNotMatch(page, /faq-kicker/);
   assert.match(page, /faqItems\.map/);
   assert.match(page, /name="zenaian-faq"/);
   assert.match(page, /Why should I install Zenaian\?/);

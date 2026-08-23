@@ -261,7 +261,6 @@ export default async function HomePage() {
 
       <section id="faq" className="faq-section shell reveal" data-animate aria-labelledby="faq-title">
         <div className="faq-heading">
-          <span className="faq-kicker">FAQ</span>
           <h2 id="faq-title">Frequently Asked Questions</h2>
           <p>Everything you need to know before getting started with Zenaian.</p>
         </div>
