@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { UserRateLimiter } from "../src/rate-limit.js";
+import {
+  AdaptiveCapacityLimiter,
+  UserRateLimiter,
+  WeightedCapacityLimiter,
+} from "../src/rate-limit.js";
 
 test("limits concurrent work per user and releases slots", () => {
   const limiter = new UserRateLimiter({
@@ -89,4 +93,64 @@ test("uses distinct account-operation admission-control error codes", () => {
     (error) =>
       error.status === 429 && error.code === "ACCOUNT_RATE_LIMITED",
   );
+});
+
+test("weighted capacity bounds aggregate in-flight analysis bytes", () => {
+  const limiter = new WeightedCapacityLimiter({ maxWeight: 10 });
+  const releaseFirst = limiter.acquire(6);
+  assert.deepEqual(limiter.snapshot(), {
+    scope: "analysis",
+    activeWeight: 6,
+    maxWeight: 10,
+  });
+  assert.throws(
+    () => limiter.acquire(5),
+    (error) => error.status === 429 && error.code === "ANALYSIS_MEMORY_LIMITED",
+  );
+  const releaseSecond = limiter.acquire(4);
+  releaseFirst();
+  releaseFirst();
+  assert.equal(limiter.snapshot().activeWeight, 4);
+  releaseSecond();
+  assert.equal(limiter.snapshot().activeWeight, 0);
+});
+
+test("adaptive capacity sheds new work under pressure and recovers gradually", () => {
+  let now = 1000;
+  const limiter = new AdaptiveCapacityLimiter({
+    maxConcurrent: 40,
+    minConcurrent: 10,
+    recoveryMs: 1000,
+    now: () => now,
+  });
+
+  limiter.recordPressure("event_loop", { factor: 0.5, cooldownMs: 2000 });
+  assert.equal(limiter.snapshot().currentLimit, 20);
+  const releases = Array.from({ length: 20 }, () => limiter.acquire());
+  assert.throws(
+    () => limiter.acquire(),
+    (error) =>
+      error.status === 429 &&
+      error.code === "ANALYSIS_ADAPTIVELY_LIMITED" &&
+      error.retryAfterSeconds === 2,
+  );
+
+  releases.forEach((release) => release());
+  now = 4000;
+  assert.equal(limiter.snapshot().currentLimit, 21);
+  now = 23000;
+  assert.equal(limiter.snapshot().currentLimit, 40);
+  assert.equal(limiter.snapshot().lastPressureReason, "none");
+});
+
+test("adaptive capacity never drops below its configured safe floor", () => {
+  const limiter = new AdaptiveCapacityLimiter({
+    maxConcurrent: 40,
+    minConcurrent: 10,
+  });
+
+  for (let index = 0; index < 10; index += 1) {
+    limiter.recordPressure("provider_rate_limit", { factor: 0.25 });
+  }
+  assert.equal(limiter.snapshot().currentLimit, 10);
 });

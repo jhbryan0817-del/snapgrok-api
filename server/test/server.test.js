@@ -8,6 +8,7 @@ import {
   publicMaintenanceDiagnostics,
   validateRuntimeConfig,
 } from "../src/server.js";
+import { AdaptiveCapacityLimiter } from "../src/rate-limit.js";
 
 const EXTENSION_ORIGIN = "chrome-extension://abcdefghijklmnopabcdefghijklmnop";
 const WEBSITE_ORIGIN = "https://www.zenaian.com";
@@ -37,6 +38,115 @@ test("account deletion aborts legacy direct analysis and queued jobs", () => {
   assert.equal(second.signal.aborted, true);
   assert.equal(other.signal.aborted, false);
   assert.deepEqual(jobCalls, [["user_delete", "delete"]]);
+});
+
+test("graceful shutdown aborts active jobs and releases their quota reservations", async () => {
+  let aborted = false;
+  let releases = 0;
+  let billingClosed = 0;
+  const deviceSessions = {
+    async authenticateAccess() {
+      return {
+        userId: "user_shutdown",
+        sessionId: "sess_shutdown",
+        deviceSessionId: "device_shutdown",
+        userAllowedChecked: true,
+      };
+    },
+    async maintenance() {},
+    async close() {},
+  };
+  const privacy = {
+    async assertUserAllowed() {},
+    async assertAnalysisAllowed() {},
+    async recordZdrSuccess() {},
+    async close() {},
+  };
+  const billing = billingStub({
+    async reserveAnalysis() {
+      return {
+        allowed: true,
+        model: "grok-4.5",
+        reservation: { operationId: OPERATION_ID },
+      };
+    },
+    async releaseAnalysis() { releases += 1; },
+    async close() { billingClosed += 1; },
+  });
+  const server = createSnapGrokServer({
+    config: testConfig(),
+    authenticate: async () => ({ userId: "user_shutdown", sessionId: "sess_shutdown" }),
+    analyze: ({ signal }) => new Promise((_, reject) => {
+      signal.addEventListener("abort", () => {
+        aborted = true;
+        reject(signal.reason);
+      }, { once: true });
+    }),
+    billing,
+    deviceSessions,
+    privacy,
+  });
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const address = server.address();
+  const response = await fetch(
+    `http://127.0.0.1:${address.port}/api/analyze-jobs`,
+    {
+      ...requestOptions(validBody()),
+      headers: {
+        ...requestOptions(validBody()).headers,
+        "X-Probe-User": "shutdown",
+      },
+    },
+  );
+  assert.equal(response.status, 202);
+  await server.shutdown({ timeoutMs: 1000 });
+  assert.equal(aborted, true);
+  assert.equal(releases, 1);
+  assert.equal(billingClosed, 1);
+});
+
+test("graceful shutdown deadline is bounded when an analyzer ignores abort", async () => {
+  const deviceSessions = {
+    async authenticateAccess() {
+      return {
+        userId: "user_stuck_shutdown",
+        sessionId: "sess_stuck_shutdown",
+        deviceSessionId: "device_stuck_shutdown",
+        userAllowedChecked: true,
+      };
+    },
+    async maintenance() {},
+    async close() {},
+  };
+  const server = createSnapGrokServer({
+    config: testConfig(),
+    authenticate: async () => ({
+      userId: "user_stuck_shutdown",
+      sessionId: "sess_stuck_shutdown",
+    }),
+    analyze: () => new Promise(() => {}),
+    billing: billingStub(),
+    deviceSessions,
+    privacy: {
+      async assertUserAllowed() {},
+      async assertAnalysisAllowed() {},
+      async recordZdrSuccess() {},
+      async close() {},
+    },
+  });
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const address = server.address();
+  const response = await fetch(
+    `http://127.0.0.1:${address.port}/api/analyze-jobs`,
+    requestOptions(validBody()),
+  );
+  assert.equal(response.status, 202);
+
+  const startedAt = performance.now();
+  await server.shutdown({ timeoutMs: 50 });
+  assert.ok(performance.now() - startedAt < 300);
 });
 
 test("maintenance diagnostics retain safe SQLSTATE without database details", () => {
@@ -107,7 +217,7 @@ test("health endpoint reveals no secret configuration", async () => {
     );
     assert.deepEqual(await response.json(), {
       ok: true,
-      version: "6.3.0",
+      version: "6.4.0",
       service: "zenaian-api",
       authRequired: true,
       persistentRequestStorage: false,
@@ -116,7 +226,93 @@ test("health endpoint reveals no secret configuration", async () => {
       privacyControls: false,
       privacyReady: false,
       maintenance: { status: "disabled" },
+      capacity: {
+        status: "normal",
+        currentLimit: 40,
+        maximumLimit: 40,
+        pressureReason: "none",
+      },
     });
+  });
+});
+
+test("adaptive pressure lowers analysis admission without blocking health", async () => {
+  let releaseAnalysis;
+  let markStarted;
+  const started = new Promise((resolve) => { markStarted = resolve; });
+  const blocked = new Promise((resolve) => { releaseAnalysis = resolve; });
+  const adaptiveLimiter = new AdaptiveCapacityLimiter({
+    maxConcurrent: 2,
+    minConcurrent: 1,
+    recoveryMs: 30000,
+  });
+  adaptiveLimiter.recordPressure("database_wait", { factor: 0.5 });
+
+  await withServer({
+    adaptiveLimiter,
+    analyze: async () => {
+      markStarted();
+      await blocked;
+      return { status: "answered", answers: ["A"] };
+    },
+  }, async (baseUrl) => {
+    const first = fetch(
+      `${baseUrl}/api/analyze`,
+      requestOptions(validBody()),
+    );
+    await started;
+    const second = await fetch(
+      `${baseUrl}/api/analyze`,
+      requestOptions(validBody()),
+    );
+    assert.equal(second.status, 429);
+    assert.equal((await second.json()).code, "ANALYSIS_ADAPTIVELY_LIMITED");
+
+    const health = await (await fetch(`${baseUrl}/api/health`)).json();
+    assert.deepEqual(health.capacity, {
+      status: "protecting",
+      currentLimit: 1,
+      maximumLimit: 2,
+      pressureReason: "database_wait",
+    });
+    releaseAnalysis();
+    assert.equal((await first).status, 200);
+  });
+});
+
+test("capacity diagnostics include shared database-pool pressure", async () => {
+  const pool = {
+    totalCount: 8,
+    idleCount: 3,
+    waitingCount: 2,
+  };
+  await withServer({ mainDatabasePool: pool }, async (_baseUrl, server) => {
+    const snapshot = server.capacitySnapshot();
+    assert.equal(snapshot.databaseTotal, 8);
+    assert.equal(snapshot.databaseIdle, 3);
+    assert.equal(snapshot.databaseWaiting, 2);
+  });
+});
+
+test("persistent provider throttling reduces later admission capacity", async () => {
+  const providerError = Object.assign(new Error("provider detail"), {
+    status: 502,
+    code: "XAI_RATE_LIMITED",
+    upstreamStatus: 429,
+    retryAfterMs: 5000,
+  });
+  await withServer({
+    analyze: async () => { throw providerError; },
+  }, async (baseUrl) => {
+    const response = await fetch(
+      `${baseUrl}/api/analyze`,
+      requestOptions(validBody()),
+    );
+    assert.equal(response.status, 502);
+    const health = await (await fetch(`${baseUrl}/api/health`)).json();
+    assert.equal(health.capacity.status, "protecting");
+    assert.equal(health.capacity.currentLimit, 20);
+    assert.equal(health.capacity.pressureReason, "provider_rate_limit");
   });
 });
 
@@ -649,6 +845,67 @@ test("website pairing and extension polling routes keep their authentication bou
       assert.equal(cancelled.status, 200);
       assert.equal((await cancelled.json()).cancelled, true);
       assert.deepEqual(calls.map(([name]) => name), ["pair", "exchange"]);
+    },
+  );
+});
+
+test("long polling is bounded by the control-plane concurrency guard", async () => {
+  let releaseFirstPoll;
+  let markPollEntered;
+  const pollEntered = new Promise((resolve) => { markPollEntered = resolve; });
+  const config = createConfig({
+    ...baseEnvironment(),
+    CONTROL_PLANE_MAX_CONCURRENT_REQUESTS: "1",
+    CONTROL_PLANE_RATE_LIMIT_MAX_REQUESTS: "100",
+  });
+  const deviceSessions = {
+    async authenticateAccess() {
+      return {
+        userId: "user_poll_guard",
+        sessionId: "sess_poll_guard",
+        deviceSessionId: "device_poll_guard",
+        userAllowedChecked: true,
+      };
+    },
+    async maintenance() {},
+    async close() {},
+  };
+  const analysisJobs = {
+    async poll() {
+      markPollEntered();
+      await new Promise((resolve) => { releaseFirstPoll = resolve; });
+      return {
+        httpStatus: 202,
+        payload: { ok: true, status: "processing", pollAfterMs: 750 },
+      };
+    },
+    cancelForUser() { return 0; },
+    cancelForDevice() { return 0; },
+    cleanup() {},
+    close() {},
+  };
+
+  await withServer(
+    { config, deviceSessions, analysisJobs, billing: billingStub() },
+    async (baseUrl) => {
+      const pollUrl =
+        `${baseUrl}/api/analyze-jobs/22222222-2222-4222-8222-222222222222/poll`;
+      const options = {
+        method: "POST",
+        headers: {
+          Origin: EXTENSION_ORIGIN,
+          Authorization: "Bearer device-token",
+          "Content-Type": "application/json",
+        },
+        body: "{}",
+      };
+      const firstPoll = fetch(pollUrl, options);
+      await pollEntered;
+      const blockedPoll = await fetch(pollUrl, options);
+      assert.equal(blockedPoll.status, 429);
+      assert.equal((await blockedPoll.json()).code, "GLOBAL_CONCURRENCY_LIMITED");
+      releaseFirstPoll();
+      assert.equal((await firstPoll).status, 202);
     },
   );
 });

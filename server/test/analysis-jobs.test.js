@@ -78,6 +78,66 @@ test("only the creating extension device can poll a job", async () => {
   manager.close();
 });
 
+test("long polling wakes as soon as an analysis finishes", async () => {
+  let finishAnalysis;
+  const manager = createAnalysisJobManager({
+    analyze: () => new Promise((resolve) => { finishAnalysis = resolve; }),
+    billingService: billingStub([]),
+    userRateLimiter: limiterStub([], "user"),
+    globalRequestLimiter: limiterStub([], "global"),
+    config: config(),
+    randomUUIDFn: () => "00000000-0000-4000-8000-000000000020",
+  });
+  const created = await manager.create({
+    auth: AUTH,
+    body: validBody(),
+    requestId: "long-poll",
+  });
+  const polled = manager.poll({
+    jobId: created.jobId,
+    auth: AUTH,
+    waitMs: 500,
+  });
+  finishAnalysis({ status: "answered", answers: ["D"] });
+  const result = await polled;
+  assert.equal(result.httpStatus, 200);
+  assert.deepEqual(result.payload.answers, ["D"]);
+});
+
+test("server-owned admission slots transfer to a job and release on completion", async () => {
+  const calls = [];
+  const manager = createAnalysisJobManager({
+    analyze: async () => ({ status: "answered", answers: ["A"] }),
+    billingService: billingStub(calls),
+    userRateLimiter: { acquire() { throw new Error("must use transferred user slot"); } },
+    globalRequestLimiter: { acquire() { throw new Error("must use transferred global slot"); } },
+    config: config(),
+    randomUUIDFn: () => "00000000-0000-4000-8000-000000000021",
+  });
+  const created = await manager.create({
+    auth: AUTH,
+    body: validBody(),
+    requestId: "transferred-admission",
+    admission: {
+      startedAt: Date.now(),
+      activeBytes: 2048,
+      releaseUser: () => calls.push("user:release"),
+      releaseGlobal: () => calls.push("global:release"),
+      releaseMemory: () => calls.push("memory:release"),
+      releaseAdaptive: () => calls.push("adaptive:release"),
+    },
+  });
+  await waitFor(() => manager.get({ jobId: created.jobId, auth: AUTH }).httpStatus === 200);
+  assert.deepEqual(calls, [
+    "reserve",
+    "consume",
+    "user:release",
+    "global:release",
+    "memory:release",
+    "adaptive:release",
+  ]);
+});
+
 test("cancellation aborts inference and releases reserved quota", async () => {
   const calls = [];
   const manager = createAnalysisJobManager({

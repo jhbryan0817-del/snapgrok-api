@@ -12,18 +12,22 @@ export function createAnalysisJobManager({
   randomUUIDFn = randomUUID,
 }) {
   const jobs = new Map();
+  const activeRuns = new Set();
   let activeJobs = 0;
 
-  async function create({ auth, body, requestId }) {
+  async function create({ auth, body, requestId, admission = null }) {
     cleanup();
-    const admissionStartedAt = now();
-    const releaseGlobal = globalRequestLimiter.acquire("analysis");
-    let releaseUser = null;
+    const admissionStartedAt = admission?.startedAt ?? now();
+    const releaseGlobal = admission?.releaseGlobal ||
+      globalRequestLimiter.acquire("analysis");
+    let releaseUser = admission?.releaseUser || null;
+    const releaseMemory = admission?.releaseMemory || null;
+    const releaseAdaptive = admission?.releaseAdaptive || null;
     let access = null;
     let accessStartedAt = null;
 
     try {
-      releaseUser = userRateLimiter.acquire(auth.userId);
+      releaseUser ||= userRateLimiter.acquire(auth.userId);
       accessStartedAt = now();
       access = validateAccess(
         config,
@@ -45,6 +49,8 @@ export function createAnalysisJobManager({
     } catch (error) {
       releaseUser?.();
       releaseGlobal();
+      releaseMemory?.();
+      releaseAdaptive?.();
       throw error;
     }
 
@@ -65,6 +71,9 @@ export function createAnalysisJobManager({
       access,
       releaseUser,
       releaseGlobal,
+      releaseMemory,
+      releaseAdaptive,
+      pollWaiter: null,
       reservationSettled: false,
       performance: {
         startedAt: admissionStartedAt,
@@ -72,13 +81,17 @@ export function createAnalysisJobManager({
         accessMs: Math.max(0, now() - accessStartedAt),
         requestBytes: estimateAnalysisRequestBytes(body),
         activeAtStart: activeJobs + 1,
+        activeBytesAtStart: admission?.activeBytes || 0,
+        adaptiveLimitAtStart: admission?.adaptiveLimit || 0,
         xaiMs: 0,
         settlementMs: 0,
       },
     };
     jobs.set(job.id, job);
     activeJobs += 1;
-    void run(job);
+    const running = run(job).finally(() => activeRuns.delete(running));
+    activeRuns.add(running);
+    void running;
 
     return {
       jobId: job.id,
@@ -94,6 +107,7 @@ export function createAnalysisJobManager({
         new DOMException("The analysis job timed out.", "TimeoutError"),
       );
     }, config.analysisJobTimeoutMs);
+    timeoutId.unref?.();
     const xaiStartedAt = now();
 
     try {
@@ -109,6 +123,7 @@ export function createAnalysisJobManager({
         shortcutName: String(job.body.shortcutName || "").trim(),
         mockMode: config.mockMode,
         requireZeroDataRetention: config.requireXaiZdr,
+        maxStartsPerSecond: config.xaiMaxStartsPerSecond,
         signal: job.controller.signal,
       });
       job.performance.xaiMs = Math.max(0, now() - xaiStartedAt);
@@ -140,10 +155,15 @@ export function createAnalysisJobManager({
       job.controller = null;
       job.releaseUser?.();
       job.releaseGlobal?.();
+      job.releaseMemory?.();
+      job.releaseAdaptive?.();
       job.releaseUser = null;
       job.releaseGlobal = null;
+      job.releaseMemory = null;
+      job.releaseAdaptive = null;
       job.retentionExpiresAt = now() + config.analysisJobRetentionMs;
       activeJobs = Math.max(0, activeJobs - 1);
+      notifyPollWaiter(job);
       performanceLogger?.({
         transport: "async-job",
         status: job.status,
@@ -154,6 +174,8 @@ export function createAnalysisJobManager({
         settlementMs: job.performance.settlementMs,
         requestBytes: job.performance.requestBytes,
         activeAtStart: job.performance.activeAtStart,
+        activeBytesAtStart: job.performance.activeBytesAtStart,
+        adaptiveLimitAtStart: job.performance.adaptiveLimitAtStart,
         activeAfter: activeJobs,
       });
     }
@@ -187,6 +209,14 @@ export function createAnalysisJobManager({
     );
   }
 
+  async function poll({ jobId, auth, waitMs = 0, signal = null }) {
+    const initial = get({ jobId, auth });
+    if (initial.httpStatus !== 202 || waitMs <= 0) return initial;
+    const job = ownedJob(jobId, auth);
+    await waitForJobUpdate(job, waitMs, signal);
+    return get({ jobId, auth });
+  }
+
   function cancel({ jobId, auth, reason = "The extension cancelled the request." }) {
     cleanup();
     const job = ownedJob(jobId, auth);
@@ -208,6 +238,7 @@ export function createAnalysisJobManager({
       clearSensitiveBody(job.body);
       job.body = null;
       job.result = null;
+      notifyPollWaiter(job);
       jobs.delete(jobId);
       cancelled += 1;
     }
@@ -259,7 +290,7 @@ export function createAnalysisJobManager({
     }
   }
 
-  function close() {
+  async function close() {
     for (const job of jobs.values()) {
       if (job.status === "processing" && job.controller) {
         job.error = jobError(
@@ -272,17 +303,46 @@ export function createAnalysisJobManager({
         );
       }
     }
+    await Promise.allSettled([...activeRuns]);
   }
 
   return {
+    acceptsAdmission: true,
     create,
     get,
+    poll,
     cancel,
     cancelForUser,
     cancelForDevice,
     cleanup,
     close,
   };
+
+  function waitForJobUpdate(job, waitMs, signal) {
+    if (job.status !== "processing" || job.pollWaiter) {
+      return Promise.resolve();
+    }
+    return new Promise((resolve) => {
+      let settled = false;
+      const finish = () => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timeout);
+        signal?.removeEventListener("abort", finish);
+        if (job.pollWaiter === finish) job.pollWaiter = null;
+        resolve();
+      };
+      const timeout = setTimeout(finish, waitMs);
+      timeout.unref?.();
+      job.pollWaiter = finish;
+      if (signal?.aborted || job.status !== "processing") finish();
+      else signal?.addEventListener("abort", finish, { once: true });
+    });
+  }
+}
+
+function notifyPollWaiter(job) {
+  job?.pollWaiter?.();
 }
 
 function validateAccess(config, access) {

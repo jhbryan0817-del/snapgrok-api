@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import pg from "pg";
+import { observePostgresPool } from "./postgres-runtime.js";
 
 const { Pool } = pg;
 const ACCESS_HOLD_STATES = new Set(["payment_failed", "revoked"]);
@@ -38,6 +39,7 @@ export function createPostgresBillingStore({
     application_name: "zenaian-api",
   });
   const ownsPool = !pool;
+  if (ownsPool) observePostgresPool(database, "billing");
   const assertUserAllowed = (client, userId) =>
     assertBillingUserAllowed(client, userId, deletionGuard);
 

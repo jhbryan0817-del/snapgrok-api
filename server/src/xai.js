@@ -1,6 +1,10 @@
+import { Readable } from "node:stream";
+
 const XAI_RESPONSES_URL = "https://api.x.ai/v1/responses";
 const XAI_MANAGEMENT_BASE_URL = "https://management-api.x.ai";
 const MAX_UPSTREAM_RESPONSE_BYTES = 1024 * 1024;
+const IMAGE_STREAM_PLACEHOLDER = "__ZENAIAN_STREAMED_IMAGE_DATA_URL__";
+const xaiStartGates = new Map();
 
 const RESULT_SCHEMA = {
   type: "object",
@@ -121,7 +125,7 @@ function upstreamResponseError(message, code, upstreamStatus) {
   return error;
 }
 
-function xaiHttpError(payload, upstreamStatus) {
+function xaiHttpError(payload, upstreamStatus, headers = null) {
   const code =
     upstreamStatus === 429
       ? "XAI_RATE_LIMITED"
@@ -130,11 +134,27 @@ function xaiHttpError(payload, upstreamStatus) {
         : upstreamStatus >= 500
           ? "XAI_UNAVAILABLE"
           : "XAI_REQUEST_REJECTED";
-  return upstreamResponseError(
+  const error = upstreamResponseError(
     parseErrorMessage(payload, upstreamStatus),
     code,
     upstreamStatus,
   );
+  if (upstreamStatus === 429) {
+    error.retryAfterMs = parseRetryAfterMs(headers?.get?.("retry-after"));
+  }
+  return error;
+}
+
+function parseRetryAfterMs(value, now = Date.now()) {
+  const text = String(value || "").trim();
+  if (!text) return 0;
+  if (/^\d+(?:\.\d+)?$/.test(text)) {
+    return Math.min(120000, Math.max(0, Math.ceil(Number(text) * 1000)));
+  }
+  const timestamp = Date.parse(text);
+  return Number.isFinite(timestamp)
+    ? Math.min(120000, Math.max(0, timestamp - now))
+    : 0;
 }
 
 function sanitizeAnswerLabel(value) {
@@ -276,6 +296,7 @@ async function requestXai({
   apiKey,
   timeoutMs,
   requestBody,
+  imageDataUrl,
   requireZeroDataRetention,
   signal,
 }) {
@@ -286,13 +307,16 @@ async function requestXai({
   else signal?.addEventListener("abort", abortFromCaller, { once: true });
 
   try {
+    const streamedBody = createStreamingJsonBody(requestBody, imageDataUrl);
     const response = await fetch(XAI_RESPONSES_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        "Content-Length": String(streamedBody.contentLength),
         Authorization: `Bearer ${apiKey}`,
       },
-      body: JSON.stringify(requestBody),
+      body: streamedBody.body,
+      duplex: "half",
       signal: controller.signal,
     });
 
@@ -317,7 +341,7 @@ async function requestXai({
     const payload = await readBoundedJson(response);
 
     if (!response.ok) {
-      throw xaiHttpError(payload, response.status);
+      throw xaiHttpError(payload, response.status, response.headers);
     }
 
     return payload;
@@ -339,6 +363,29 @@ async function requestXai({
   }
 }
 
+function createStreamingJsonBody(requestBody, imageDataUrl) {
+  const image = String(imageDataUrl || "");
+  if (!image || /["\\\u0000-\u001f]/.test(image)) {
+    throw new Error("The image data URL is not safe for JSON transport.");
+  }
+  const serialized = JSON.stringify(requestBody);
+  const placeholder = JSON.stringify(IMAGE_STREAM_PLACEHOLDER);
+  const fieldPrefix = '"image_url":';
+  const needle = `${fieldPrefix}${placeholder}`;
+  const fieldIndex = serialized.indexOf(needle);
+  if (fieldIndex < 0 || serialized.indexOf(needle, fieldIndex + needle.length) >= 0) {
+    throw new Error("The xAI request body is missing its streamed image field.");
+  }
+  const valueIndex = fieldIndex + fieldPrefix.length;
+  const prefix = `${serialized.slice(0, valueIndex)}"`;
+  const suffix = `"${serialized.slice(valueIndex + placeholder.length)}`;
+  return {
+    body: Readable.from([prefix, image, suffix]),
+    contentLength:
+      Buffer.byteLength(prefix) + Buffer.byteLength(image) + Buffer.byteLength(suffix),
+  };
+}
+
 export async function analyzeScreenshot({
   apiKey,
   model,
@@ -348,6 +395,7 @@ export async function analyzeScreenshot({
   shortcutName,
   mockMode,
   requireZeroDataRetention = false,
+  maxStartsPerSecond = 0,
   signal,
 }) {
   if (signal?.aborted) throw signal.reason;
@@ -386,18 +434,33 @@ export async function analyzeScreenshot({
           timeoutError.code = "XAI_TIMEOUT";
           throw timeoutError;
         }
+        await waitForXaiStart({
+          model,
+          maxStartsPerSecond,
+          deadline,
+          signal,
+        });
+        const upstreamRemainingMs = deadline - Date.now();
+        if (upstreamRemainingMs <= 0) {
+          const timeoutError = new Error("The xAI request timed out.");
+          timeoutError.status = 504;
+          timeoutError.code = "XAI_TIMEOUT";
+          throw timeoutError;
+        }
         const payload = await requestXai({
           apiKey,
-          timeoutMs: remainingMs,
+          timeoutMs: upstreamRemainingMs,
           requireZeroDataRetention,
           signal,
           requestBody: buildRequestBody({
             model,
-            imageDataUrl,
+            imageDataUrl: IMAGE_STREAM_PLACEHOLDER,
             prompt,
             formatMode,
           }),
+          imageDataUrl,
         });
+        recordXaiSuccess({ model, maxStartsPerSecond });
 
         const result = parseResultText(extractOutputText(payload));
 
@@ -418,14 +481,19 @@ export async function analyzeScreenshot({
         } else {
           lastError = error;
         }
+        recordXaiFailure({ model, maxStartsPerSecond, error: lastError });
 
         const retryable =
           error?.name === "AbortError" ||
           error?.upstreamStatus === 429 ||
           Number(error?.upstreamStatus) >= 500;
 
-        if (attempt < 2 && retryable && Date.now() + 1000 * attempt < deadline) {
-          await sleep(1000 * attempt, signal);
+        const retryDelayMs = Math.max(
+          1000 * attempt,
+          Number(lastError?.retryAfterMs) || 0,
+        );
+        if (attempt < 2 && retryable && Date.now() + retryDelayMs < deadline) {
+          await sleep(retryDelayMs, signal);
           continue;
         }
 
@@ -439,6 +507,55 @@ export async function analyzeScreenshot({
   }
 
   throw lastError || new Error("Unknown xAI request failure.");
+}
+
+async function waitForXaiStart({ model, maxStartsPerSecond, deadline, signal }) {
+  const gate = xaiGate(model, maxStartsPerSecond);
+  if (!gate) return;
+  const intervalMs = Math.ceil(1000 / maxStartsPerSecond);
+  const reservedAt = Math.max(Date.now(), gate.nextAt);
+  gate.nextAt = reservedAt + intervalMs;
+  while (true) {
+    const scheduledAt = Math.max(reservedAt, gate.blockedUntil || 0);
+    const waitMs = scheduledAt - Date.now();
+    if (waitMs <= 0) return;
+    if (scheduledAt >= deadline) {
+      const error = new Error("The xAI request timed out before upstream admission.");
+      error.status = 504;
+      error.code = "XAI_TIMEOUT";
+      throw error;
+    }
+    await sleep(waitMs, signal);
+  }
+}
+
+function xaiGate(model, maxStartsPerSecond) {
+  if (!Number.isInteger(maxStartsPerSecond) || maxStartsPerSecond < 1) return null;
+  const key = `${model}:${maxStartsPerSecond}`;
+  let gate = xaiStartGates.get(key);
+  if (!gate) {
+    gate = { nextAt: 0, blockedUntil: 0, failureCount: 0 };
+    xaiStartGates.set(key, gate);
+  }
+  return gate;
+}
+
+function recordXaiSuccess({ model, maxStartsPerSecond }) {
+  const gate = xaiGate(model, maxStartsPerSecond);
+  if (gate) gate.failureCount = 0;
+}
+
+function recordXaiFailure({ model, maxStartsPerSecond, error }) {
+  const gate = xaiGate(model, maxStartsPerSecond);
+  if (!gate) return;
+  const upstreamStatus = Number(error?.upstreamStatus);
+  if (upstreamStatus !== 429 && !(upstreamStatus >= 500)) return;
+  gate.failureCount = Math.min(8, gate.failureCount + 1);
+  const fallbackMs = upstreamStatus === 429
+    ? 1000
+    : Math.min(5000, 250 * (2 ** (gate.failureCount - 1)));
+  const retryAfterMs = Math.max(fallbackMs, Number(error?.retryAfterMs) || 0);
+  gate.blockedUntil = Math.max(gate.blockedUntil, Date.now() + retryAfterMs);
 }
 
 export async function getPrepaidBalance({

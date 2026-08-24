@@ -91,7 +91,49 @@ test("a large capture is decoded, resized once, and released", async () => {
   assert.equal(result.stats.outputWidth, 1920);
   assert.equal(result.stats.outputBytes, 4);
   assert.equal(result.stats.optimized, true);
+  assert.equal(result.stats.targetMet, true);
+  assert.equal(result.stats.targetBytes, 512 * 1024);
   assert.equal(closed, true);
+});
+
+test("an oversized capture lowers encoding quality until it meets the byte target", async () => {
+  const qualities = [];
+  const outputTypes = [];
+  const api = loadOptimizationApi({
+    fetch: async () => ({ blob: async () => ({ size: 900000 }) }),
+    createImageBitmap: async () => ({ width: 1600, height: 900, close() {} }),
+    OffscreenCanvas: class {
+      getContext() {
+        return { drawImage() {} };
+      }
+
+      async convertToBlob({ quality, type }) {
+        qualities.push(quality);
+        outputTypes.push(type);
+        const size = quality > 0.75 ? 700000 : 480000;
+        return {
+          type: "image/jpeg",
+          size,
+          arrayBuffer: async () => new Uint8Array([1, 2, 3, 4]).buffer,
+        };
+      }
+    },
+    Uint8Array,
+    btoa: (value) => Buffer.from(value, "binary").toString("base64"),
+  });
+
+  const result = await api.optimizeCapture(
+    `data:image/jpeg;base64,${"A".repeat(800000)}`,
+    {
+    targetBytes: 500000,
+    },
+  );
+
+  assert.deepEqual(qualities, [0.82, 0.74]);
+  assert.deepEqual(outputTypes, ["image/webp", "image/webp"]);
+  assert.equal(result.stats.outputBytes, 480000);
+  assert.equal(result.stats.quality, 0.74);
+  assert.equal(result.stats.targetMet, true);
 });
 
 test("service worker routes full and zone captures through the optimizer", () => {
@@ -101,6 +143,7 @@ test("service worker routes full and zone captures through the optimizer", () =>
   );
 
   assert.match(worker, /"image-optimization\.js"/);
+  assert.match(worker, /"retry-policy\.js"/);
   assert.match(worker, /const CAPTURE_JPEG_QUALITY = 82;/);
   assert.equal(
     (worker.match(/SnapGrokImageOptimization\.optimizeCapture\(/g) || []).length,

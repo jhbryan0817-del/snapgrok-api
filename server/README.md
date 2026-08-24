@@ -1,4 +1,4 @@
-# Zenaian API v6.2.0
+# Zenaian API v6.4.0
 
 Render-ready API with production Clerk authentication, exact-origin CORS,
 PostgreSQL quotas, server-created Whop checkout, signed webhook
@@ -26,6 +26,16 @@ markers outside the main restore boundary, defines a 400-day ledger-retention
 window with controlled disposal, supports safe encryption-key rotation, and
 degrades health for overdue or repeatedly incomplete deletion work. It also
 adds one ordered migration-and-preflight command for both databases.
+
+v6.4.0 raises the hard analysis maximum from 20 to 40 after isolated load
+testing, adds a 96 MiB weighted in-flight request cap, adaptive pressure-based
+admission, coordinated xAI pacing/backoff, and streamed upstream JSON. It also
+uses five-second completion-aware long polling, a shared main PostgreSQL pool,
+coalesced session-touch writes, content-free capacity telemetry, and bounded
+analysis drain during shutdown. Extension v5.9 targets oversized images to 512
+KiB using WebP and retries only transient capacity responses. See
+[CAPACITY.md](CAPACITY.md) for the evidence, independent bottlenecks, probe
+command, and production rollout criteria.
 
 ## API routes
 
@@ -107,6 +117,36 @@ Start Command: npm start
 Health Check: /api/health
 Node: 22.13.1
 ```
+
+The v6.4 capacity defaults are intentionally conservative for the current
+single Render Starter instance (0.5 CPU, 512 MiB RAM). Forty is a hard maximum;
+adaptive admission can temporarily lower it to protect latency:
+
+```text
+MAX_CONCURRENT_REQUESTS_GLOBAL=40
+MAX_ACTIVE_ANALYSIS_MB=96
+XAI_MAX_STARTS_PER_SECOND=30
+ANALYSIS_POLL_WAIT_MS=5000
+EXTENSION_SESSION_TOUCH_INTERVAL_MS=60000
+CONTROL_PLANE_MAX_CONCURRENT_REQUESTS=80
+DATABASE_POOL_MAX=10
+ADAPTIVE_CONCURRENCY_ENABLED=true
+ADAPTIVE_MIN_CONCURRENT=10
+ADAPTIVE_RECOVERY_MS=30000
+ADAPTIVE_RSS_LIMIT_MB=358
+ADAPTIVE_EVENT_LOOP_P99_MS=100
+ADAPTIVE_DATABASE_WAITING_THRESHOLD=2
+```
+
+These values are application guards, not a throughput SLA. The supplied xAI
+account export reports Grok 4.3 at 37 starts/second and Grok 4.5 at 150
+starts/second, so the 30/second local gate is conservative for that team; the
+production API key's team association remains unverified. `/api/health` exposes
+only aggregate adaptive status and limits; content-free performance logs add
+RSS, event-loop, and database-pool evidence. Follow the staged canary in
+[CAPACITY.md](CAPACITY.md) before keeping 40 under load or increasing it. The
+isolated probe supports 80 only as laboratory headroom, not as a production
+setting.
 
 Migrations are a separate, intentional release step. Never retain either
 DDL-capable migration URL on the long-running Render API service. Run the

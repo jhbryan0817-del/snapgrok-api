@@ -3,6 +3,9 @@
 
   const DEFAULT_MAX_LONG_EDGE = 1920;
   const DEFAULT_JPEG_QUALITY = 0.82;
+  const DEFAULT_TARGET_BYTES = 512 * 1024;
+  const DEFAULT_OUTPUT_TYPE = "image/webp";
+  const MIN_LONG_EDGE = 1280;
 
   async function optimizeCapture(
     imageDataUrl,
@@ -10,6 +13,8 @@
       crop = null,
       maxLongEdge = DEFAULT_MAX_LONG_EDGE,
       jpegQuality = DEFAULT_JPEG_QUALITY,
+      targetBytes = DEFAULT_TARGET_BYTES,
+      outputType = DEFAULT_OUTPUT_TYPE,
     } = {},
   ) {
     const startedAt = monotonicNow();
@@ -28,7 +33,8 @@
       );
       const needsReencode = Boolean(crop) ||
         target.width !== source.width ||
-        target.height !== source.height;
+        target.height !== source.height ||
+        sourceBytes > positiveInteger(targetBytes, "target byte size");
 
       if (!needsReencode) {
         return {
@@ -41,51 +47,111 @@
             outputWidth: source.width,
             outputHeight: source.height,
             optimized: false,
+            targetBytes,
+            quality: null,
+            outputType: sourceBlob.type,
             startedAt,
           }),
         };
       }
 
-      const canvas = new OffscreenCanvas(target.width, target.height);
-      const context = canvas.getContext("2d", { alpha: false });
-      if (!context) {
-        throw new Error("Chrome could not create the screenshot optimization canvas.");
-      }
-      context.imageSmoothingEnabled = true;
-      context.imageSmoothingQuality = "high";
-      context.drawImage(
+      const encoded = await encodeToTarget({
         bitmap,
-        source.x,
-        source.y,
-        source.width,
-        source.height,
-        0,
-        0,
-        target.width,
-        target.height,
-      );
-
-      const outputBlob = await canvas.convertToBlob({
-        type: "image/jpeg",
-        quality: boundedQuality(jpegQuality),
+        source,
+        target,
+        jpegQuality,
+        targetBytes: positiveInteger(targetBytes, "target byte size"),
+        outputType: safeOutputType(outputType),
       });
-      const outputDataUrl = await blobToDataUrl(outputBlob);
+      const outputDataUrl = await blobToDataUrl(encoded.blob);
       return {
         imageDataUrl: outputDataUrl,
         stats: captureStats({
           sourceBytes,
-          outputBytes: outputBlob.size,
+          outputBytes: encoded.blob.size,
           sourceWidth: source.width,
           sourceHeight: source.height,
-          outputWidth: target.width,
-          outputHeight: target.height,
+          outputWidth: encoded.width,
+          outputHeight: encoded.height,
           optimized: true,
+          targetBytes,
+          quality: encoded.quality,
+          outputType: encoded.blob.type,
           startedAt,
         }),
       };
     } finally {
       bitmap.close();
     }
+  }
+
+  async function encodeToTarget({
+    bitmap,
+    source,
+    target,
+    jpegQuality,
+    targetBytes,
+    outputType,
+  }) {
+    let dimensions = target;
+    let smallest = null;
+    const initialQuality = boundedQuality(jpegQuality);
+
+    for (let resizePass = 0; resizePass < 3; resizePass += 1) {
+      const canvas = drawToCanvas(bitmap, source, dimensions);
+      const qualities = [...new Set([initialQuality, 0.74, 0.66, 0.60])]
+        .filter((quality) => quality <= initialQuality)
+        .sort((left, right) => right - left);
+      for (const quality of qualities) {
+        const blob = await canvas.convertToBlob({ type: outputType, quality });
+        const candidate = {
+          blob,
+          quality,
+          width: dimensions.width,
+          height: dimensions.height,
+        };
+        if (!smallest || blob.size < smallest.blob.size) smallest = candidate;
+        if (blob.size <= targetBytes) return candidate;
+      }
+
+      const longEdge = Math.max(dimensions.width, dimensions.height);
+      if (longEdge <= MIN_LONG_EDGE) break;
+      const desiredScale = Math.sqrt(targetBytes / Math.max(1, smallest.blob.size)) * 0.96;
+      const nextLongEdge = Math.max(
+        MIN_LONG_EDGE,
+        Math.round(longEdge * clamp(desiredScale, 0.70, 0.90)),
+      );
+      if (nextLongEdge >= longEdge) break;
+      dimensions = calculateTargetDimensions(
+        dimensions.width,
+        dimensions.height,
+        nextLongEdge,
+      );
+    }
+
+    return smallest;
+  }
+
+  function drawToCanvas(bitmap, source, dimensions) {
+    const canvas = new OffscreenCanvas(dimensions.width, dimensions.height);
+    const context = canvas.getContext("2d", { alpha: false });
+    if (!context) {
+      throw new Error("Chrome could not create the screenshot optimization canvas.");
+    }
+    context.imageSmoothingEnabled = true;
+    context.imageSmoothingQuality = "high";
+    context.drawImage(
+      bitmap,
+      source.x,
+      source.y,
+      source.width,
+      source.height,
+      0,
+      0,
+      dimensions.width,
+      dimensions.height,
+    );
+    return canvas;
   }
 
   function sourceCropRectangle(bitmap, rectangle) {
@@ -152,6 +218,9 @@
     outputWidth,
     outputHeight,
     optimized,
+    targetBytes,
+    quality,
+    outputType,
     startedAt,
   }) {
     return {
@@ -162,6 +231,12 @@
       outputWidth: nonnegativeInteger(outputWidth),
       outputHeight: nonnegativeInteger(outputHeight),
       optimized: optimized === true,
+      targetBytes: nonnegativeInteger(targetBytes),
+      targetMet: nonnegativeInteger(outputBytes) <= nonnegativeInteger(targetBytes),
+      quality: quality == null ? null : Math.round(Number(quality) * 100) / 100,
+      outputType: ["image/jpeg", "image/png", "image/webp"].includes(outputType)
+        ? outputType
+        : "unknown",
       durationMs: Math.max(0, Math.round(monotonicNow() - startedAt)),
     };
   }
@@ -189,6 +264,16 @@
     return numeric;
   }
 
+  function positiveInteger(value, label) {
+    return Math.max(1, Math.round(positiveNumber(value, label)));
+  }
+
+  function safeOutputType(value) {
+    return value === "image/jpeg" || value === "image/webp"
+      ? value
+      : DEFAULT_OUTPUT_TYPE;
+  }
+
   function positiveOrZero(value) {
     const numeric = Number(value);
     return Number.isFinite(numeric) ? Math.max(0, numeric) : 0;
@@ -212,6 +297,8 @@
   self.SnapGrokImageOptimization = Object.freeze({
     DEFAULT_MAX_LONG_EDGE,
     DEFAULT_JPEG_QUALITY,
+    DEFAULT_OUTPUT_TYPE,
+    DEFAULT_TARGET_BYTES,
     calculateTargetDimensions,
     estimateDataUrlBytes,
     optimizeCapture,

@@ -1,6 +1,6 @@
 {
   "name": "zenaian-api",
-  "version": "6.3.0",
+  "version": "6.4.0",
   "private": true,
   "description": "Render-ready Zenaian backend with Clerk authentication, strict CORS, rate limiting, and no persistent request-data storage.",
   "type": "module",
@@ -16,9 +16,10 @@
     "privacy:replay-deletions": "node scripts/replay-deletions-after-restore.js",
     "privacy:purge-ledger": "node scripts/purge-deletion-ledger.js",
     "billing:reconcile": "node scripts/reconcile-billing.js",
+    "capacity:probe": "node --expose-gc scripts/capacity-probe.js",
     "zdr:status": "node scripts/manage-zdr-latch.js status",
     "zdr:reset": "node scripts/manage-zdr-latch.js reset",
-    "check": "node --check src/server.js && node --check src/auth.js && node --check src/device-auth.js && node --check src/device-session-store.js && node --check src/analysis-jobs.js && node --check src/rate-limit.js && node --check src/xai.js && node --check src/env.js && node --check src/billing-policy.js && node --check src/billing-service.js && node --check src/whop-billing-store.js && node --check src/whop.js && node --check src/deletion-ledger-store.js && node --check src/privacy-readiness.js && node --check src/privacy-store.js && node --check src/privacy-service.js && node --check scripts/migrate.js && node --check scripts/migrate-deletion-ledger.js && node --check scripts/privacy-preflight.js && node --check scripts/deletion-ledger-preflight.js && node --check scripts/release-databases.js && node --check scripts/replay-deletions-after-restore.js && node --check scripts/purge-deletion-ledger.js && node --check scripts/reconcile-billing.js && node --check scripts/manage-zdr-latch.js",
+    "check": "node --check src/server.js && node --check src/auth.js && node --check src/device-auth.js && node --check src/device-session-store.js && node --check src/analysis-jobs.js && node --check src/rate-limit.js && node --check src/postgres-runtime.js && node --check src/xai.js && node --check src/env.js && node --check src/billing-policy.js && node --check src/billing-service.js && node --check src/whop-billing-store.js && node --check src/whop.js && node --check src/deletion-ledger-store.js && node --check src/privacy-readiness.js && node --check src/privacy-store.js && node --check src/privacy-service.js && node --check scripts/capacity-probe.js && node --check scripts/capacity-probe-worker.js && node --check scripts/migrate.js && node --check scripts/migrate-deletion-ledger.js && node --check scripts/privacy-preflight.js && node --check scripts/deletion-ledger-preflight.js && node --check scripts/release-databases.js && node --check scripts/replay-deletions-after-restore.js && node --check scripts/purge-deletion-ledger.js && node --check scripts/reconcile-billing.js && node --check scripts/manage-zdr-latch.js",
     "test": "node --test"
   },
   "dependencies": {

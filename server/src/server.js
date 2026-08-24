@@ -2,7 +2,9 @@ import http from "node:http";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
+import { monitorEventLoopDelay } from "node:perf_hooks";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import pg from "pg";
 import { createAnalysisJobManager } from "./analysis-jobs.js";
 import { createAuthenticator } from "./auth.js";
 import {
@@ -14,10 +16,15 @@ import { createDeviceSessionService } from "./device-auth.js";
 import { createPostgresDeviceSessionStore } from "./device-session-store.js";
 import { loadEnv } from "./env.js";
 import { createWhopClient } from "./whop.js";
-import { UserRateLimiter } from "./rate-limit.js";
+import {
+  AdaptiveCapacityLimiter,
+  UserRateLimiter,
+  WeightedCapacityLimiter,
+} from "./rate-limit.js";
 import { analyzeScreenshot, getPrepaidBalance } from "./xai.js";
 import { createPostgresPrivacyStore } from "./privacy-store.js";
 import { createDeletionLedgerStore } from "./deletion-ledger-store.js";
+import { observePostgresPool } from "./postgres-runtime.js";
 import {
   createPrivacyService,
   requireRecentAuthentication,
@@ -31,6 +38,7 @@ const serviceVersion = String(
   JSON.parse(readFileSync(path.join(projectDirectory, "package.json"), "utf8"))
     .version || "",
 );
+const { Pool } = pg;
 
 loadEnv(path.join(projectDirectory, ".env"));
 
@@ -47,6 +55,13 @@ export function createConfig(environment = process.env) {
     environment,
     "REQUIRE_XAI_ZDR",
     productionRuntime,
+  );
+  const maxConcurrentRequestsGlobal = boundedInteger(
+    environment,
+    "MAX_CONCURRENT_REQUESTS_GLOBAL",
+    40,
+    1,
+    200,
   );
 
   return {
@@ -70,6 +85,13 @@ export function createConfig(environment = process.env) {
       10000,
       1000,
       30000,
+    ),
+    xaiMaxStartsPerSecond: boundedInteger(
+      environment,
+      "XAI_MAX_STARTS_PER_SECOND",
+      30,
+      1,
+      150,
     ),
     maxRequestBytes:
       boundedInteger(environment, "MAX_REQUEST_MB", 15, 1, 25) * 1024 * 1024,
@@ -162,6 +184,13 @@ export function createConfig(environment = process.env) {
       0,
       5000,
     ),
+    extensionSessionTouchIntervalMs: boundedInteger(
+      environment,
+      "EXTENSION_SESSION_TOUCH_INTERVAL_MS",
+      60000,
+      5000,
+      300000,
+    ),
     analysisJobTimeoutMs: boundedInteger(
       environment,
       "ANALYSIS_JOB_TIMEOUT_MS",
@@ -181,6 +210,13 @@ export function createConfig(environment = process.env) {
       "ANALYSIS_POLL_INTERVAL_MS",
       750,
       250,
+      5000,
+    ),
+    analysisPollWaitMs: boundedInteger(
+      environment,
+      "ANALYSIS_POLL_WAIT_MS",
+      5000,
+      0,
       5000,
     ),
 
@@ -219,12 +255,45 @@ export function createConfig(environment = process.env) {
       1,
       100000,
     ),
-    maxConcurrentRequestsGlobal: boundedInteger(
+    maxConcurrentRequestsGlobal,
+    maxActiveAnalysisBytes:
+      boundedInteger(environment, "MAX_ACTIVE_ANALYSIS_MB", 96, 16, 256) *
+      1024 * 1024,
+    adaptiveConcurrencyEnabled: strictBooleanFrom(
       environment,
-      "MAX_CONCURRENT_REQUESTS_GLOBAL",
-      20,
+      "ADAPTIVE_CONCURRENCY_ENABLED",
+      true,
+    ),
+    adaptiveMinConcurrent: boundedInteger(
+      environment,
+      "ADAPTIVE_MIN_CONCURRENT",
+      Math.min(10, maxConcurrentRequestsGlobal),
       1,
       200,
+    ),
+    adaptiveRecoveryMs: boundedInteger(
+      environment,
+      "ADAPTIVE_RECOVERY_MS",
+      30000,
+      5000,
+      300000,
+    ),
+    adaptiveRssLimitBytes:
+      boundedInteger(environment, "ADAPTIVE_RSS_LIMIT_MB", 358, 64, 2048) *
+      1024 * 1024,
+    adaptiveEventLoopP99Ms: boundedInteger(
+      environment,
+      "ADAPTIVE_EVENT_LOOP_P99_MS",
+      100,
+      20,
+      2000,
+    ),
+    adaptiveDatabaseWaitingThreshold: boundedInteger(
+      environment,
+      "ADAPTIVE_DATABASE_WAITING_THRESHOLD",
+      2,
+      1,
+      50,
     ),
     controlPlaneRateLimitMaxRequests: boundedInteger(
       environment,
@@ -236,7 +305,7 @@ export function createConfig(environment = process.env) {
     controlPlaneMaxConcurrentRequests: boundedInteger(
       environment,
       "CONTROL_PLANE_MAX_CONCURRENT_REQUESTS",
-      20,
+      80,
       1,
       200,
     ),
@@ -514,6 +583,16 @@ export function validateRuntimeConfig(config) {
     throw new Error("HEADERS_TIMEOUT_MS cannot exceed REQUEST_TIMEOUT_MS.");
   }
 
+  if (config.maxRequestBytes > config.maxActiveAnalysisBytes) {
+    throw new Error("MAX_REQUEST_MB cannot exceed MAX_ACTIVE_ANALYSIS_MB.");
+  }
+
+  if (config.adaptiveMinConcurrent > config.maxConcurrentRequestsGlobal) {
+    throw new Error(
+      "ADAPTIVE_MIN_CONCURRENT cannot exceed MAX_CONCURRENT_REQUESTS_GLOBAL.",
+    );
+  }
+
   if (config.extensionDeviceAuthEnabled) {
     const missingExtensionAuth = [];
     for (const [name, value] of [
@@ -718,12 +797,19 @@ export function createZenaianServer({
   limiter,
   globalLimiter,
   controlGlobalLimiter,
+  memoryLimiter,
+  adaptiveLimiter,
+  mainDatabasePool,
   resolveAnalysisAccess,
   billing,
   deviceSessions,
   analysisJobs,
   privacy,
 } = {}) {
+  const ownsMainDatabasePool = !mainDatabasePool && Boolean(config.databaseUrl);
+  const runtimeMainDatabasePool = mainDatabasePool || (
+    config.databaseUrl ? createMainDatabasePool(config) : null
+  );
   const authenticateRequest =
     authenticate ||
     createAuthenticator({
@@ -762,6 +848,22 @@ export function createZenaianServer({
       maxTrackedUsers: 1,
       scope: "global",
     });
+  const analysisMemoryLimiter = memoryLimiter || new WeightedCapacityLimiter({
+    maxWeight: config.maxActiveAnalysisBytes,
+    scope: "analysis-bytes",
+  });
+  const adaptiveAnalysisLimiter = adaptiveLimiter || new AdaptiveCapacityLimiter({
+    maxConcurrent: config.maxConcurrentRequestsGlobal,
+    minConcurrent: config.adaptiveConcurrencyEnabled
+      ? Math.min(config.adaptiveMinConcurrent, config.maxConcurrentRequestsGlobal)
+      : config.maxConcurrentRequestsGlobal,
+    recoveryMs: config.adaptiveRecoveryMs,
+  });
+  const capacityMonitor = createCapacityMonitor({
+    config,
+    limiter: adaptiveAnalysisLimiter,
+    databasePool: runtimeMainDatabasePool,
+  });
   const accountRequestLimiter = new UserRateLimiter({
     windowMs: 60000,
     maxRequests: 6,
@@ -774,9 +876,11 @@ export function createZenaianServer({
     await privacyService?.assertAnalysisAllowed?.();
     try {
       const result = await analyze(input);
+      capacityMonitor.recordProviderSuccess();
       await privacyService?.recordZdrSuccess?.();
       return result;
     } catch (error) {
+      capacityMonitor.recordProviderFailure(error);
       if (error?.code === "XAI_ZDR_REQUIRED") {
         const safety = await privacyService?.recordZdrFailure?.();
         privacyMaintenanceState.zdrSafety = safeZdrSafety(safety);
@@ -785,7 +889,7 @@ export function createZenaianServer({
     }
   };
   const privacyStore = !privacyService && config.billingMode !== "off"
-    ? createPrivacyStoreRuntime(config)
+    ? createPrivacyStoreRuntime(config, { pool: runtimeMainDatabasePool })
     : privacyService?.store || null;
   const deletionGuard = (userId) => privacyDeletionGuard({
     privacyService,
@@ -794,10 +898,12 @@ export function createZenaianServer({
   });
   const billingService = billing || createBillingRuntime(config, {
     deletionGuard,
+    pool: runtimeMainDatabasePool,
   });
   const deviceSessionService = deviceSessions || createDeviceSessionRuntime(
     config,
     {
+      pool: runtimeMainDatabasePool,
       assertUserAllowed: async (userId) => {
         if (privacyService) return privacyService.assertUserAllowed(userId);
         if (await deletionGuard(userId)) {
@@ -818,7 +924,10 @@ export function createZenaianServer({
           billingService,
           userRateLimiter,
           globalRequestLimiter: analysisGlobalRequestLimiter,
-          performanceLogger: createAnalysisPerformanceLogger(config),
+          performanceLogger: createAnalysisPerformanceLogger(
+            config,
+            capacityMonitor.snapshot,
+          ),
           resolveAnalysisAccess,
           config,
         })
@@ -958,6 +1067,7 @@ export function createZenaianServer({
               privacyControls: Boolean(privacyService),
               privacyReady: Boolean(privacyService?.ready),
               maintenance,
+              capacity: capacityMonitor.publicSnapshot(),
               ...(config.deploymentRevision
                 ? { deploymentRevision: config.deploymentRevision }
                 : {}),
@@ -1132,7 +1242,9 @@ export function createZenaianServer({
           const releaseGlobal = controlGlobalRequestLimiter.acquire("control-plane");
           try {
             const auth = await deviceSessionService.authenticateAccess(request);
-            await privacyService?.assertUserAllowed(auth.userId);
+            if (!auth.userAllowedChecked) {
+              await privacyService?.assertUserAllowed(auth.userId);
+            }
             const status = await billingService.status(auth.userId);
             sendJson(
               config,
@@ -1194,17 +1306,53 @@ export function createZenaianServer({
           enforceOrigin(config, request);
           requireDeviceSessionService(deviceSessionService);
           requireAnalysisJobManager(analysisJobManager);
-          const auth = await deviceSessionService.authenticateAccess(request);
-          await privacyService?.assertUserAllowed(auth.userId);
+          const admissionStartedAt = Date.now();
+          let releaseGlobal = analysisGlobalRequestLimiter.acquire("analysis");
+          let releaseAdaptive = null;
+          let releaseMemory = null;
+          let releaseUser = null;
+          let admissionTransferred = false;
           let body = null;
           try {
+            releaseAdaptive = adaptiveAnalysisLimiter.acquire();
+            releaseMemory = analysisMemoryLimiter.acquire(
+              analysisAdmissionWeight(config, request),
+            );
+            const auth = await deviceSessionService.authenticateAccess(request);
+            if (!auth.userAllowedChecked) {
+              await privacyService?.assertUserAllowed(auth.userId);
+            }
+            releaseUser = userRateLimiter.acquire(auth.userId);
             body = await readJsonBody(config, request);
             validateAnalyzeRequest(config, body);
             const job = await analysisJobManager.create({
               auth,
               body,
               requestId,
+              ...(analysisJobManager.acceptsAdmission
+                ? {
+                    admission: {
+                      startedAt: admissionStartedAt,
+                      releaseGlobal,
+                      releaseAdaptive,
+                      releaseMemory,
+                      releaseUser,
+                      activeBytes:
+                        analysisMemoryLimiter.snapshot?.().activeWeight || 0,
+                      adaptiveLimit:
+                        adaptiveAnalysisLimiter.snapshot?.().currentLimit || 0,
+                    },
+                  }
+                : {}),
             });
+            if (analysisJobManager.acceptsAdmission) {
+              admissionTransferred = true;
+              releaseGlobal = null;
+              releaseAdaptive = null;
+              releaseMemory = null;
+              releaseUser = null;
+            }
+            body = null;
             sendJson(
               config,
               request,
@@ -1213,9 +1361,14 @@ export function createZenaianServer({
               { ok: true, ...job },
               requestId,
             );
-            body = null;
           } finally {
             clearSensitiveBody(body);
+            if (!admissionTransferred) {
+              releaseUser?.();
+              releaseMemory?.();
+              releaseAdaptive?.();
+              releaseGlobal?.();
+            }
           }
           return;
         }
@@ -1228,36 +1381,61 @@ export function createZenaianServer({
           enforceOrigin(config, request);
           requireDeviceSessionService(deviceSessionService);
           requireAnalysisJobManager(analysisJobManager);
-          const auth = await deviceSessionService.authenticateAccess(request);
-          await privacyService?.assertUserAllowed(auth.userId);
-          const body = await readJsonBody(config, request);
-          requireEmptyObject(body, "Analysis job action request");
-          if (analysisJobActionMatch[2].toLowerCase() === "cancel") {
-            const result = analysisJobManager.cancel({
-              jobId: analysisJobActionMatch[1],
-              auth,
-            });
-            sendJson(
-              config,
-              request,
-              response,
-              200,
-              { ok: true, ...result },
-              requestId,
-            );
-          } else {
-            const result = analysisJobManager.get({
-              jobId: analysisJobActionMatch[1],
-              auth,
-            });
-            sendJson(
-              config,
-              request,
-              response,
-              result.httpStatus,
-              result.payload,
-              requestId,
-            );
+          const releaseControl =
+            controlGlobalRequestLimiter.acquire("control-plane");
+          try {
+            const auth = await deviceSessionService.authenticateAccess(request);
+            if (!auth.userAllowedChecked) {
+              await privacyService?.assertUserAllowed(auth.userId);
+            }
+            const body = await readJsonBody(config, request);
+            requireEmptyObject(body, "Analysis job action request");
+            if (analysisJobActionMatch[2].toLowerCase() === "cancel") {
+              const result = analysisJobManager.cancel({
+                jobId: analysisJobActionMatch[1],
+                auth,
+              });
+              sendJson(
+                config,
+                request,
+                response,
+                200,
+                { ok: true, ...result },
+                requestId,
+              );
+            } else {
+              const pollController = new AbortController();
+              const abortPoll = () => pollController.abort();
+              request.once("aborted", abortPoll);
+              response.once("close", abortPoll);
+              let result;
+              try {
+                result = analysisJobManager.poll
+                  ? await analysisJobManager.poll({
+                      jobId: analysisJobActionMatch[1],
+                      auth,
+                      waitMs: config.analysisPollWaitMs,
+                      signal: pollController.signal,
+                    })
+                  : analysisJobManager.get({
+                      jobId: analysisJobActionMatch[1],
+                      auth,
+                    });
+              } finally {
+                request.off("aborted", abortPoll);
+                response.off("close", abortPoll);
+              }
+              sendJson(
+                config,
+                request,
+                response,
+                result.httpStatus,
+                result.payload,
+                requestId,
+              );
+            }
+          } finally {
+            releaseControl();
           }
           return;
         }
@@ -1272,34 +1450,42 @@ export function createZenaianServer({
           enforceOrigin(config, request);
           requireDeviceSessionService(deviceSessionService);
           requireAnalysisJobManager(analysisJobManager);
-          const auth = await deviceSessionService.authenticateAccess(request);
-          await privacyService?.assertUserAllowed(auth.userId);
-          if (request.method === "DELETE") {
-            const result = analysisJobManager.cancel({
-              jobId: analysisJobMatch[1],
-              auth,
-            });
-            sendJson(
-              config,
-              request,
-              response,
-              200,
-              { ok: true, ...result },
-              requestId,
-            );
-          } else {
-            const result = analysisJobManager.get({
-              jobId: analysisJobMatch[1],
-              auth,
-            });
-            sendJson(
-              config,
-              request,
-              response,
-              result.httpStatus,
-              result.payload,
-              requestId,
-            );
+          const releaseControl =
+            controlGlobalRequestLimiter.acquire("control-plane");
+          try {
+            const auth = await deviceSessionService.authenticateAccess(request);
+            if (!auth.userAllowedChecked) {
+              await privacyService?.assertUserAllowed(auth.userId);
+            }
+            if (request.method === "DELETE") {
+              const result = analysisJobManager.cancel({
+                jobId: analysisJobMatch[1],
+                auth,
+              });
+              sendJson(
+                config,
+                request,
+                response,
+                200,
+                { ok: true, ...result },
+                requestId,
+              );
+            } else {
+              const result = analysisJobManager.get({
+                jobId: analysisJobMatch[1],
+                auth,
+              });
+              sendJson(
+                config,
+                request,
+                response,
+                result.httpStatus,
+                result.payload,
+                requestId,
+              );
+            }
+          } finally {
+            releaseControl();
           }
           return;
         }
@@ -1600,7 +1786,13 @@ export function createZenaianServer({
         if (request.method === "POST" && url.pathname === "/api/analyze") {
           enforceOrigin(config, request);
           const releaseGlobalLimit = analysisGlobalRequestLimiter.acquire("analysis");
+          let releaseAdaptive = null;
+          let releaseMemory = null;
           try {
+            releaseAdaptive = adaptiveAnalysisLimiter.acquire();
+            releaseMemory = analysisMemoryLimiter.acquire(
+              analysisAdmissionWeight(config, request),
+            );
             const auth = await authenticateRequest(request);
             await privacyService?.assertUserAllowed(auth.userId);
             const releaseRateLimit = userRateLimiter.acquire(auth.userId);
@@ -1658,6 +1850,7 @@ export function createZenaianServer({
                 shortcutName: String(body.shortcutName || "").trim(),
                 mockMode: config.mockMode,
                 requireZeroDataRetention: config.requireXaiZdr,
+                maxStartsPerSecond: config.xaiMaxStartsPerSecond,
                 signal: downstreamController.signal,
               });
 
@@ -1708,6 +1901,8 @@ export function createZenaianServer({
               body = null;
             }
           } finally {
+            releaseMemory?.();
+            releaseAdaptive?.();
             releaseGlobalLimit();
           }
           return;
@@ -1757,18 +1952,48 @@ export function createZenaianServer({
     },
   );
 
+  let analysisDrainPromise = null;
+  let runtimeClosePromise = null;
+  const drainAnalyses = () => {
+    analysisDrainPromise ||= Promise.resolve(
+      accountAnalysisController.close(
+        "The analysis service is restarting. Please try again shortly.",
+      ),
+    );
+    return analysisDrainPromise;
+  };
+  const closeRuntimeServices = () => {
+    runtimeClosePromise ||= (async () => {
+      await Promise.allSettled([
+        billingService.close?.() || Promise.resolve(),
+        deviceSessionService?.close?.() || Promise.resolve(),
+        privacyService?.close?.() || Promise.resolve(),
+      ]);
+      if (ownsMainDatabasePool) {
+        await runtimeMainDatabasePool?.end?.();
+      }
+    })();
+    return runtimeClosePromise;
+  };
   server.once("close", () => {
     clearInterval(cleanupTimer);
-    analysisJobManager?.close();
-    void billingService.close?.().catch(() => {});
-    void deviceSessionService?.close?.().catch(() => {});
-    void privacyService?.close?.().catch(() => {});
+    capacityMonitor.close();
+    void drainAnalyses().finally(closeRuntimeServices);
   });
   server.billingService = billingService;
   server.deviceSessionService = deviceSessionService;
   server.analysisJobManager = analysisJobManager;
   server.privacyService = privacyService;
   server.runPrivacyMaintenance = runPrivacyMaintenance;
+  server.capacitySnapshot = capacityMonitor.snapshot;
+  server.shutdown = async ({ timeoutMs = 10000 } = {}) => {
+    capacityMonitor.close();
+    const deadline = Date.now() + timeoutMs;
+    const draining = drainAnalyses();
+    const closed = closeHttpServer(server, timeoutMs);
+    await settleBeforeDeadline(Promise.allSettled([draining, closed]), deadline);
+    await settleBeforeDeadline(closeRuntimeServices(), deadline);
+  };
   server.headersTimeout = config.headersTimeoutMs;
   server.requestTimeout = config.requestTimeoutMs;
   server.keepAliveTimeout = config.keepAliveTimeoutMs;
@@ -1803,12 +2028,200 @@ export function createAccountAnalysisController(analysisJobs) {
       directControllers.delete(userId);
       return cancelled;
     },
+    async close(reason = "The analysis service is stopping.") {
+      for (const controllers of directControllers.values()) {
+        for (const controller of controllers) {
+          if (!controller.signal.aborted) {
+            controller.abort(new DOMException(reason, "AbortError"));
+          }
+        }
+      }
+      directControllers.clear();
+      await analysisJobs?.close?.();
+    },
   };
+}
+
+function closeHttpServer(server, timeoutMs) {
+  if (!server.listening) return Promise.resolve();
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      resolve();
+    };
+    const timeout = setTimeout(() => {
+      server.closeAllConnections?.();
+      finish();
+    }, timeoutMs);
+    server.close(() => finish());
+    server.closeIdleConnections?.();
+  });
+}
+
+function settleBeforeDeadline(promise, deadline) {
+  const remainingMs = Math.max(0, deadline - Date.now());
+  if (remainingMs === 0) return Promise.resolve(false);
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (completed) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      resolve(completed);
+    };
+    const timeout = setTimeout(() => finish(false), remainingMs);
+    Promise.resolve(promise).then(
+      () => finish(true),
+      () => finish(true),
+    );
+  });
 }
 
 // Compatibility aliases preserve the established test and integration API.
 export const createSneakSolveServer = createZenaianServer;
 export const createSnapGrokServer = createZenaianServer;
+
+function createCapacityMonitor({ config, limiter, databasePool }) {
+  const eventLoop = monitorEventLoopDelay({ resolution: 20 });
+  const pressureStreaks = { rss: 0, eventLoop: 0, database: 0 };
+  let providerFailureStreak = 0;
+  let closed = false;
+  let latest = {
+    rssMb: Math.round(process.memoryUsage().rss / 1024 / 1024),
+    eventLoopP99Ms: 0,
+    databaseTotal: Number(databasePool?.totalCount) || 0,
+    databaseIdle: Number(databasePool?.idleCount) || 0,
+    databaseWaiting: Number(databasePool?.waitingCount) || 0,
+  };
+
+  eventLoop.enable();
+  const timer = setInterval(sample, 1000);
+  timer.unref();
+
+  function sample() {
+    if (closed) return;
+    const p99 = Number(eventLoop.percentile(99)) / 1e6;
+    latest = {
+      rssMb: Math.round(process.memoryUsage().rss / 1024 / 1024),
+      eventLoopP99Ms: Number.isFinite(p99) ? Math.round(p99 * 100) / 100 : 0,
+      databaseTotal: Number(databasePool?.totalCount) || 0,
+      databaseIdle: Number(databasePool?.idleCount) || 0,
+      databaseWaiting: Number(databasePool?.waitingCount) || 0,
+    };
+    eventLoop.reset();
+
+    const active = limiter.snapshot().active;
+    observe(
+      "rss",
+      active > 0 && latest.rssMb * 1024 * 1024 >= config.adaptiveRssLimitBytes,
+      "rss",
+    );
+    observe(
+      "eventLoop",
+      active > 0 && latest.eventLoopP99Ms >= config.adaptiveEventLoopP99Ms,
+      "event_loop",
+    );
+    observe(
+      "database",
+      active > 0 &&
+        latest.databaseWaiting >= config.adaptiveDatabaseWaitingThreshold,
+      "database_wait",
+    );
+  }
+
+  function observe(key, pressured, reason) {
+    pressureStreaks[key] = pressured ? pressureStreaks[key] + 1 : 0;
+    if (!config.adaptiveConcurrencyEnabled || pressureStreaks[key] < 3) return;
+    pressureStreaks[key] = 0;
+    const capacity = limiter.recordPressure(reason, {
+      factor: 0.75,
+      cooldownMs: config.adaptiveRecoveryMs,
+    });
+    logPressure(reason, capacity);
+  }
+
+  function logPressure(reason, capacity) {
+    if (!config.performanceLogsEnabled) return;
+    console.warn(JSON.stringify({
+      timestamp: new Date().toISOString(),
+      event: "analysis_capacity_pressure",
+      reason,
+      adaptiveLimit: capacity.currentLimit,
+      activeAnalyses: capacity.active,
+      ...latest,
+    }));
+  }
+
+  function recordProviderFailure(error) {
+    const upstreamStatus = Number(error?.upstreamStatus);
+    if (upstreamStatus === 429 || error?.code === "XAI_RATE_LIMITED") {
+      providerFailureStreak += 1;
+      if (!config.adaptiveConcurrencyEnabled) return;
+      const cooldownMs = Math.max(
+        config.adaptiveRecoveryMs,
+        Math.min(120000, Number(error?.retryAfterMs) || 0),
+      );
+      const capacity = limiter.recordPressure("provider_rate_limit", {
+        factor: 0.5,
+        cooldownMs,
+      });
+      logPressure("provider_rate_limit", capacity);
+      return;
+    }
+    if (upstreamStatus >= 500 || error?.code === "XAI_UNAVAILABLE") {
+      providerFailureStreak += 1;
+      if (config.adaptiveConcurrencyEnabled && providerFailureStreak >= 3) {
+        providerFailureStreak = 0;
+        const capacity = limiter.recordPressure("provider_unavailable", {
+          factor: 0.75,
+          cooldownMs: config.adaptiveRecoveryMs,
+        });
+        logPressure("provider_unavailable", capacity);
+      }
+    }
+  }
+
+  function recordProviderSuccess() {
+    providerFailureStreak = 0;
+  }
+
+  function snapshot() {
+    return {
+      ...latest,
+      adaptive: limiter.snapshot(),
+    };
+  }
+
+  function publicSnapshot() {
+    const adaptive = limiter.snapshot();
+    return {
+      status: adaptive.currentLimit < adaptive.maxConcurrent
+        ? "protecting"
+        : "normal",
+      currentLimit: adaptive.currentLimit,
+      maximumLimit: adaptive.maxConcurrent,
+      pressureReason: adaptive.lastPressureReason,
+    };
+  }
+
+  function close() {
+    if (closed) return;
+    closed = true;
+    clearInterval(timer);
+    eventLoop.disable();
+  }
+
+  return {
+    close,
+    publicSnapshot,
+    recordProviderFailure,
+    recordProviderSuccess,
+    snapshot,
+  };
+}
 
 function validateAnalysisAccess(config, access) {
   if (!access || access.allowed !== true) {
@@ -1831,13 +2244,26 @@ function validateAnalysisAccess(config, access) {
   };
 }
 
+export function createMainDatabasePool(config) {
+  return observePostgresPool(new Pool({
+    connectionString: config.databaseUrl,
+    max: config.databasePoolMax,
+    connectionTimeoutMillis: config.databaseConnectionTimeoutMs,
+    idleTimeoutMillis: 30000,
+    statement_timeout: config.databaseStatementTimeoutMs,
+    query_timeout: config.databaseStatementTimeoutMs,
+    application_name: "zenaian-runtime",
+  }), "main-runtime");
+}
+
 export function createDeviceSessionRuntime(
   config,
-  { assertUserAllowed = async () => true } = {},
+  { assertUserAllowed = async () => true, pool = null } = {},
 ) {
   if (!config.extensionDeviceAuthEnabled) return null;
   const store = createPostgresDeviceSessionStore({
     connectionString: config.databaseUrl,
+    pool,
     poolMax: config.databasePoolMax,
     connectionTimeoutMs: config.databaseConnectionTimeoutMs,
     statementTimeoutMs: config.databaseStatementTimeoutMs,
@@ -1854,13 +2280,15 @@ export function createDeviceSessionRuntime(
     refreshTtlMs: config.extensionRefreshTtlMs,
     refreshGraceMs: config.extensionRefreshGraceMs,
     clerkRecheckMs: config.extensionClerkRecheckMs,
+    sessionTouchIntervalMs: config.extensionSessionTouchIntervalMs,
     assertUserAllowed,
   });
 }
 
-export function createPrivacyStoreRuntime(config) {
+export function createPrivacyStoreRuntime(config, { pool = null } = {}) {
   return createPostgresPrivacyStore({
     connectionString: config.databaseUrl,
+    pool,
     providerMode: config.billingMode,
     poolMax: Math.min(config.databasePoolMax, 4),
     connectionTimeoutMs: config.databaseConnectionTimeoutMs,
@@ -1909,12 +2337,16 @@ export function createPrivacyRuntime(
   });
 }
 
-export function createBillingRuntime(config, { deletionGuard = null } = {}) {
+export function createBillingRuntime(
+  config,
+  { deletionGuard = null, pool = null } = {},
+) {
   if (config.billingMode === "off") {
     return createBypassBillingService(config);
   }
   const store = createPostgresBillingStore({
     connectionString: config.databaseUrl,
+    pool,
     providerMode: config.billingMode,
     poolMax: config.databasePoolMax,
     connectionTimeoutMs: config.databaseConnectionTimeoutMs,
@@ -2128,12 +2560,13 @@ function strictBooleanFrom(environment, name, fallback) {
   throw new Error(`${name} must be true or false.`);
 }
 
-function createAnalysisPerformanceLogger(config) {
+function createAnalysisPerformanceLogger(config, capacitySnapshot = null) {
   if (!config.performanceLogsEnabled) return null;
   return (metrics) => {
     try {
       const totalMs = safePerformanceMetric(metrics?.totalMs);
       const xaiMs = safePerformanceMetric(metrics?.xaiMs);
+      const capacity = capacitySnapshot?.() || {};
       console.log(JSON.stringify({
         timestamp: new Date().toISOString(),
         event: "analysis_performance",
@@ -2149,7 +2582,17 @@ function createAnalysisPerformanceLogger(config) {
         settlementMs: safePerformanceMetric(metrics?.settlementMs),
         requestBytes: safePerformanceMetric(metrics?.requestBytes),
         activeAtStart: safePerformanceMetric(metrics?.activeAtStart),
+        activeBytesAtStart: safePerformanceMetric(metrics?.activeBytesAtStart),
+        adaptiveLimitAtStart: safePerformanceMetric(metrics?.adaptiveLimitAtStart),
         activeAfter: safePerformanceMetric(metrics?.activeAfter),
+        adaptiveLimitAfter: safePerformanceMetric(
+          capacity?.adaptive?.currentLimit,
+        ),
+        rssMb: safePerformanceMetric(capacity?.rssMb),
+        eventLoopP99Ms: safePerformanceMetric(capacity?.eventLoopP99Ms),
+        databasePoolTotal: safePerformanceMetric(capacity?.databaseTotal),
+        databasePoolIdle: safePerformanceMetric(capacity?.databaseIdle),
+        databasePoolWaiting: safePerformanceMetric(capacity?.databaseWaiting),
       }));
     } catch {
       // Performance diagnostics must never affect request processing.
@@ -2474,6 +2917,20 @@ function validateAnalyzeRequest(config, body) {
   }
 }
 
+function analysisAdmissionWeight(config, request) {
+  requireSingleRequestHeader(request, "content-length");
+  const header = request.headers["content-length"];
+  if (header == null) return config.maxRequestBytes;
+  if (!/^(?:0|[1-9]\d*)$/.test(String(header))) {
+    throw httpError(400, "Content-Length is invalid.", "INVALID_CONTENT_LENGTH");
+  }
+  const contentLength = Number(header);
+  if (!Number.isSafeInteger(contentLength) || contentLength > config.maxRequestBytes) {
+    throw requestTooLarge(config);
+  }
+  return Math.max(1, contentLength);
+}
+
 function validatePairingCreationRequest(body) {
   if (
     !body ||
@@ -2622,40 +3079,59 @@ function isValidImageDataUrl(value) {
     return false;
   }
 
-  const decoded = Buffer.from(encoded, "base64");
-  if (!decoded.length) return false;
-  const canonical = decoded.toString("base64");
-  if (canonical !== encoded) return false;
+  const padding = encoded.endsWith("==") ? 2 : encoded.endsWith("=") ? 1 : 0;
+  const finalValue = base64Value(encoded[encoded.length - padding - 1]);
+  if (
+    finalValue < 0 ||
+    (padding === 2 && (finalValue & 0b1111) !== 0) ||
+    (padding === 1 && (finalValue & 0b11) !== 0)
+  ) {
+    return false;
+  }
+  const decodedLength = (encoded.length / 4) * 3 - padding;
+  if (decodedLength < 1) return false;
+  const head = Buffer.from(encoded.slice(0, Math.min(32, encoded.length)), "base64");
+  const tail = Buffer.from(encoded.slice(Math.max(0, encoded.length - 8)), "base64");
 
   switch (match[1].toLowerCase()) {
     case "jpeg":
       return (
-        decoded.length >= 4 &&
-        decoded[0] === 0xff &&
-        decoded[1] === 0xd8 &&
-        decoded[2] === 0xff &&
-        decoded[decoded.length - 2] === 0xff &&
-        decoded[decoded.length - 1] === 0xd9
+        decodedLength >= 4 &&
+        head[0] === 0xff &&
+        head[1] === 0xd8 &&
+        head[2] === 0xff &&
+        tail[tail.length - 2] === 0xff &&
+        tail[tail.length - 1] === 0xd9
       );
     case "png":
       return (
-        decoded.length >= 24 &&
-        decoded.subarray(0, 8).equals(
+        decodedLength >= 24 &&
+        head.subarray(0, 8).equals(
           Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
         ) &&
-        decoded.subarray(12, 16).toString("ascii") === "IHDR" &&
-        decoded.readUInt32BE(16) > 0 &&
-        decoded.readUInt32BE(20) > 0
+        head.subarray(12, 16).toString("ascii") === "IHDR" &&
+        head.readUInt32BE(16) > 0 &&
+        head.readUInt32BE(20) > 0
       );
     case "webp":
       return (
-        decoded.length >= 16 &&
-        decoded.subarray(0, 4).toString("ascii") === "RIFF" &&
-        decoded.subarray(8, 12).toString("ascii") === "WEBP"
+        decodedLength >= 16 &&
+        head.subarray(0, 4).toString("ascii") === "RIFF" &&
+        head.subarray(8, 12).toString("ascii") === "WEBP"
       );
     default:
       return false;
   }
+}
+
+function base64Value(character) {
+  const code = String(character || "").charCodeAt(0);
+  if (code >= 65 && code <= 90) return code - 65;
+  if (code >= 97 && code <= 122) return code - 71;
+  if (code >= 48 && code <= 57) return code + 4;
+  if (code === 43) return 62;
+  if (code === 47) return 63;
+  return -1;
 }
 
 function clearSensitiveBody(body) {
@@ -2847,6 +3323,29 @@ async function startServer() {
   await server.billingService.initialize();
   await server.deviceSessionService?.initialize();
   await server.privacyService?.initialize();
+  let shuttingDown = false;
+  const shutdown = (signal) => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    console.log(JSON.stringify({
+      timestamp: new Date().toISOString(),
+      event: "server_shutdown",
+      signal,
+    }));
+    void server.shutdown({ timeoutMs: 10000 }).then(
+      () => process.exit(0),
+      (error) => {
+        console.error(JSON.stringify({
+          timestamp: new Date().toISOString(),
+          event: "server_shutdown_failed",
+          code: publicErrorCode(error),
+        }));
+        process.exit(1);
+      },
+    );
+  };
+  process.once("SIGTERM", () => shutdown("SIGTERM"));
+  process.once("SIGINT", () => shutdown("SIGINT"));
   server.listen(config.port, "0.0.0.0", () => {
     console.log(`Zenaian server is listening on port ${config.port}`);
     console.log(`Model: ${config.mockMode ? "mock-xai" : config.model}`);
@@ -2857,8 +3356,17 @@ async function startServer() {
     );
     console.log(
       `Analysis capacity: ${config.maxConcurrentRequestsGlobal} concurrent; ` +
+      `${Math.round(config.maxActiveAnalysisBytes / 1024 / 1024)} MB in-flight; ` +
       `control-plane capacity: ${config.controlPlaneMaxConcurrentRequests} concurrent`,
     );
+    console.log(
+      `Adaptive analysis capacity: ${config.adaptiveConcurrencyEnabled ? "enabled" : "disabled"}; ` +
+      `floor: ${config.adaptiveMinConcurrent}; ` +
+      `RSS threshold: ${Math.round(config.adaptiveRssLimitBytes / 1024 / 1024)} MB; ` +
+      `event-loop p99 threshold: ${config.adaptiveEventLoopP99Ms} ms; ` +
+      `database wait threshold: ${config.adaptiveDatabaseWaitingThreshold}`,
+    );
+    console.log(`Shared main database pool: ${config.databasePoolMax} connections`);
     console.log(
       `Content-free performance logs: ${config.performanceLogsEnabled ? "enabled" : "disabled"}`,
     );

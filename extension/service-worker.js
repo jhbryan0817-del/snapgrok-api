@@ -4,6 +4,7 @@ importScripts(
   "settings.js",
   "protocol.js",
   "image-optimization.js",
+  "retry-policy.js",
 );
 
 "use strict";
@@ -17,6 +18,7 @@ const MULTIPLE_RESULT_DISPLAY_MS = 6000;
 const SELECTION_TTL_MS = 90000;
 const PROCESSING_TTL_MS = 150000;
 const CAPTURE_JPEG_QUALITY = 82;
+const MAX_CAPACITY_RETRIES = 2;
 const PROCESSING_ALARM_PREFIX = "snapgrok-processing-";
 const JOB_POLL_ALARM_PREFIX = "snapgrok-job-poll-";
 const OPERATION_KEY = "snapgrokOperation";
@@ -552,17 +554,17 @@ async function analyzeAndDisplay(operationId, imageDataUrl, userInstruction, exi
       maxWords: MAX_WORDS,
     });
     imageDataUrl = "";
-    let response;
+    let submission;
     try {
-      response = await SnapGrokAuth.fetchWithAuth("/api/analyze-jobs", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${authToken}` },
-        body: requestBody,
-      });
+      submission = await submitAnalysisJobWithBackoff(
+        operationId,
+        requestBody,
+        authToken,
+      );
     } finally {
       requestBody = "";
     }
-    const payload = await readApiPayload(response);
+    const { response, payload } = submission;
     if (!response.ok || !payload?.ok || !isUuid(payload.jobId)) {
       throw apiResponseError(response.status, payload);
     }
@@ -604,9 +606,27 @@ async function pollAnalysisJob(operationId) {
       { method: "POST", body: "{}" },
     );
     const payload = await readApiPayload(response);
+    const retryDelayMs = SnapGrokRetryPolicy.capacityRetryDelay({
+      status: response.status,
+      code: payload?.code,
+      retryAfterHeader: response.headers.get("retry-after"),
+      attempt: Number(operation.pollCapacityRetries) || 0,
+    });
+    if (retryDelayMs != null) {
+      await updateOperation(operationId, {
+        pollCapacityRetries: (Number(operation.pollCapacityRetries) || 0) + 1,
+      });
+      await scheduleJobPoll(operationId, retryDelayMs);
+      trace("ANALYSIS_POLL_BACKPRESSURE", {
+        operationId: shortId(operationId),
+        code: String(payload?.code || "CAPACITY_LIMITED").slice(0, 64),
+        retryDelayMs,
+      });
+      return;
+    }
     if (response.status === 202 && payload?.status === "processing") {
       const pollAfterMs = normalizePollDelay(payload.pollAfterMs || operation.pollAfterMs);
-      await updateOperation(operationId, { pollAfterMs });
+      await updateOperation(operationId, { pollAfterMs, pollCapacityRetries: 0 });
       await scheduleJobPoll(operationId, pollAfterMs);
       return;
     }
@@ -664,6 +684,39 @@ async function cancelAnalysisJob(operation) {
   await response.arrayBuffer().catch(() => undefined);
 }
 
+async function submitAnalysisJobWithBackoff(operationId, requestBody, authToken) {
+  for (let attempt = 0; attempt <= MAX_CAPACITY_RETRIES; attempt += 1) {
+    const response = await SnapGrokAuth.fetchWithAuth("/api/analyze-jobs", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${authToken}` },
+      body: requestBody,
+    });
+    const payload = await readApiPayload(response);
+    const retryDelayMs = SnapGrokRetryPolicy.capacityRetryDelay({
+      status: response.status,
+      code: payload?.code,
+      retryAfterHeader: response.headers.get("retry-after"),
+      attempt,
+    });
+    if (retryDelayMs == null || attempt >= MAX_CAPACITY_RETRIES) {
+      return { response, payload };
+    }
+
+    trace("ANALYSIS_ADMISSION_BACKPRESSURE", {
+      operationId: shortId(operationId),
+      code: String(payload?.code || "CAPACITY_LIMITED").slice(0, 64),
+      retryDelayMs,
+      attempt: attempt + 1,
+    });
+    await delay(retryDelayMs);
+    const current = await getOperation();
+    if (!current || current.id !== operationId || current.phase !== "processing") {
+      throw new Error("The analysis request was cancelled before capacity became available.");
+    }
+  }
+  throw new Error("The analysis service remained at capacity.");
+}
+
 async function readApiPayload(response) {
   return response.json().catch(() => ({}));
 }
@@ -682,8 +735,12 @@ function apiResponseError(status, payload) {
 function normalizePollDelay(value) {
   const milliseconds = Number(value);
   return Number.isFinite(milliseconds)
-    ? Math.min(5000, Math.max(500, Math.round(milliseconds)))
+    ? Math.min(30000, Math.max(500, Math.round(milliseconds)))
     : 750;
+}
+
+function delay(milliseconds) {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
 
 function isUuid(value) {
@@ -1068,6 +1125,10 @@ function traceCapturePerformance(mode, operationId, stats) {
     sourceDimensions: `${stats?.sourceWidth || 0}x${stats?.sourceHeight || 0}`,
     outputDimensions: `${stats?.outputWidth || 0}x${stats?.outputHeight || 0}`,
     optimized: stats?.optimized === true,
+    targetBytes: stats?.targetBytes || 0,
+    targetMet: stats?.targetMet === true,
+    outputQuality: stats?.quality,
+    outputType: stats?.outputType,
     preparationMs: stats?.durationMs || 0,
   });
 }

@@ -109,6 +109,149 @@ export class UserRateLimiter {
   }
 }
 
+export class WeightedCapacityLimiter {
+  constructor({ maxWeight, scope = "analysis" }) {
+    if (!Number.isSafeInteger(maxWeight) || maxWeight < 1) {
+      throw new Error("Weighted capacity must be a positive safe integer.");
+    }
+    this.maxWeight = maxWeight;
+    this.scope = scope;
+    this.activeWeight = 0;
+  }
+
+  acquire(weight) {
+    if (!Number.isSafeInteger(weight) || weight < 1) {
+      throw new Error("Capacity weight must be a positive safe integer.");
+    }
+    if (weight > this.maxWeight || this.activeWeight + weight > this.maxWeight) {
+      throw rateLimitError(
+        "The analysis service is processing its safe image-data capacity. Please try again shortly.",
+        1,
+        "ANALYSIS_MEMORY_LIMITED",
+      );
+    }
+
+    this.activeWeight += weight;
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+      this.activeWeight = Math.max(0, this.activeWeight - weight);
+    };
+  }
+
+  snapshot() {
+    return {
+      scope: this.scope,
+      activeWeight: this.activeWeight,
+      maxWeight: this.maxWeight,
+    };
+  }
+}
+
+export class AdaptiveCapacityLimiter {
+  constructor({
+    maxConcurrent,
+    minConcurrent = 1,
+    recoveryMs = 30000,
+    now = Date.now,
+  }) {
+    if (!Number.isSafeInteger(maxConcurrent) || maxConcurrent < 1) {
+      throw new Error("Adaptive capacity maximum must be a positive safe integer.");
+    }
+    if (
+      !Number.isSafeInteger(minConcurrent) ||
+      minConcurrent < 1 ||
+      minConcurrent > maxConcurrent
+    ) {
+      throw new Error("Adaptive capacity minimum must not exceed its maximum.");
+    }
+    if (!Number.isSafeInteger(recoveryMs) || recoveryMs < 1) {
+      throw new Error("Adaptive capacity recovery interval must be positive.");
+    }
+    this.maxConcurrent = maxConcurrent;
+    this.minConcurrent = minConcurrent;
+    this.recoveryMs = recoveryMs;
+    this.now = now;
+    this.currentLimit = maxConcurrent;
+    this.active = 0;
+    this.pressureUntil = 0;
+    this.lastRecoveryAt = now();
+    this.lastPressureReason = "none";
+  }
+
+  acquire() {
+    this.recover();
+    if (this.active >= this.currentLimit) {
+      const retryAfterSeconds = Math.max(
+        1,
+        Math.ceil(Math.max(0, this.pressureUntil - this.now()) / 1000),
+      );
+      throw rateLimitError(
+        "The analysis service is protecting response time while a dependency is under pressure. Please retry shortly.",
+        retryAfterSeconds,
+        "ANALYSIS_ADAPTIVELY_LIMITED",
+      );
+    }
+    this.active += 1;
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+      this.active = Math.max(0, this.active - 1);
+    };
+  }
+
+  recordPressure(reason, { factor = 0.75, cooldownMs = this.recoveryMs } = {}) {
+    const safeFactor = Number.isFinite(Number(factor))
+      ? Math.min(0.95, Math.max(0.25, Number(factor)))
+      : 0.75;
+    const safeCooldown = Number.isSafeInteger(cooldownMs) && cooldownMs > 0
+      ? cooldownMs
+      : this.recoveryMs;
+    const timestamp = this.now();
+    this.currentLimit = Math.max(
+      this.minConcurrent,
+      Math.min(this.currentLimit - 1, Math.floor(this.currentLimit * safeFactor)),
+    );
+    this.pressureUntil = Math.max(this.pressureUntil, timestamp + safeCooldown);
+    this.lastRecoveryAt = this.pressureUntil;
+    this.lastPressureReason = safePressureReason(reason);
+    return this.snapshot();
+  }
+
+  recover() {
+    const timestamp = this.now();
+    if (timestamp < this.pressureUntil || this.currentLimit >= this.maxConcurrent) {
+      return;
+    }
+    const steps = Math.floor((timestamp - this.lastRecoveryAt) / this.recoveryMs);
+    if (steps < 1) return;
+    this.currentLimit = Math.min(this.maxConcurrent, this.currentLimit + steps);
+    this.lastRecoveryAt += steps * this.recoveryMs;
+    if (this.currentLimit === this.maxConcurrent) {
+      this.lastPressureReason = "none";
+    }
+  }
+
+  snapshot() {
+    this.recover();
+    return {
+      active: this.active,
+      currentLimit: this.currentLimit,
+      minConcurrent: this.minConcurrent,
+      maxConcurrent: this.maxConcurrent,
+      pressureUntil: this.pressureUntil,
+      lastPressureReason: this.lastPressureReason,
+    };
+  }
+}
+
+function safePressureReason(value) {
+  const reason = String(value || "unknown").trim().toLowerCase();
+  return /^[a-z0-9_-]{1,48}$/.test(reason) ? reason : "unknown";
+}
+
 function rateLimitError(message, retryAfterSeconds, code = "RATE_LIMITED") {
   const error = new Error(message);
   error.status = 429;

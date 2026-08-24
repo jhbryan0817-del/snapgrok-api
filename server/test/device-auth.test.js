@@ -44,6 +44,7 @@ test("one-time pairing creates an exact-origin device session", async () => {
   ));
   assert.equal(auth.userId, USER_ID);
   assert.equal(auth.extensionId, EXTENSION_ID);
+  assert.equal(auth.userAllowedChecked, true);
   assert.equal(store.sessions.size, 1);
 });
 
@@ -146,6 +147,21 @@ test("short Clerk recheck caching bounds polling load without caching revocation
   );
 });
 
+test("frequent job polling coalesces device-session last-seen writes", async () => {
+  let clock = new Date("2026-08-01T00:00:00.000Z");
+  const { service, store } = fixture({
+    now: () => new Date(clock),
+    sessionTouchIntervalMs: 60000,
+  });
+  const session = await pairedSession(service);
+  await service.authenticateAccess(requestFor(session.accessToken, EXTENSION_ORIGIN));
+  await service.authenticateAccess(requestFor(session.accessToken, EXTENSION_ORIGIN));
+  assert.equal(store.touches, 1);
+  clock = new Date(clock.getTime() + 60001);
+  await service.authenticateAccess(requestFor(session.accessToken, EXTENSION_ORIGIN));
+  assert.equal(store.touches, 2);
+});
+
 test("privacy deletion blocks pairing and removes a session created during an exchange race", async () => {
   let blocked = true;
   const deletionError = () => Object.assign(new Error("deleting"), {
@@ -224,6 +240,7 @@ function fixture(overrides = {}) {
     signingKey: SIGNING_KEY,
     extensionIds: [EXTENSION_ID],
     clerkRecheckMs: overrides.clerkRecheckMs ?? 0,
+    sessionTouchIntervalMs: overrides.sessionTouchIntervalMs ?? 60000,
     now: overrides.now || (() => new Date("2026-08-01T00:00:00.000Z")),
     randomBytesFn: () => Buffer.alloc(32, ++codeCounter),
     randomUUIDFn: () => `00000000-0000-4000-8000-${String(++uuidCounter).padStart(12, "0")}`,
@@ -240,7 +257,7 @@ function fixture(overrides = {}) {
 function memoryStore() {
   const pairings = new Map();
   const sessions = new Map();
-  return {
+  const store = {
     pairings,
     sessions,
     async initialize() {},
@@ -280,7 +297,8 @@ function memoryStore() {
     async deleteSession(id) {
       return sessions.delete(id);
     },
-    async touchSession() {},
+    touches: 0,
+    async touchSession() { store.touches += 1; },
     async rotateSession(input) {
       const current = sessions.get(input.sessionId);
       if (!current || current.revokedAt) {
@@ -330,4 +348,5 @@ function memoryStore() {
       return 1;
     },
   };
+  return store;
 }

@@ -1,6 +1,7 @@
 import { createHmac, randomUUID } from "node:crypto";
 import pg from "pg";
 import { inspectPrivacyRuntimeReadiness } from "./privacy-readiness.js";
+import { observePostgresPool } from "./postgres-runtime.js";
 
 const { Pool } = pg;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -52,6 +53,7 @@ export function createPostgresPrivacyStore({
     application_name: "zenaian-privacy",
   });
   const ownsPool = !pool;
+  if (ownsPool) observePostgresPool(database, "privacy");
   // Session advisory locks must not consume a connection from the pool used
   // by the callback. Otherwise a pool of one deadlocks, and enough concurrent
   // privacy requests can starve every callback behind its own lock holder.
@@ -68,6 +70,7 @@ export function createPostgresPrivacyStore({
     application_name: "zenaian-privacy-locks",
   }) : database;
   const ownsLockPool = Boolean(connectionString);
+  if (ownsLockPool) observePostgresPool(lockDatabase, "privacy-locks");
 
   function hmacWith(key, value) {
     return createHmac("sha256", key)

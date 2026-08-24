@@ -106,4 +106,5 @@ jobs:
           node-version: 22.13.1
       - run: node --check service-worker.js
       - run: node --check image-optimization.js
+      - run: node --check retry-policy.js
       - run: node --test test/*.test.js

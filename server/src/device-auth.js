@@ -24,6 +24,7 @@ export function createDeviceSessionService({
   refreshTtlMs = 30 * 24 * 60 * 60 * 1000,
   refreshGraceMs = 30000,
   clerkRecheckMs = 2000,
+  sessionTouchIntervalMs = 60000,
   now = () => new Date(),
   randomBytesFn = randomBytes,
   randomUUIDFn = randomUUID,
@@ -112,6 +113,7 @@ export function createDeviceSessionService({
     return { email: primaryEmail, displayName };
   });
   const clerkChecks = new Map();
+  const sessionTouches = new Map();
 
   async function confirmClerkSession(sessionId, userId) {
     const timestamp = now().getTime();
@@ -144,6 +146,20 @@ export function createDeviceSessionService({
       promise,
     });
     return promise;
+  }
+
+  function touchSessionAtMostOncePerInterval(sessionId) {
+    const touchedAt = now();
+    const timestamp = touchedAt.getTime();
+    if ((sessionTouches.get(sessionId) || 0) + sessionTouchIntervalMs > timestamp) {
+      return;
+    }
+    sessionTouches.set(sessionId, timestamp);
+    void store.touchSession(sessionId, touchedAt).catch(() => {
+      if (sessionTouches.get(sessionId) === timestamp) {
+        sessionTouches.delete(sessionId);
+      }
+    });
   }
 
   function signToken(type, session) {
@@ -272,6 +288,7 @@ export function createDeviceSessionService({
     },
 
     async close() {
+      sessionTouches.clear();
       await store.close();
     },
 
@@ -280,6 +297,11 @@ export function createDeviceSessionService({
       for (const [sessionId, check] of clerkChecks) {
         if (!check.promise && check.verifiedUntil <= timestamp) {
           clerkChecks.delete(sessionId);
+        }
+      }
+      for (const [sessionId, touchedAt] of sessionTouches) {
+        if (touchedAt + sessionTouchIntervalMs <= timestamp) {
+          sessionTouches.delete(sessionId);
         }
       }
       return store.cleanupExpired(now());
@@ -371,13 +393,14 @@ export function createDeviceSessionService({
         requestOrigin(request),
         "access",
       );
-      void store.touchSession(session.id, now()).catch(() => undefined);
+      touchSessionAtMostOncePerInterval(session.id);
       return {
         userId: session.userId,
         sessionId: session.clerkSessionId,
         organizationId: null,
         deviceSessionId: session.id,
         extensionId: session.extensionId,
+        userAllowedChecked: true,
       };
     },
 
@@ -422,6 +445,7 @@ export function createDeviceSessionService({
     },
 
     async revokeDeviceSession(deviceSessionId) {
+      sessionTouches.delete(deviceSessionId);
       return store.revokeSession(deviceSessionId, now());
     },
   };

@@ -5,6 +5,7 @@ import {
   randomBytes,
 } from "node:crypto";
 import pg from "pg";
+import { observePostgresPool } from "./postgres-runtime.js";
 
 const { Pool } = pg;
 const LEDGER_RETENTION_DAYS = 400;
@@ -49,6 +50,7 @@ export function createDeletionLedgerStore({
     application_name: "zenaian-deletion-ledger",
   });
   const ownsPool = !pool;
+  if (ownsPool) observePostgresPool(database, "deletion-ledger");
 
   return {
     async initialize() {

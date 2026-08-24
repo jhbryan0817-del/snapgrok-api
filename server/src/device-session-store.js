@@ -1,4 +1,5 @@
 import pg from "pg";
+import { observePostgresPool } from "./postgres-runtime.js";
 
 const { Pool } = pg;
 
@@ -23,6 +24,7 @@ export function createPostgresDeviceSessionStore({
     application_name: "zenaian-extension-auth",
   });
   const ownsPool = !pool;
+  if (ownsPool) observePostgresPool(database, "extension-auth");
 
   return {
     async initialize() {

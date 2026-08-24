@@ -32,6 +32,130 @@ test("custom context supplements rather than replaces the default prompt", () =>
   assert.match(prompt, /Capture mode: capture-full-screen/);
 });
 
+test("streams the large image field without changing the xAI JSON payload", async () => {
+  const originalFetch = globalThis.fetch;
+  const imageDataUrl = `data:image/jpeg;base64,${"A".repeat(128 * 1024)}`;
+  let observedLength = 0;
+  globalThis.fetch = async (_url, options) => {
+    assert.equal(options.duplex, "half");
+    const chunks = [];
+    for await (const chunk of options.body) chunks.push(Buffer.from(chunk));
+    const body = Buffer.concat(chunks);
+    observedLength = body.length;
+    assert.equal(Number(options.headers["Content-Length"]), body.length);
+    const payload = JSON.parse(body.toString("utf8"));
+    assert.equal(payload.input[0].content[0].image_url, imageDataUrl);
+    return Response.json({
+      id: "resp_stream123456",
+      model: "grok-test",
+      output: [{
+        content: [{
+          type: "output_text",
+          text: '{"status":"answered","answers":["C"]}',
+        }],
+      }],
+    });
+  };
+
+  try {
+    const result = await analyzeScreenshot({
+      apiKey: "xai-test-key",
+      model: "grok-test",
+      timeoutMs: 1000,
+      imageDataUrl,
+      instruction: "Keep this placeholder literal: __ZENAIAN_STREAMED_IMAGE_DATA_URL__",
+      shortcutName: "capture-full-screen",
+      mockMode: false,
+    });
+    assert.deepEqual(result.answers, ["C"]);
+    assert.ok(observedLength > imageDataUrl.length);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("paces concurrent upstream starts below the configured xAI burst limit", async () => {
+  const originalFetch = globalThis.fetch;
+  const starts = [];
+  globalThis.fetch = async () => {
+    starts.push(Date.now());
+    return Response.json({
+      id: "resp_paced123456",
+      model: "grok-rate-probe",
+      output: [{
+        content: [{
+          type: "output_text",
+          text: '{"status":"answered","answers":["A"]}',
+        }],
+      }],
+    });
+  };
+  const input = {
+    apiKey: "xai-test-key",
+    model: "grok-rate-probe",
+    timeoutMs: 2000,
+    imageDataUrl: "data:image/jpeg;base64,/9j/2Q==",
+    instruction: "",
+    shortcutName: "",
+    mockMode: false,
+    maxStartsPerSecond: 10,
+  };
+
+  try {
+    await Promise.all([
+      analyzeScreenshot(input),
+      analyzeScreenshot(input),
+      analyzeScreenshot(input),
+    ]);
+    assert.equal(starts.length, 3);
+    assert.ok(starts[2] - starts[0] >= 180);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("coordinates provider Retry-After across retries for the same model", async () => {
+  const originalFetch = globalThis.fetch;
+  const starts = [];
+  globalThis.fetch = async () => {
+    starts.push(Date.now());
+    if (starts.length === 1) {
+      return Response.json(
+        { error: { message: "slow down" } },
+        { status: 429, headers: { "Retry-After": "1.1" } },
+      );
+    }
+    return Response.json({
+      id: "resp_retry_after_123456",
+      model: "grok-retry-after-probe",
+      output: [{
+        content: [{
+          type: "output_text",
+          text: '{"status":"answered","answers":["B"]}',
+        }],
+      }],
+    });
+  };
+
+  try {
+    const result = await analyzeScreenshot({
+      apiKey: "xai-test-key",
+      model: "grok-retry-after-probe",
+      timeoutMs: 3000,
+      imageDataUrl: "data:image/jpeg;base64,/9j/2Q==",
+      instruction: "",
+      shortcutName: "",
+      mockMode: false,
+      maxStartsPerSecond: 30,
+    });
+    assert.deepEqual(result.answers, ["B"]);
+    assert.equal(starts.length, 2);
+    assert.ok(starts[1] - starts[0] >= 1050);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("maps upstream credential failures to a redacted gateway error class", async () => {
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async () =>
