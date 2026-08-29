@@ -104,6 +104,8 @@ test(
       try {
         integrationPhase = "initialize restricted billing store";
         await store.initialize();
+        integrationPhase = "verify distributed admission";
+        await verifyDistributedAdmission(scopedUrl);
         integrationPhase = "verify atomic quota";
         await verifyAtomicQuota(store);
         integrationPhase = "verify checkout and membership mapping";
@@ -557,6 +559,97 @@ async function verifyCheckoutAndMembershipMapping(store, connectionString) {
     orphaned,
     { duplicate: false, applied: false, quarantined: true },
   );
+}
+
+async function verifyDistributedAdmission(connectionString) {
+  const stores = [0, 1].map(() => createPostgresBillingStore({
+    connectionString,
+    providerMode: "test",
+    poolMax: 3,
+    connectionTimeoutMs: 5_000,
+    statementTimeoutMs: 10_000,
+    globalConcurrentReservationLimit: 2,
+    globalStartsPerMinuteLimit: 300,
+    reservationTtlMs: 300_000,
+  }));
+  const periodFor = (index) => ({
+    key: `plus:distributed-${index}`,
+    allowance: 20,
+    model: "grok-4.5",
+    startsAt: new Date("2026-08-29T00:00:00.000Z"),
+    endsAt: new Date("2026-09-29T00:00:00.000Z"),
+  });
+  const attempts = Array.from({ length: 3 }, (_, index) => ({
+    store: stores[index % stores.length],
+    userId: `user_DistributedTester12${index}`,
+    operationId: randomUUID(),
+    planId: "plus",
+    model: "grok-4.5",
+    period: periodFor(index),
+  }));
+
+  try {
+    const concurrency = await Promise.allSettled(
+      attempts.map(({ store, ...input }) => store.reserveUsage(input)),
+    );
+    const admitted = concurrency.flatMap((result, index) =>
+      result.status === "fulfilled" ? [{ ...attempts[index], result: result.value }] : []
+    );
+    const rejected = concurrency.filter((result) => result.status === "rejected");
+    assert.equal(admitted.length, 2);
+    assert.equal(rejected.length, 1);
+    assert.equal(rejected[0].reason.code, "ANALYSIS_GLOBAL_CAPACITY_REACHED");
+    await Promise.all(admitted.map(({ store, userId, result }) =>
+      store.releaseUsage(result.operationId, userId)
+    ));
+
+    const rateLimitedStore = createPostgresBillingStore({
+      connectionString,
+      providerMode: "test",
+      poolMax: 3,
+      connectionTimeoutMs: 5_000,
+      statementTimeoutMs: 10_000,
+      globalConcurrentReservationLimit: 10,
+      globalStartsPerMinuteLimit: 4,
+      reservationTtlMs: 300_000,
+    });
+    try {
+      const first = await rateLimitedStore.reserveUsage({
+        userId: "user_DistributedRate1230",
+        operationId: randomUUID(),
+        planId: "plus",
+        model: "grok-4.5",
+        period: periodFor(10),
+      });
+      const second = await rateLimitedStore.reserveUsage({
+        userId: "user_DistributedRate1231",
+        operationId: randomUUID(),
+        planId: "plus",
+        model: "grok-4.5",
+        period: periodFor(11),
+      });
+      await assert.rejects(
+        rateLimitedStore.reserveUsage({
+          userId: "user_DistributedRate1232",
+          operationId: randomUUID(),
+          planId: "plus",
+          model: "grok-4.5",
+          period: periodFor(12),
+        }),
+        (error) =>
+          error.code === "ANALYSIS_GLOBAL_RATE_LIMITED" &&
+          error.retryAfterSeconds >= 1,
+      );
+      await Promise.all([
+        rateLimitedStore.releaseUsage(first.operationId, "user_DistributedRate1230"),
+        rateLimitedStore.releaseUsage(second.operationId, "user_DistributedRate1231"),
+      ]);
+    } finally {
+      await rateLimitedStore.close();
+    }
+  } finally {
+    await Promise.allSettled(stores.map((store) => store.close()));
+  }
 }
 
 async function verifyDeletedCheckoutTombstone(store, connectionString) {

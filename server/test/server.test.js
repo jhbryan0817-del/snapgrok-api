@@ -217,7 +217,7 @@ test("health endpoint reveals no secret configuration", async () => {
     );
     assert.deepEqual(await response.json(), {
       ok: true,
-      version: "6.4.0",
+      version: "6.5.0",
       service: "zenaian-api",
       authRequired: true,
       persistentRequestStorage: false,
@@ -226,14 +226,62 @@ test("health endpoint reveals no secret configuration", async () => {
       privacyControls: false,
       privacyReady: false,
       maintenance: { status: "disabled" },
+      readiness: {
+        status: "ready",
+        lifecycle: "ready",
+        database: { status: "disabled" },
+      },
       capacity: {
         status: "normal",
         currentLimit: 40,
         maximumLimit: 40,
         pressureReason: "none",
+        coordination: "instance",
       },
     });
   });
+});
+
+test("health fails closed after the cached database readiness probe degrades", async () => {
+  const config = testConfig();
+  config.databaseUrl = "postgresql://runtime:password@database/zenaian";
+  config.databaseReadinessIntervalMs = 10;
+  config.databaseReadinessFailureThreshold = 1;
+  let probes = 0;
+  const pool = {
+    totalCount: 1,
+    idleCount: 1,
+    waitingCount: 0,
+    async query() {
+      probes += 1;
+      if (probes === 1) return { rows: [{ ready: 1 }] };
+      throw Object.assign(new Error("private database detail"), { code: "57P01" });
+    },
+  };
+  const server = createSnapGrokServer({
+    config,
+    mainDatabasePool: pool,
+    authenticate: async () => ({ userId: "user_test", sessionId: "sess_test" }),
+    analyze: async () => ({ status: "answered", answers: ["A"] }),
+  });
+  await server.initializeReadiness();
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+
+  try {
+    await new Promise((resolve) => setTimeout(resolve, 35));
+    const address = server.address();
+    const response = await fetch(`http://127.0.0.1:${address.port}/api/health`);
+    const body = await response.json();
+    assert.equal(response.status, 503);
+    assert.equal(body.ok, false);
+    assert.equal(body.readiness.status, "degraded");
+    assert.equal(body.readiness.database.status, "degraded");
+    assert.doesNotMatch(JSON.stringify(body), /private database detail/);
+  } finally {
+    server.close();
+    await once(server, "close");
+  }
 });
 
 test("adaptive pressure lowers analysis admission without blocking health", async () => {
@@ -274,6 +322,7 @@ test("adaptive pressure lowers analysis admission without blocking health", asyn
       currentLimit: 1,
       maximumLimit: 2,
       pressureReason: "database_wait",
+      coordination: "instance",
     });
     releaseAnalysis();
     assert.equal((await first).status, 200);
@@ -1128,6 +1177,40 @@ test("Whop webhook route requires and forwards all Standard Webhooks headers", a
   );
 });
 
+test("billing webhook abuse is bounded before signature work repeats", async () => {
+  const config = billingRouteConfig();
+  config.webhookRateLimitMaxRequests = 1;
+  const options = {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "webhook-id": "msg_webhook123456",
+      "webhook-timestamp": "1785153600",
+      "webhook-signature": "v1,AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+    },
+    body: '{"type":"membership.activated"}',
+  };
+  await withServer(
+    {
+      config,
+      billing: billingStub({
+        async handleWebhook() {
+          return { accepted: true, duplicate: false, applied: false };
+        },
+      }),
+    },
+    async (baseUrl) => {
+      assert.equal(
+        (await fetch(`${baseUrl}/api/billing/webhook`, options)).status,
+        200,
+      );
+      const limited = await fetch(`${baseUrl}/api/billing/webhook`, options);
+      assert.equal(limited.status, 429);
+      assert.equal((await limited.json()).code, "WEBHOOK_RATE_LIMITED");
+    },
+  );
+});
+
 test("analyze reserves and consumes exactly one quota operation", async () => {
   const calls = [];
   await withServer(
@@ -1647,6 +1730,18 @@ test("security-sensitive configuration fails closed on typos", () => {
     () => createConfig({ PERFORMANCE_LOGS_ENABLED: "maybe" }),
     /PERFORMANCE_LOGS_ENABLED must be true or false/,
   );
+});
+
+test("production capacity defaults are bounded and database coordinated", () => {
+  const config = createConfig();
+  assert.equal(config.maxRequestBytes, 2 * 1024 * 1024);
+  assert.equal(config.maxConcurrentRequestsGlobal, 40);
+  assert.equal(config.maxDistributedConcurrentAnalyses, 40);
+  assert.equal(config.maxDistributedAnalysisStartsPerMinute, 300);
+  assert.equal(config.adaptiveSampleIntervalMs, 250);
+  assert.equal(config.adaptivePressureSamples, 3);
+  assert.equal(config.shutdownTimeoutMs, 25000);
+  assert.equal(config.webhookRateLimitMaxRequests, 60);
 });
 
 test("production configuration forbids mock inference and HTTP origins", () => {

@@ -1,4 +1,4 @@
-# Zenaian API v6.4.0
+# Zenaian API v6.5.0
 
 Render-ready API with production Clerk authentication, exact-origin CORS,
 PostgreSQL quotas, server-created Whop checkout, signed webhook
@@ -36,6 +36,16 @@ analysis drain during shutdown. Extension v5.9 targets oversized images to 512
 KiB using WebP and retries only transient capacity responses. See
 [CAPACITY.md](CAPACITY.md) for the evidence, independent bottlenecks, probe
 command, and production rollout criteria.
+
+v6.5.0 hardens that candidate capacity for production rollout. Billing-backed
+analysis reservations now take a PostgreSQL transaction advisory lock and
+enforce shared concurrent/start-rate limits across API instances. The default
+request ceiling is reduced from 15 MiB to 2 MiB, adaptive pressure is sampled
+every 250 ms, the health endpoint includes cached database readiness, invalid
+webhook bursts are bounded before repeated signature work, shutdown has an
+explicit 25-second application budget, and Render is pinned to Node 22.13.1.
+These controls do not make the transient analysis-job registry durable; see
+[CAPACITY.md](CAPACITY.md) before enabling more than one API instance.
 
 ## API routes
 
@@ -85,7 +95,8 @@ command, and production rollout criteria.
   validate timestamp, event, company, product, plan, resource, and Clerk
   checkout mapping.
 - PostgreSQL transactions reserve and settle quota atomically across API
-  processes.
+  processes. In billing modes, the same transaction also serializes global
+  admission across instances and enforces a shared starts-per-minute cost cap.
 - In-memory per-user/global limits remain abuse guards, not subscription
   quotas.
 - New Whop checkout configurations contain no Clerk ID, email, local checkout
@@ -118,13 +129,16 @@ Health Check: /api/health
 Node: 22.13.1
 ```
 
-The v6.4 capacity defaults are intentionally conservative for the current
+The v6.5 capacity defaults are intentionally conservative for the current
 single Render Starter instance (0.5 CPU, 512 MiB RAM). Forty is a hard maximum;
 adaptive admission can temporarily lower it to protect latency:
 
 ```text
 MAX_CONCURRENT_REQUESTS_GLOBAL=40
+DISTRIBUTED_MAX_CONCURRENT_ANALYSES=40
+DISTRIBUTED_MAX_ANALYSIS_STARTS_PER_MINUTE=300
 MAX_ACTIVE_ANALYSIS_MB=96
+MAX_REQUEST_MB=2
 XAI_MAX_STARTS_PER_SECOND=30
 ANALYSIS_POLL_WAIT_MS=5000
 EXTENSION_SESSION_TOUCH_INTERVAL_MS=60000
@@ -136,14 +150,21 @@ ADAPTIVE_RECOVERY_MS=30000
 ADAPTIVE_RSS_LIMIT_MB=358
 ADAPTIVE_EVENT_LOOP_P99_MS=100
 ADAPTIVE_DATABASE_WAITING_THRESHOLD=2
+ADAPTIVE_SAMPLE_INTERVAL_MS=250
+ADAPTIVE_PRESSURE_SAMPLES=3
+DATABASE_READINESS_INTERVAL_MS=10000
+DATABASE_READINESS_FAILURE_THRESHOLD=2
+WEBHOOK_RATE_LIMIT_MAX_REQUESTS=60
+WEBHOOK_MAX_CONCURRENT_REQUESTS=10
+SHUTDOWN_TIMEOUT_MS=25000
 ```
 
 These values are application guards, not a throughput SLA. The supplied xAI
 account export reports Grok 4.3 at 37 starts/second and Grok 4.5 at 150
 starts/second, so the 30/second local gate is conservative for that team; the
 production API key's team association remains unverified. `/api/health` exposes
-only aggregate adaptive status and limits; content-free performance logs add
-RSS, event-loop, and database-pool evidence. Follow the staged canary in
+only aggregate readiness/adaptive status and limits; content-free performance
+logs add RSS, event-loop, and database-pool evidence. Follow the staged canary in
 [CAPACITY.md](CAPACITY.md) before keeping 40 under load or increasing it. The
 isolated probe supports 80 only as laboratory headroom, not as a production
 setting.

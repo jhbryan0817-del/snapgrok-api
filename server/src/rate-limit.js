@@ -42,12 +42,16 @@ export class UserRateLimiter {
           ? "The analysis service is busy. Please try again shortly."
           : this.scope === "account"
             ? "Another account operation is already running. Please try again shortly."
+            : this.scope === "webhook"
+              ? "The billing webhook is busy. Please retry shortly."
           : "You already have the maximum number of analyses running.",
         1,
         this.scope === "global"
           ? "GLOBAL_CONCURRENCY_LIMITED"
           : this.scope === "account"
             ? "ACCOUNT_OPERATION_BUSY"
+            : this.scope === "webhook"
+              ? "WEBHOOK_CONCURRENCY_LIMITED"
           : "RATE_LIMITED",
       );
     }
@@ -62,12 +66,16 @@ export class UserRateLimiter {
           ? "The analysis service is receiving too many requests. Please try again shortly."
           : this.scope === "account"
             ? "Too many account operations were requested. Please wait and try again."
+            : this.scope === "webhook"
+              ? "Too many webhook deliveries were received. Please retry shortly."
           : "Too many analyses were requested. Please wait and try again.",
         retryAfterSeconds,
         this.scope === "global"
           ? "GLOBAL_RATE_LIMITED"
           : this.scope === "account"
             ? "ACCOUNT_RATE_LIMITED"
+            : this.scope === "webhook"
+              ? "WEBHOOK_RATE_LIMITED"
             : "RATE_LIMITED",
       );
     }

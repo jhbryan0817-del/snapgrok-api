@@ -117,6 +117,58 @@ test("pending deleted-checkout terminations are bounded and de-identified", asyn
   assert.doesNotMatch(observedSql, /clerk_user_id|email/i);
 });
 
+test("database-coordinated analysis admission fails closed at shared capacity", async () => {
+  const queries = [];
+  const store = createPostgresBillingStore({
+    pool: scriptedPool((sql) => {
+      queries.push(sql);
+      if (sql.startsWith("SELECT operation_id")) return { rows: [] };
+      if (sql.startsWith("SELECT count(*)::integer AS active")) {
+        return { rows: [{ active: 1 }] };
+      }
+      return { rows: [] };
+    }),
+    providerMode: "live",
+    globalConcurrentReservationLimit: 1,
+  });
+
+  await assert.rejects(
+    store.reserveUsage(analysisReservationInput()),
+    (error) =>
+      error.status === 429 &&
+      error.code === "ANALYSIS_GLOBAL_CAPACITY_REACHED" &&
+      error.retryAfterSeconds === 1,
+  );
+  assert.ok(queries.some((sql) => sql.includes("pg_advisory_xact_lock")));
+  assert.ok(queries.some((sql) => sql === "ROLLBACK"));
+  assert.ok(!queries.some((sql) => sql.startsWith("INSERT INTO billing_usage_periods")));
+});
+
+test("database-coordinated start budget returns a bounded retry interval", async () => {
+  const store = createPostgresBillingStore({
+    pool: scriptedPool((sql) => {
+      if (sql.startsWith("SELECT operation_id")) return { rows: [] };
+      if (sql.startsWith("SELECT count(*)::integer AS active")) {
+        return { rows: [{ active: 0 }] };
+      }
+      if (sql.startsWith("WITH admitted AS")) {
+        return { rows: [{ admitted: false, retry_after_seconds: 17 }] };
+      }
+      return { rows: [] };
+    }),
+    providerMode: "live",
+    globalStartsPerMinuteLimit: 1,
+  });
+
+  await assert.rejects(
+    store.reserveUsage(analysisReservationInput()),
+    (error) =>
+      error.status === 429 &&
+      error.code === "ANALYSIS_GLOBAL_RATE_LIMITED" &&
+      error.retryAfterSeconds === 17,
+  );
+});
+
 test("checkout and quota transactions fail closed for a deletion-blocked user", async () => {
   const queries = [];
   const store = createPostgresBillingStore({
@@ -913,6 +965,21 @@ function paymentStateInput(overrides = {}) {
     checkoutIntentId: "",
     accessState: "revoked",
     ...overrides,
+  };
+}
+
+function analysisReservationInput() {
+  return {
+    userId: "user_AdmissionTester123",
+    operationId: "11111111-1111-4111-8111-111111111111",
+    planId: "plus",
+    model: "grok-4.5",
+    period: {
+      key: "plus:admission-test",
+      allowance: 20,
+      startsAt: new Date("2026-08-29T00:00:00.000Z"),
+      endsAt: new Date("2026-09-29T00:00:00.000Z"),
+    },
   };
 }
 

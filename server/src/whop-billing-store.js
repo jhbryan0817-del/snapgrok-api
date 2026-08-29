@@ -17,6 +17,9 @@ export function createPostgresBillingStore({
   poolMax = 10,
   connectionTimeoutMs = 5000,
   statementTimeoutMs = 10000,
+  globalConcurrentReservationLimit = 40,
+  globalStartsPerMinuteLimit = 300,
+  reservationTtlMs = 300000,
   deletionGuard = null,
 }) {
   if (!pool && !connectionString) {
@@ -27,6 +30,15 @@ export function createPostgresBillingStore({
   }
   if (deletionGuard != null && typeof deletionGuard !== "function") {
     throw new Error("Whop billing deletionGuard must be a function.");
+  }
+  for (const [name, value] of [
+    ["globalConcurrentReservationLimit", globalConcurrentReservationLimit],
+    ["globalStartsPerMinuteLimit", globalStartsPerMinuteLimit],
+    ["reservationTtlMs", reservationTtlMs],
+  ]) {
+    if (!Number.isSafeInteger(value) || value < 1) {
+      throw new Error(`${name} must be a positive safe integer.`);
+    }
   }
 
   const database = pool || new Pool({
@@ -317,6 +329,12 @@ export function createPostgresBillingStore({
         if (existing.rows[0]) {
           throw existingOperationError(existing.rows[0], userId);
         }
+
+        await enforceDistributedAnalysisAdmission(client, {
+          globalConcurrentReservationLimit,
+          globalStartsPerMinuteLimit,
+          reservationTtlMs,
+        });
 
         const periodId = randomUUID();
         const periodResult = await client.query(
@@ -2189,6 +2207,86 @@ async function upsertPaymentHistory(
 
 function nullableIdMatches(existing, next) {
   return !existing || !next || existing === next;
+}
+
+async function enforceDistributedAnalysisAdmission(client, {
+  globalConcurrentReservationLimit,
+  globalStartsPerMinuteLimit,
+  reservationTtlMs,
+}) {
+  // Every API instance connected to this database takes the same short-lived
+  // transaction lock before it creates a reservation. This turns the existing
+  // billing reservation table into an atomic, cross-instance admission gate
+  // without persisting screenshots, prompts, or model responses.
+  await client.query(
+    "SELECT pg_advisory_xact_lock(hashtext($1))",
+    ["zenaian:analysis-admission:v1"],
+  );
+  const result = await client.query(
+    `SELECT count(*)::integer AS active
+     FROM billing_analysis_usage
+     WHERE state = 'reserved'
+       AND created_at >= now() - ($1::bigint * interval '1 millisecond')`,
+    [reservationTtlMs],
+  );
+  const active = Number(result.rows[0]?.active) || 0;
+  if (active >= globalConcurrentReservationLimit) {
+    throw distributedAdmissionError(
+      "The analysis service is at its shared capacity. Please try again shortly.",
+      "ANALYSIS_GLOBAL_CAPACITY_REACHED",
+      1,
+    );
+  }
+
+  // A synthetic, non-user usage-period row is the durable minute bucket. Its
+  // existing unique key makes this update atomic and indexed without adding a
+  // new production migration. Normal retention cleanup removes expired buckets.
+  const starts = await client.query(
+    `WITH admitted AS (
+       INSERT INTO billing_usage_periods (
+         id, clerk_user_id, period_key, plan_id, allowance, consumed,
+         starts_at, ends_at
+       ) VALUES (
+         $1, '__zenaian_global_admission__',
+         'global-analysis:' ||
+           floor(extract(epoch FROM current_timestamp) / 60)::bigint::text,
+         'ultra', $2, 1,
+         date_trunc('minute', current_timestamp),
+         date_trunc('minute', current_timestamp) + interval '1 minute'
+       )
+       ON CONFLICT (clerk_user_id, period_key)
+       DO UPDATE SET
+         allowance = EXCLUDED.allowance,
+         consumed = billing_usage_periods.consumed + 1,
+         updated_at = current_timestamp
+       WHERE billing_usage_periods.consumed < EXCLUDED.allowance
+       RETURNING consumed
+     )
+     SELECT EXISTS(SELECT 1 FROM admitted) AS admitted,
+            GREATEST(
+              1,
+              ceil(extract(epoch FROM (
+                date_trunc('minute', current_timestamp) + interval '1 minute' -
+                current_timestamp
+              )))::integer
+            ) AS retry_after_seconds`,
+    [randomUUID(), globalStartsPerMinuteLimit],
+  );
+  if (!starts.rows[0]?.admitted) {
+    throw distributedAdmissionError(
+      "The analysis service has reached its shared start-rate limit. Please try again shortly.",
+      "ANALYSIS_GLOBAL_RATE_LIMITED",
+      Number(starts.rows[0]?.retry_after_seconds) || 60,
+    );
+  }
+}
+
+function distributedAdmissionError(message, code, retryAfterSeconds) {
+  return Object.assign(new Error(message), {
+    status: 429,
+    code,
+    retryAfterSeconds,
+  });
 }
 
 function mapUsagePeriod(row) {

@@ -1,13 +1,13 @@
 # Zenaian capacity and reliability
 
-Last measured: 2026-08-24
+Last measured: 2026-08-29
 
 ## Decision
 
-Use **40 concurrent analyses** as the hard code-level maximum for the current
-single Render Starter instance. Production is still running v6.3 with an
-effective limit of 20; that number is an application setting, not a Node.js or
-Render limit. The v6.4 default is protected by a separate **96 MiB aggregate
+Use **40 concurrent analyses** as the candidate hard code-level maximum for the
+current single Render Starter instance. Production is running v6.4 with that
+configured maximum; the number is an application setting, not a Node.js or
+Render guarantee. The v6.5 default is protected by a separate **96 MiB aggregate
 request-body budget** and an **adaptive 10-40 admission window**, so concurrency
 automatically falls when screenshots are large or sustained runtime pressure is
 detected.
@@ -18,8 +18,9 @@ or 240 per minute. This describes requests from different users because each
 user remains limited to one active analysis. It is not a production SLA:
 Render CPU, actual screenshot sizes, xAI latency and rate limits, Clerk, and
 PostgreSQL can each reduce the observed value. The best current code-only
-estimate is therefore **40 production-ready, 80 laboratory headroom for
-ordinary payloads**. There is not enough evidence to advertise 80 or higher.
+estimate is therefore **40 as a guarded release candidate, with 80 only as
+laboratory headroom for ordinary payloads**. There is not enough live evidence
+to advertise 40 as an SLA or to configure 80 or higher.
 
 Do not set the count to 80 in production merely because the small-payload probe
 completed at 80. That test established headroom and failure behavior; it did
@@ -67,6 +68,25 @@ xAI limits, or other traffic on the deployed Render service.
   KiB binary-image target and retries only transient capacity responses with
   bounded jitter. Authentication, quota, and invalid-request failures are never
   retried.
+- v6.5 reduces `MAX_REQUEST_MB` from 15 to 2. The 512 KiB extension target still
+  has ample headroom, while one request can no longer block the event loop with
+  a near-15 MiB JSON/base64 parse.
+- Billing-backed reservations now take one PostgreSQL transaction advisory lock
+  and enforce `DISTRIBUTED_MAX_CONCURRENT_ANALYSES` plus
+  `DISTRIBUTED_MAX_ANALYSIS_STARTS_PER_MINUTE` across every API process sharing
+  the database. No screenshot, prompt, answer, or model response is added to
+  PostgreSQL.
+- Cached `SELECT 1` probes make `/api/health` fail closed after repeated database
+  failures without running a database query on every platform health request.
+- Adaptive pressure sampling now defaults to 250 ms, so three sustained samples
+  reduce admission in roughly 750 ms instead of roughly three seconds. A sample
+  at 125% of the event-loop threshold, twice the database threshold, or 110% of
+  the RSS threshold sheds capacity immediately so a short severe spike is not
+  missed.
+- The signed billing webhook has a dedicated 60/minute, 10-concurrent process
+  guard before repeated signature verification and JSON work.
+- The API runtime is pinned to Node 22.13.1 and uses an explicit 25-second
+  shutdown budget inside Render's default 30-second termination window.
 
 ## Isolated load-test evidence
 
@@ -91,6 +111,20 @@ Measured results on the development machine:
 | 40 × 2 MiB, 1 s inference | 40/40 | 2.57 s | 208.46 MiB | 114.10 ms | 80 |
 | 80 × 512 KiB, 1 s inference | 80/80 | 3.88 s | 151.82 MiB | 38.63 ms | 160 |
 | 80 × 2 MiB, 1 s inference | 48/48; 32 safe 429s | 3.00 s | 210.68 MiB | 127.60 ms | 128 |
+
+The v6.5 regression run on 2026-08-29 used the new 2 MiB request ceiling and
+250 ms adaptive sampler:
+
+| Scenario | Accepted/completed | Safe rejections | Duration | Peak server RSS | p99 event-loop delay | Final adaptive limit |
+|---|---:|---:|---:|---:|---:|---:|
+| 40 × 512 KiB, 10 s inference | 40/40 | 0 | 11.91 s | 111.56 MiB | 27.87 ms | 40 |
+| 40 × 1.5 MiB, 1 s inference | 40/40 | 0 | 2.51 s | 164.57 MiB | 142.21 ms | 30 |
+| 50 × 512 KiB, 1 s inference; max 40 | 40/40 | 10 | 2.55 s | 112.30 MiB | 104.01 ms | 40 |
+
+The 1.5 MiB burst completed cleanly, but its short event-loop spike triggered
+the new severe-pressure path and reduced later admission from 40 to 30 for the
+cooldown. The overload run rejected the ten excess submissions immediately;
+none failed after admission.
 
 Before the memory/serialization changes, the equivalent 40 × 2 MiB, 1-second
 probe peaked at 297.54 MiB RSS. The optimized run above peaked at 208.46 MiB,
@@ -135,37 +169,44 @@ do not tune the byte budget up to the Render memory limit.
    revocation-sensitive behavior is unchanged. Long polling and touch
    coalescing reduce amplification but do not remove this dependency.
 5. **Quotas and abuse guards.** Each user gets one concurrent analysis and ten
-   starts per minute by default. The global request window, billing reservation,
-   and provider quota can reject work before compute is the bottleneck.
+   starts per minute by default. The global request window, database-coordinated
+   billing reservation, shared 300 starts/minute breaker, and provider quota can
+   reject work before compute is the bottleneck.
 6. **Payload distribution.** A count-only limit is unsafe for base64 images.
-   The weighted budget means a near-15 MiB request can allow only about six
-   simultaneous bodies, whereas sub-1 MiB captures usually reach the count cap.
+   v6.5 rejects requests above 2 MiB, so 40 maximum-size request bodies fit under
+   the 96 MiB weighted budget with margin; sub-1 MiB captures normally reach the
+   count cap first.
+7. **Transient job ownership.** Analysis job state and terminal results remain
+   process-local so screenshots and answers are never persisted. Database-backed
+   admission is now multi-instance safe, but polling is not: a request routed to
+   another instance cannot find the original job, and a process loss cannot
+   resume it. Keep one API instance until a privacy-reviewed shared transient
+   queue/result store is introduced.
 
 ## Authenticated production snapshot
 
-The following read-only evidence was collected from Render on 2026-08-24. No
+The following read-only evidence was collected from Render through 2026-08-29. No
 production load was generated and no configuration was changed.
 
 - The API is one Starter web-service instance: 0.5 CPU, 512 MiB RAM,
   autoscaling disabled. Its root is `server`, health path is `/api/health`, and
   deploys occur after GitHub CI passes.
-- The deployed backend revision is v6.3-era code with no capacity environment
-  overrides. Its startup log confirms 20 analysis slots and 20 control-plane
+- The deployed backend revision is v6.4.0 (`4df2af3`) with 40 analysis slots,
+  a 96 MiB weighted request budget, adaptive admission, and 80 control-plane
   slots.
 - Render recorded 796 HTTP requests in the preceding seven days. Memory was
   ordinarily about 60-100 MiB and briefly about 120-130 MiB around a deploy.
   CPU was effectively idle at this traffic level. There was no observed OOM or
   runtime-restart pattern.
-- Thirteen content-free `analysis_performance` records all completed and all
-  began at active concurrency one. End-to-end latency was 3.67 s at p50,
-  5.97 s at p90, and 8.25 s at the sample maximum/p95. The corresponding JSON
-  request sizes were about 99 KiB at p50, 304 KiB at p90, and 512 KiB at the
-  sample maximum/p95. Non-xAI work took only 7-28 ms, so provider time dominated.
+- Eight post-v6.4 content-free `analysis_performance` records all completed and
+  all began at active concurrency one. End-to-end latency ranged from 3.45 s to
+  24.63 s; the slow sample spent 24.33 s in xAI. Request sizes ranged from about
+  65 KiB to 329 KiB. Non-xAI work stayed below 552 ms, so provider time dominated.
 - At 40 active analyses, those observed latency points imply only a theoretical
   roughly 4.8-10.9 completions/second before other bottlenecks. At the user's
   ten-second assumption, the simpler bound is four/second. Neither is an SLA.
-- One provider quota-exhausted 429 was visible. There was no concurrent burst in
-  the sample, so it does not establish the load threshold.
+- There were no post-v6.4 5xx responses, app errors, adaptive-pressure events,
+  or 429s. This clean but low-volume sample does not establish the load threshold.
 - The main and deletion-ledger PostgreSQL services are each Basic-256mb
   instances with 0.1 CPU and 256 MiB RAM. The main database's documented
   connection limit is 100, while the optimized API can open at most 14
@@ -184,7 +225,7 @@ No production load test should be run without an agreed maintenance window and
 test accounts because it would consume real model quota and exercise live
 Clerk and database state. Use this rollout instead:
 
-1. Deploy the v6.4 server and v5.9 extension with the defaults listed in README.
+1. Deploy the v6.5 server and v5.9 extension with the defaults listed in README.
    Do not increase the 96 MiB byte budget during this canary.
 2. Confirm from the first deployed startup log that all capacity values are active.
    If the production key reports a lower provider limit than the supplied team
