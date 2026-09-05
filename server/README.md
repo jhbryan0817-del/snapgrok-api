@@ -1,4 +1,4 @@
-# Zenaian API v6.5.0
+# Zenaian API v6.5.1
 
 Render-ready API with production Clerk authentication, exact-origin CORS,
 PostgreSQL quotas, server-created Whop checkout, signed webhook
@@ -47,10 +47,15 @@ explicit 25-second application budget, and Render is pinned to Node 22.13.1.
 These controls do not make the transient analysis-job registry durable; see
 [CAPACITY.md](CAPACITY.md) before enabling more than one API instance.
 
+v6.5.1 accepts both Whop's documented literal webhook secret and the
+Standard Webhooks `whsec_` serialization, adds a process-only Render liveness
+endpoint, and gives harmless crawler requests explicit public responses.
+
 ## API routes
 
 | Route | Authentication | Purpose |
 |---|---|---|
+| `GET /api/live` | Public | Process liveness for Render; independent of database and privacy maintenance readiness |
 | `GET /api/health` | Public | Redacted health/version metadata |
 | `POST /api/extension/pairings` | Clerk + exact website origin | Create a one-time extension pairing grant |
 | `POST /api/extension/pairings/exchange` | Exact extension origin + one-time grant | Create an extension-bound device session |
@@ -91,8 +96,9 @@ These controls do not make the transient analysis-job registry durable; see
   provider IDs, model IDs, allowance, or entitlement.
 - Retired plan IDs are recognition-only allowlists. They can reconcile existing
   records but can never be selected by the checkout endpoint.
-- Webhooks use Standard Webhooks verification before parsing and then strictly
-  validate timestamp, event, company, product, plan, resource, and Clerk
+- Webhooks use Standard Webhooks verification before parsing, support both
+  Whop's documented literal secret and serialized `whsec_` key derivation, and
+  strictly validate timestamp, event, company, product, plan, resource, and Clerk
   checkout mapping.
 - PostgreSQL transactions reserve and settle quota atomically across API
   processes. In billing modes, the same transaction also serializes global
@@ -125,7 +131,7 @@ These controls do not make the transient analysis-job registry durable; see
 Root Directory: server
 Build Command: npm ci --ignore-scripts
 Start Command: npm start
-Health Check: /api/health
+Health Check: /api/live
 Node: 22.13.1
 ```
 

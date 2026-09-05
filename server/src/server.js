@@ -1119,6 +1119,24 @@ export function createZenaianServer({
       }
 
       try {
+        if (request.method === "GET" && url.pathname === "/api/live") {
+          const live = lifecycleState === "ready";
+          sendJson(
+            config,
+            request,
+            response,
+            live ? 200 : 503,
+            {
+              ok: live,
+              service: "zenaian-api",
+              version: serviceVersion,
+              lifecycle: lifecycleState,
+            },
+            requestId,
+          );
+          return;
+        }
+
         if (request.method === "GET" && url.pathname === "/api/health") {
           const maintenance = publicPrivacyMaintenance(
             privacyService,
@@ -1160,6 +1178,51 @@ export function createZenaianServer({
             },
             requestId,
           );
+          return;
+        }
+
+        if (
+          (request.method === "GET" || request.method === "HEAD") &&
+          url.pathname === "/"
+        ) {
+          sendJson(
+            config,
+            request,
+            response,
+            200,
+            {
+              ok: true,
+              service: "zenaian-api",
+              health: "/api/health",
+            },
+            requestId,
+          );
+          return;
+        }
+
+        if (
+          (request.method === "GET" || request.method === "HEAD") &&
+          url.pathname === "/robots.txt"
+        ) {
+          sendText(
+            config,
+            request,
+            response,
+            200,
+            "User-agent: *\nDisallow: /\n",
+            requestId,
+            { "Cache-Control": "public, max-age=86400" },
+          );
+          return;
+        }
+
+        if (
+          (request.method === "GET" || request.method === "HEAD") &&
+          url.pathname === "/favicon.ico"
+        ) {
+          setCommonHeaders(config, request, response, requestId);
+          response.writeHead(204, { "Cache-Control": "public, max-age=86400" });
+          response.end();
           return;
         }
 
@@ -2900,7 +2963,26 @@ function sendJson(config, request, response, status, body, requestId, headers = 
     }
   }
   response.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
-  response.end(JSON.stringify(body));
+  response.end(request.method === "HEAD" ? undefined : JSON.stringify(body));
+}
+
+function sendText(
+  config,
+  request,
+  response,
+  status,
+  body,
+  requestId,
+  headers = {},
+) {
+  setCommonHeaders(config, request, response, requestId);
+  for (const [name, value] of Object.entries(headers)) {
+    if (value !== undefined && value !== null && value !== "") {
+      response.setHeader(name, String(value));
+    }
+  }
+  response.writeHead(status, { "Content-Type": "text/plain; charset=utf-8" });
+  response.end(request.method === "HEAD" ? undefined : body);
 }
 
 function enforceOrigin(config, request) {

@@ -223,6 +223,45 @@ test("Standard Webhooks validation rejects stale timestamps and altered bodies",
   );
 });
 
+test("Standard Webhooks validation accepts a decoded whsec signing key", () => {
+  const key = Buffer.from("0123456789abcdef0123456789abcdef", "utf8");
+  const secret = `whsec_${key.toString("base64")}`;
+  const id = "msg_webhook123456";
+  const timestamp = "1785153600";
+  const rawBody = Buffer.from('{"type":"membership.activated"}');
+  const signature = `v1,${createHmac("sha256", key)
+    .update(Buffer.concat([Buffer.from(`${id}.${timestamp}.`), rawBody]))
+    .digest("base64")}`;
+
+  assert.doesNotThrow(() => verifyWhopWebhook({
+    rawBody,
+    webhookId: id,
+    webhookTimestamp: timestamp,
+    webhookSignature: signature,
+    secret,
+    nowSeconds: Number(timestamp),
+  }));
+});
+
+test("Whop literal whsec compatibility remains available", () => {
+  const secret = `whsec_${Buffer.from("0123456789abcdef0123456789abcdef").toString("base64")}`;
+  const id = "msg_webhook123456";
+  const timestamp = "1785153600";
+  const rawBody = Buffer.from('{"type":"payment.succeeded"}');
+  const signature = `v1,${createHmac("sha256", secret)
+    .update(Buffer.concat([Buffer.from(`${id}.${timestamp}.`), rawBody]))
+    .digest("base64")}`;
+
+  assert.doesNotThrow(() => verifyWhopWebhook({
+    rawBody,
+    webhookId: id,
+    webhookTimestamp: timestamp,
+    webhookSignature: signature,
+    secret,
+    nowSeconds: Number(timestamp),
+  }));
+});
+
 test("trusted Whop URLs require an exact HTTPS hostname", () => {
   assert.equal(
     trustedWhopUrl("https://sandbox.whop.com/checkout/example", new Set(["sandbox.whop.com"])),

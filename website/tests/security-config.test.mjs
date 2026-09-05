@@ -23,7 +23,7 @@ test("security headers include CSP, clickjacking, and MIME protections", async (
     "private, no-store, no-cache",
     "X-Robots-Tag",
   ]) {
-    assert.match(config, new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+    assert.ok(config.includes(expected), `next.config.ts is missing ${expected}`);
   }
   for (const expected of [
     "Content-Security-Policy",
@@ -35,7 +35,7 @@ test("security headers include CSP, clickjacking, and MIME protections", async (
     "https://*.protect.clerk.com",
     "snapgrok-api.onrender.com",
   ]) {
-    assert.match(proxy, new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+    assert.ok(proxy.includes(expected), `proxy.ts is missing ${expected}`);
   }
   assert.doesNotMatch(`${config}\n${proxy}`, /accounts\.dev|script-src[^;\n]*'unsafe-inline'/);
 });
@@ -102,6 +102,12 @@ test("the dynamic request nonce is passed to Clerk and required by the root layo
   assert.match(layout, /<ZenaianClerkProvider nonce=\{nonce\}>/);
   assert.match(proxy, /_next\/static\|_next\/image/);
   assert.doesNotMatch(proxy, /favicon\.ico\|\.\*\\\\\./);
+});
+
+test("website exposes a dedicated no-store Render health endpoint", async () => {
+  const route = await fs.readFile("app/api/health/route.ts", "utf8");
+  assert.ok(route.includes('service: "zenaian-web"'));
+  assert.ok(route.includes('"Cache-Control": "no-store"'));
 });
 
 test("account routes are explicitly private and non-indexable", async () => {
