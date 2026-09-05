@@ -213,9 +213,13 @@ export function verifyWhopWebhook({
     );
   }
 
-  const candidates = String(webhookSignature || "")
-    .trim()
+  const signatureHeader = String(webhookSignature || "").trim();
+  if (!signatureHeader || signatureHeader.length > 2048) {
+    throw webhookSignatureError();
+  }
+  const candidates = signatureHeader
     .split(/\s+/)
+    .slice(0, 8)
     .map((value) => value.split(",", 2))
     .filter(([version, signature]) => version === "v1" && isBase64Signature(signature))
     .map(([, signature]) => Buffer.from(signature, "base64"));
@@ -225,12 +229,14 @@ export function verifyWhopWebhook({
     Buffer.from(`${id}.${timestampText}.`, "utf8"),
     Buffer.isBuffer(rawBody) ? rawBody : Buffer.from(rawBody),
   ]);
-  const expected = createHmac("sha256", Buffer.from(secret, "utf8"))
-    .update(signedContent)
-    .digest();
-  const valid = candidates.some(
-    (provided) =>
-      provided.length === expected.length && timingSafeEqual(provided, expected),
+  const expectedSignatures = webhookSigningKeys(secret).map((key) =>
+    createHmac("sha256", key).update(signedContent).digest(),
+  );
+  const valid = candidates.some((provided) =>
+    expectedSignatures.some(
+      (expected) =>
+        provided.length === expected.length && timingSafeEqual(provided, expected),
+    ),
   );
   if (!valid) throw webhookSignatureError();
   return { id, timestamp: new Date(timestamp * 1000) };
@@ -266,6 +272,41 @@ function requireProviderId(value, prefix, name) {
 
 function isBase64Signature(value) {
   return typeof value === "string" && /^[A-Za-z0-9+/]{43}=$/.test(value);
+}
+
+function webhookSigningKeys(value) {
+  const secret = String(value || "");
+  const keys = [Buffer.from(secret, "utf8")];
+
+  // Whop's SDK documentation base64-encodes the displayed secret before it
+  // reaches the Standard Webhooks verifier, which makes the literal displayed
+  // value the HMAC key. Standard Webhooks itself serializes keys as
+  // `whsec_<base64>` and decodes the suffix. Accept both secret-derived forms
+  // so existing Whop endpoints and spec-compliant endpoints can rotate or
+  // migrate without rejecting authentic lifecycle events.
+  if (secret.startsWith("whsec_")) {
+    const encoded = secret.slice("whsec_".length);
+    const decoded = decodeCanonicalBase64(encoded);
+    if (decoded && decoded.length >= 16 && !decoded.equals(keys[0])) {
+      keys.push(decoded);
+    }
+  }
+
+  return keys;
+}
+
+function decodeCanonicalBase64(value) {
+  if (!/^[A-Za-z0-9+/]+={0,2}$/.test(value) || value.length % 4 === 1) {
+    return null;
+  }
+  try {
+    const decoded = Buffer.from(value, "base64");
+    const canonicalInput = value.replace(/=+$/, "");
+    const canonicalDecoded = decoded.toString("base64").replace(/=+$/, "");
+    return canonicalInput === canonicalDecoded ? decoded : null;
+  } catch {
+    return null;
+  }
 }
 
 function isPageInfo(value) {

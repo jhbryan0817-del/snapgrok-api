@@ -89,7 +89,7 @@ Use these Render settings:
 Root Directory: server
 Build Command: npm ci --ignore-scripts
 Start Command: npm start
-Health Check Path: /api/health
+Health Check Path: /api/live
 Node version: 22.13.1
 ```
 
@@ -117,6 +117,7 @@ Use these Render settings:
 Root Directory: website
 Build Command: npm ci --ignore-scripts && npm run build
 Start Command: npm start
+Health Check Path: /api/health
 Node version: 22.13.1
 ```
 

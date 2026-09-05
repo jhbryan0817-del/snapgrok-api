@@ -78,6 +78,9 @@ xAI limits, or other traffic on the deployed Render service.
   PostgreSQL.
 - Cached `SELECT 1` probes make `/api/health` fail closed after repeated database
   failures without running a database query on every platform health request.
+- Render probes `/api/live`, which reports only process lifecycle. Database or
+  privacy-maintenance degradation therefore remains visible on `/api/health`
+  and continues to fail application work closed without provoking restart loops.
 - Adaptive pressure sampling now defaults to 250 ms, so three sustained samples
   reduce admission in roughly 750 ms instead of roughly three seconds. A sample
   at 125% of the event-loop threshold, twice the database threshold, or 110% of
@@ -189,7 +192,8 @@ The following read-only evidence was collected from Render through 2026-08-29. N
 production load was generated and no configuration was changed.
 
 - The API is one Starter web-service instance: 0.5 CPU, 512 MiB RAM,
-  autoscaling disabled. Its root is `server`, health path is `/api/health`, and
+  autoscaling disabled. Its root is `server`, platform liveness path is
+  `/api/live`, and
   deploys occur after GitHub CI passes.
 - The deployed backend revision is v6.4.0 (`4df2af3`) with 40 analysis slots,
   a 96 MiB weighted request budget, adaptive admission, and 80 control-plane

@@ -1,5 +1,9 @@
 # Zenaian website changelog
 
+## v6.16.4 - Deployment health endpoint
+
+- Adds a dedicated no-store `/api/health` route for Render website health checks.
+
 ## v6.16.3 - Cleaner footer navigation
 
 - Removes the vertical separators between footer navigation links while

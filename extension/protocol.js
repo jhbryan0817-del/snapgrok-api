@@ -314,10 +314,45 @@
       .replace(/[.!:]$/, "");
 
     if (!normalized) return null;
-    if (!/^[A-E](?:\s*,?\s*[A-E])*$/.test(normalized)) return null;
-
-    const answers = normalizeAnswers(normalized);
+    const answers = parseSeparatedOptionTokens(normalized);
     return answers.length ? answerOutcome(answers) : null;
+  }
+
+  // Accept the historical token-only formats ("A B", "A,B", and
+  // "A, B") without an ambiguous regular expression. The previous pattern
+  // allowed the two optional whitespace matches to backtrack against each
+  // other, so a short crafted non-match could block the extension worker for
+  // seconds. This scanner performs a single bounded pass over the response.
+  function parseSeparatedOptionTokens(value) {
+    const answers = [];
+    let index = 0;
+
+    while (index < value.length) {
+      while (value[index] === " ") index += 1;
+      const option = value[index];
+      if (!VALID_SET.has(option)) return [];
+      answers.push(option);
+      index += 1;
+
+      if (index === value.length) break;
+
+      let sawWhitespace = false;
+      while (value[index] === " ") {
+        sawWhitespace = true;
+        index += 1;
+      }
+
+      if (value[index] === ",") {
+        index += 1;
+        while (value[index] === " ") index += 1;
+      } else if (!sawWhitespace) {
+        return [];
+      }
+
+      if (index === value.length) return [];
+    }
+
+    return answers;
   }
 
   function parseLabelledAnswer(text) {

@@ -217,7 +217,7 @@ test("health endpoint reveals no secret configuration", async () => {
     );
     assert.deepEqual(await response.json(), {
       ok: true,
-      version: "6.5.0",
+      version: "6.5.1",
       service: "zenaian-api",
       authRequired: true,
       persistentRequestStorage: false,
@@ -239,6 +239,35 @@ test("health endpoint reveals no secret configuration", async () => {
         coordination: "instance",
       },
     });
+  });
+});
+
+test("liveness and crawler routes are cheap public endpoints", async () => {
+  await withServer({}, async (baseUrl) => {
+    const live = await fetch(`${baseUrl}/api/live`);
+    assert.equal(live.status, 200);
+    assert.deepEqual(await live.json(), {
+      ok: true,
+      service: "zenaian-api",
+      version: "6.5.1",
+      lifecycle: "ready",
+    });
+
+    const root = await fetch(`${baseUrl}/`);
+    assert.equal(root.status, 200);
+    assert.deepEqual(await root.json(), {
+      ok: true,
+      service: "zenaian-api",
+      health: "/api/health",
+    });
+
+    const robots = await fetch(`${baseUrl}/robots.txt`);
+    assert.equal(robots.status, 200);
+    assert.equal(robots.headers.get("content-type"), "text/plain; charset=utf-8");
+    assert.equal(await robots.text(), "User-agent: *\nDisallow: /\n");
+
+    const favicon = await fetch(`${baseUrl}/favicon.ico`);
+    assert.equal(favicon.status, 204);
   });
 });
 
@@ -384,6 +413,10 @@ test("health becomes degraded after privacy maintenance fails", async () => {
     assert.equal(payload.maintenance.consecutiveFailures, 1);
     assert.match(payload.maintenance.lastAttemptAt, /^2026-|^202[7-9]-/);
     assert.equal(payload.maintenance.lastSuccessAt, null);
+
+    const live = await fetch(`${baseUrl}/api/live`);
+    assert.equal(live.status, 200);
+    assert.equal((await live.json()).lifecycle, "ready");
   });
 });
 
