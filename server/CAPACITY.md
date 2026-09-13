@@ -29,9 +29,10 @@ xAI limits, or other traffic on the deployed Render service.
 
 ## What changed
 
-- Analysis count and request-byte admission now happens before authentication,
-  JSON buffering, and base64 validation. Rejected work cannot consume
-  unbounded upload memory first.
+- Per-network ingress admission happens before authentication and body parsing.
+  Trusted global, adaptive, request-byte, and per-account analysis admission
+  happens only after authentication, so invalid credentials cannot consume the
+  trusted analysis budget.
 - `MAX_ACTIVE_ANALYSIS_MB` limits declared aggregate analysis request bytes.
   Missing `Content-Length` reserves the full per-request maximum, failing safe.
 - Image validation checks canonical base64 and file signatures without decoding
@@ -77,18 +78,21 @@ xAI limits, or other traffic on the deployed Render service.
   the database. No screenshot, prompt, answer, or model response is added to
   PostgreSQL.
 - Cached `SELECT 1` probes make `/api/health` fail closed after repeated database
-  failures without running a database query on every platform health request.
-- Render probes `/api/live`, which reports only process lifecycle. Database or
-  privacy-maintenance degradation therefore remains visible on `/api/health`
-  and continues to fail application work closed without provoking restart loops.
+  failures without running a database query on every request. Its public body
+  is intentionally limited to aggregate readiness.
+- Render probes `/api/live`, which reports only process liveness. Database or
+  privacy-maintenance degradation therefore affects the aggregate `/api/health`
+  status and continues to fail application work closed without provoking
+  restart loops; details stay in operator logs.
 - Adaptive pressure sampling now defaults to 250 ms, so three sustained samples
   reduce admission in roughly 750 ms instead of roughly three seconds. A sample
   at 125% of the event-loop threshold, twice the database threshold, or 110% of
   the RSS threshold sheds capacity immediately so a short severe spike is not
   missed.
-- The signed billing webhook has a dedicated 60/minute, 10-concurrent process
-  guard before repeated signature verification and JSON work.
-- The API runtime is pinned to Node 22.13.1 and uses an explicit 25-second
+- The signed billing webhook has a per-network ingress guard before bounded body
+  and signature work, then a separate 60/minute, 10-concurrent trusted-provider
+  budget acquired only after signature and payload validation.
+- The API runtime is pinned to Node 22.23.2 and uses an explicit 25-second
   shutdown budget inside Render's default 30-second termination window.
 
 ## Isolated load-test evidence

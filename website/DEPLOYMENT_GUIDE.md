@@ -12,7 +12,7 @@ the API is healthy before deploying the website.
 
 ## Step 1: Test locally
 
-Use Node `22.13.1`. From the repository root, run:
+Use Node `22.23.2`. From the repository root, run:
 
 ```powershell
 cd server
@@ -90,7 +90,7 @@ Root Directory: server
 Build Command: npm ci --ignore-scripts
 Start Command: npm start
 Health Check Path: /api/live
-Node version: 22.13.1
+Node version: 22.23.2
 ```
 
 Keep the existing server environment variables and deploy the latest commit.
@@ -98,14 +98,9 @@ When Render says the service is live, open:
 
 `https://snapgrok-api.onrender.com/api/health`
 
-Check that:
-
-- the version matches `server/package.json`
-- `privacyControls` is `true`
-- `privacyReady` is `true`
-- `maintenance.status` is `healthy`
-- the deletion backlog is not overdue
-- the ZDR safety latch is enabled
+Check that the endpoint returns `200` with only the aggregate service readiness.
+Confirm the deployed commit in Render and review the startup/maintenance logs
+for database readiness, privacy maintenance, deletion backlog, and ZDR safety.
 
 Stop here if the API is unhealthy.
 
@@ -118,7 +113,7 @@ Root Directory: website
 Build Command: npm ci --ignore-scripts && npm run build
 Start Command: npm start
 Health Check Path: /api/health
-Node version: 22.13.1
+Node version: 22.23.2
 ```
 
 Set these public environment variables:

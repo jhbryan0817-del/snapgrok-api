@@ -570,6 +570,7 @@ export function createBillingService({
       webhookId,
       webhookTimestamp,
       webhookSignature,
+      acquireVerifiedCapacity,
     }) {
       const verified = verifyWhopWebhook({
         rawBody,
@@ -599,6 +600,11 @@ export function createBillingService({
         throw webhookPayloadInvalid();
       }
 
+      const releaseVerifiedCapacity =
+        typeof acquireVerifiedCapacity === "function"
+          ? acquireVerifiedCapacity()
+          : null;
+      try {
       const payloadDigest = createHash("sha256").update(rawBody).digest("hex");
       const companyId = safeProviderId(body?.company_id, "biz");
       const resourceId = safeAnyProviderId(body?.data?.id);
@@ -785,6 +791,9 @@ export function createBillingService({
         reason: "event_not_required",
       });
       return { accepted: true, duplicate: recorded.duplicate, applied: false };
+      } finally {
+        releaseVerifiedCapacity?.();
+      }
     },
   };
 }

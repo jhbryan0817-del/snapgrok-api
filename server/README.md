@@ -41,9 +41,9 @@ v6.5.0 hardens that candidate capacity for production rollout. Billing-backed
 analysis reservations now take a PostgreSQL transaction advisory lock and
 enforce shared concurrent/start-rate limits across API instances. The default
 request ceiling is reduced from 15 MiB to 2 MiB, adaptive pressure is sampled
-every 250 ms, the health endpoint includes cached database readiness, invalid
+every 250 ms, internal runtime telemetry includes cached database readiness, invalid
 webhook bursts are bounded before repeated signature work, shutdown has an
-explicit 25-second application budget, and Render is pinned to Node 22.13.1.
+explicit 25-second application budget, and Render is pinned to Node 22.23.2.
 These controls do not make the transient analysis-job registry durable; see
 [CAPACITY.md](CAPACITY.md) before enabling more than one API instance.
 
@@ -56,7 +56,7 @@ endpoint, and gives harmless crawler requests explicit public responses.
 | Route | Authentication | Purpose |
 |---|---|---|
 | `GET /api/live` | Public | Process liveness for Render; independent of database and privacy maintenance readiness |
-| `GET /api/health` | Public | Redacted health/version metadata |
+| `GET /api/health` | Public | Minimal aggregate readiness signal; detailed diagnostics stay in operator logs |
 | `POST /api/extension/pairings` | Clerk + exact website origin | Create a one-time extension pairing grant |
 | `POST /api/extension/pairings/exchange` | Exact extension origin + one-time grant | Create an extension-bound device session |
 | `POST /api/extension/session/refresh` | Exact extension origin + refresh credential | Rotate the extension session |
@@ -122,8 +122,9 @@ endpoint, and gives harmless crawler requests explicit public responses.
   billing-address, screenshot, prompt, or answer data.
 - Daily-gated, bounded maintenance enforces the documented 30-day, 90-day,
   12-month, 3-year, 5-year, and one-year retention boundaries. A failed purge
-  remains due for the next five-minute cycle, and `/api/health` exposes last
-  success/failure, deletion backlog, ZDR latch state, and degraded readiness.
+  remains due for the next five-minute cycle. Detailed success/failure,
+  deletion-backlog, and ZDR-latch diagnostics are emitted only to operator logs;
+  `/api/health` exposes only aggregate readiness.
 
 ## Render
 
@@ -132,7 +133,7 @@ Root Directory: server
 Build Command: npm ci --ignore-scripts
 Start Command: npm start
 Health Check: /api/live
-Node: 22.13.1
+Node: 22.23.2
 ```
 
 The v6.5 capacity defaults are intentionally conservative for the current
@@ -148,7 +149,13 @@ MAX_REQUEST_MB=2
 XAI_MAX_STARTS_PER_SECOND=30
 ANALYSIS_POLL_WAIT_MS=5000
 EXTENSION_SESSION_TOUCH_INTERVAL_MS=60000
+EXTENSION_MAX_ACTIVE_PAIRINGS_PER_USER=3
+EXTENSION_MAX_ACTIVE_DEVICE_SESSIONS_PER_USER=5
+ANALYSIS_INGRESS_RATE_LIMIT_MAX_REQUESTS=600
+ANALYSIS_INGRESS_MAX_CONCURRENT_REQUESTS=30
 CONTROL_PLANE_MAX_CONCURRENT_REQUESTS=80
+CONTROL_PLANE_INGRESS_RATE_LIMIT_MAX_REQUESTS=300
+CONTROL_PLANE_INGRESS_MAX_CONCURRENT_REQUESTS=40
 DATABASE_POOL_MAX=10
 ADAPTIVE_CONCURRENCY_ENABLED=true
 ADAPTIVE_MIN_CONCURRENT=10
@@ -162,6 +169,8 @@ DATABASE_READINESS_INTERVAL_MS=10000
 DATABASE_READINESS_FAILURE_THRESHOLD=2
 WEBHOOK_RATE_LIMIT_MAX_REQUESTS=60
 WEBHOOK_MAX_CONCURRENT_REQUESTS=10
+WEBHOOK_INGRESS_RATE_LIMIT_MAX_REQUESTS=120
+WEBHOOK_INGRESS_MAX_CONCURRENT_REQUESTS=5
 SHUTDOWN_TIMEOUT_MS=25000
 ```
 

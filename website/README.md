@@ -68,6 +68,6 @@ npm.cmd ci --ignore-scripts
 npm.cmd run check
 ```
 
-Use Node 22.13.1. The website remains compatible with the currently deployed
+Use Node 22.23.2. The website remains compatible with the currently deployed
 API v5.8.1 and extension v5.3.0. Neither needs to be redeployed for this
 website-only release.

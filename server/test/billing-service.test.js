@@ -224,6 +224,7 @@ test("payment history returns only the store's sanitized account records", async
 
 test("invalid Whop webhook signatures are rejected before storage", async () => {
   let storeCalls = 0;
+  let trustedCapacityCalls = 0;
   const service = createBillingService({
     config: testConfig(),
     store: fakeStore({ async recordProviderEvent() { storeCalls += 1; } }),
@@ -236,10 +237,48 @@ test("invalid Whop webhook signatures are rejected before storage", async () => 
       webhookId: "msg_webhook123456",
       webhookTimestamp: epochSeconds(),
       webhookSignature: "v1,AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+      acquireVerifiedCapacity: () => {
+        trustedCapacityCalls += 1;
+        return () => undefined;
+      },
     }),
     (error) => error.status === 401 && error.code === "WEBHOOK_SIGNATURE_INVALID",
   );
   assert.equal(storeCalls, 0);
+  assert.equal(trustedCapacityCalls, 0);
+});
+
+test("verified webhooks acquire and release trusted delivery capacity", async () => {
+  let acquired = 0;
+  let released = 0;
+  const service = createBillingService({
+    config: testConfig(),
+    store: fakeStore(),
+    whopClient: fakeWhop(),
+    now: () => NOW,
+  });
+  const id = "msg_webhook123456";
+  const timestamp = epochSeconds();
+  const rawBody = Buffer.from(JSON.stringify({
+    id,
+    api_version: "v1",
+    timestamp: NOW.toISOString(),
+    type: "unneeded.event",
+    data: {},
+    company_id: "biz_745hMbzbWHtrZr",
+  }));
+  await service.handleWebhook({
+    rawBody,
+    webhookId: id,
+    webhookTimestamp: timestamp,
+    webhookSignature: signatureFor(id, timestamp, rawBody),
+    acquireVerifiedCapacity: () => {
+      acquired += 1;
+      return () => { released += 1; };
+    },
+  });
+  assert.equal(acquired, 1);
+  assert.equal(released, 1);
 });
 
 test("signed membership activation is normalized without requiring metadata", async () => {
