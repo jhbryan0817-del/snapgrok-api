@@ -20,6 +20,8 @@ export function createDeviceSessionService({
   clerkPublishableKey,
   clerkTimeoutMs = 10000,
   pairingTtlMs = 120000,
+  maxActivePairingsPerUser = 3,
+  maxActiveDeviceSessionsPerUser = 5,
   accessTtlMs = 15 * 60 * 1000,
   refreshTtlMs = 30 * 24 * 60 * 60 * 1000,
   refreshGraceMs = 30000,
@@ -320,15 +322,18 @@ export function createDeviceSessionService({
       const rawCode = randomBytesFn(32).toString("base64url");
       const createdAt = now();
       const expiresAt = new Date(createdAt.getTime() + pairingTtlMs);
-      await store.createPairing({
-        id: randomUUIDFn(),
-        codeHash: hash(`${PAIRING_PREFIX}${rawCode}`),
-        nonceHash: hash(nonce),
-        userId,
-        clerkSessionId,
-        extensionId,
-        expiresAt,
-      });
+      await store.createPairing(
+        {
+          id: randomUUIDFn(),
+          codeHash: hash(`${PAIRING_PREFIX}${rawCode}`),
+          nonceHash: hash(nonce),
+          userId,
+          clerkSessionId,
+          extensionId,
+          expiresAt,
+        },
+        { maxActivePairings: maxActivePairingsPerUser },
+      );
       return {
         pairingCode: `${PAIRING_PREFIX}${rawCode}`,
         expiresAt: expiresAt.toISOString(),
@@ -365,6 +370,7 @@ export function createDeviceSessionService({
           accessExpiresAt: new Date(issuedAt.getTime() + accessTtlMs),
           refreshExpiresAt: new Date(issuedAt.getTime() + refreshTtlMs),
         },
+        maxActiveDeviceSessions: maxActiveDeviceSessionsPerUser,
       });
       try {
         await assertUserAllowed(session.userId);

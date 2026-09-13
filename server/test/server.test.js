@@ -217,27 +217,7 @@ test("health endpoint reveals no secret configuration", async () => {
     );
     assert.deepEqual(await response.json(), {
       ok: true,
-      version: "6.5.1",
       service: "zenaian-api",
-      authRequired: true,
-      persistentRequestStorage: false,
-      billingMode: "off",
-      extensionDeviceAuth: false,
-      privacyControls: false,
-      privacyReady: false,
-      maintenance: { status: "disabled" },
-      readiness: {
-        status: "ready",
-        lifecycle: "ready",
-        database: { status: "disabled" },
-      },
-      capacity: {
-        status: "normal",
-        currentLimit: 40,
-        maximumLimit: 40,
-        pressureReason: "none",
-        coordination: "instance",
-      },
     });
   });
 });
@@ -249,8 +229,6 @@ test("liveness and crawler routes are cheap public endpoints", async () => {
     assert.deepEqual(await live.json(), {
       ok: true,
       service: "zenaian-api",
-      version: "6.5.1",
-      lifecycle: "ready",
     });
 
     const root = await fetch(`${baseUrl}/`);
@@ -303,9 +281,7 @@ test("health fails closed after the cached database readiness probe degrades", a
     const response = await fetch(`http://127.0.0.1:${address.port}/api/health`);
     const body = await response.json();
     assert.equal(response.status, 503);
-    assert.equal(body.ok, false);
-    assert.equal(body.readiness.status, "degraded");
-    assert.equal(body.readiness.database.status, "degraded");
+    assert.deepEqual(body, { ok: false, service: "zenaian-api" });
     assert.doesNotMatch(JSON.stringify(body), /private database detail/);
   } finally {
     server.close();
@@ -332,7 +308,7 @@ test("adaptive pressure lowers analysis admission without blocking health", asyn
       await blocked;
       return { status: "answered", answers: ["A"] };
     },
-  }, async (baseUrl) => {
+  }, async (baseUrl, server) => {
     const first = fetch(
       `${baseUrl}/api/analyze`,
       requestOptions(validBody()),
@@ -346,13 +322,8 @@ test("adaptive pressure lowers analysis admission without blocking health", asyn
     assert.equal((await second.json()).code, "ANALYSIS_ADAPTIVELY_LIMITED");
 
     const health = await (await fetch(`${baseUrl}/api/health`)).json();
-    assert.deepEqual(health.capacity, {
-      status: "protecting",
-      currentLimit: 1,
-      maximumLimit: 2,
-      pressureReason: "database_wait",
-      coordination: "instance",
-    });
+    assert.deepEqual(health, { ok: true, service: "zenaian-api" });
+    assert.equal(server.capacitySnapshot().adaptive.currentLimit, 1);
     releaseAnalysis();
     assert.equal((await first).status, 200);
   });
@@ -381,16 +352,15 @@ test("persistent provider throttling reduces later admission capacity", async ()
   });
   await withServer({
     analyze: async () => { throw providerError; },
-  }, async (baseUrl) => {
+  }, async (baseUrl, server) => {
     const response = await fetch(
       `${baseUrl}/api/analyze`,
       requestOptions(validBody()),
     );
     assert.equal(response.status, 502);
-    const health = await (await fetch(`${baseUrl}/api/health`)).json();
-    assert.equal(health.capacity.status, "protecting");
-    assert.equal(health.capacity.currentLimit, 20);
-    assert.equal(health.capacity.pressureReason, "provider_rate_limit");
+    const capacity = server.capacitySnapshot().adaptive;
+    assert.equal(capacity.currentLimit, 20);
+    assert.equal(capacity.lastPressureReason, "provider_rate_limit");
   });
 });
 
@@ -408,15 +378,11 @@ test("health becomes degraded after privacy maintenance fails", async () => {
     const response = await fetch(`${baseUrl}/api/health`);
     const payload = await response.json();
     assert.equal(response.status, 503);
-    assert.equal(payload.ok, false);
-    assert.equal(payload.maintenance.status, "degraded");
-    assert.equal(payload.maintenance.consecutiveFailures, 1);
-    assert.match(payload.maintenance.lastAttemptAt, /^2026-|^202[7-9]-/);
-    assert.equal(payload.maintenance.lastSuccessAt, null);
+    assert.deepEqual(payload, { ok: false, service: "zenaian-api" });
 
     const live = await fetch(`${baseUrl}/api/live`);
     assert.equal(live.status, 200);
-    assert.equal((await live.json()).lifecycle, "ready");
+    assert.deepEqual(await live.json(), { ok: true, service: "zenaian-api" });
   });
 });
 
@@ -443,22 +409,20 @@ test("health degrades for overdue or repeatedly partial deletions", async () => 
     const response = await fetch(`${baseUrl}/api/health`);
     const payload = await response.json();
     assert.equal(response.status, 503);
-    assert.equal(payload.maintenance.status, "degraded");
-    assert.equal(payload.maintenance.deletionBacklog.overdue, 1);
-    assert.equal(payload.maintenance.deletionBacklog.repeatedlyPartial, 1);
+    assert.deepEqual(payload, { ok: false, service: "zenaian-api" });
   });
 });
 
-test("health exposes only a validated deployment revision", async () => {
+test("health omits deployment revision even when configured", async () => {
   const config = testConfig();
   config.deploymentRevision = "8c71355d96426888679ccb038c5724535f501e63";
   await withServer({ config }, async (baseUrl) => {
     const response = await fetch(`${baseUrl}/api/health`);
     assert.equal(response.status, 200);
-    assert.equal(
-      (await response.json()).deploymentRevision,
-      "8c71355d96426888679ccb038c5724535f501e63",
-    );
+    assert.deepEqual(await response.json(), {
+      ok: true,
+      service: "zenaian-api",
+    });
   });
 });
 
@@ -1227,8 +1191,13 @@ test("billing webhook abuse is bounded before signature work repeats", async () 
     {
       config,
       billing: billingStub({
-        async handleWebhook() {
-          return { accepted: true, duplicate: false, applied: false };
+        async handleWebhook(input) {
+          const release = input.acquireVerifiedCapacity();
+          try {
+            return { accepted: true, duplicate: false, applied: false };
+          } finally {
+            release();
+          }
         },
       }),
     },
@@ -1582,7 +1551,7 @@ test("analyze bounds shortcut names before xAI", async () => {
   );
 });
 
-test("global admission control runs before authentication", async () => {
+test("invalid authentication cannot consume trusted analysis admission", async () => {
   const authError = Object.assign(new Error("Authentication required."), {
     status: 401,
     code: "AUTH_REQUIRED",
@@ -1596,7 +1565,8 @@ test("global admission control runs before authentication", async () => {
       }),
       authenticate: async () => {
         authenticationCalls += 1;
-        throw authError;
+        if (authenticationCalls <= 2) throw authError;
+        return { userId: "user_test", sessionId: "sess_test" };
       },
     },
     async (baseUrl) => {
@@ -1610,8 +1580,53 @@ test("global admission control runs before authentication", async () => {
         `${baseUrl}/api/analyze`,
         requestOptions(validBody()),
       );
+      assert.equal(second.status, 401);
+
+      const admitted = await fetch(
+        `${baseUrl}/api/analyze`,
+        requestOptions(validBody()),
+      );
+      assert.equal(admitted.status, 200);
+
+      const limited = await fetch(
+        `${baseUrl}/api/analyze`,
+        requestOptions(validBody()),
+      );
+      assert.equal(limited.status, 429);
+      assert.equal((await limited.json()).code, "GLOBAL_RATE_LIMITED");
+      assert.equal(authenticationCalls, 5);
+    },
+  );
+});
+
+test("per-network ingress limits repeated unauthenticated analysis requests", async () => {
+  let authenticationCalls = 0;
+  await withServer(
+    {
+      config: createConfig({
+        ...baseEnvironment(),
+        ANALYSIS_INGRESS_RATE_LIMIT_MAX_REQUESTS: "1",
+      }),
+      authenticate: async () => {
+        authenticationCalls += 1;
+        throw Object.assign(new Error("Authentication required."), {
+          status: 401,
+          code: "AUTH_REQUIRED",
+        });
+      },
+    },
+    async (baseUrl) => {
+      const first = await fetch(
+        `${baseUrl}/api/analyze`,
+        requestOptions(validBody()),
+      );
+      assert.equal(first.status, 401);
+      const second = await fetch(
+        `${baseUrl}/api/analyze`,
+        requestOptions(validBody()),
+      );
       assert.equal(second.status, 429);
-      assert.equal((await second.json()).code, "GLOBAL_RATE_LIMITED");
+      assert.equal((await second.json()).code, "INGRESS_RATE_LIMITED");
       assert.equal(authenticationCalls, 1);
     },
   );

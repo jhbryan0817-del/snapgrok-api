@@ -4,7 +4,7 @@ ZENAIAN WEBSITE V6.14.1 - UPLOAD NOTES
 2. Keep the path website/app/page.tsx, not website/website/app/page.tsx.
 3. Keep the five public environment variables in .env.example.
 4. Never add server-side secrets to the website service.
-5. Build with Node 22.13.1 and deploy.
+5. Build with Node 22.23.2 and deploy.
 6. The API and extension remain unchanged from the v6.14.0 deployment and need no redeployment.
 7. Run the post-deployment checks in the repository root DEPLOYMENT_GUIDE.md.
 8. The shortcut and context controls on the landing page are local-only demos.

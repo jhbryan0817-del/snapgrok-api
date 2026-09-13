@@ -45,9 +45,31 @@ export function createPostgresDeviceSessionStore({
       if (ownsPool) await database.end();
     },
 
-    async createPairing(pairing) {
+    async createPairing(pairing, { maxActivePairings = 3 } = {}) {
+      const client = await database.connect();
       try {
-        await database.query(
+        await client.query("BEGIN");
+        await client.query(
+          "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+          [`pairing:${pairing.userId}:${pairing.extensionId}`],
+        );
+        const active = await client.query(
+          `SELECT count(*)::integer AS count
+           FROM extension_pairing_grants
+           WHERE clerk_user_id = $1
+             AND extension_id = $2
+             AND consumed_at IS NULL
+             AND expires_at > CURRENT_TIMESTAMP`,
+          [pairing.userId, pairing.extensionId],
+        );
+        if (Number(active.rows[0]?.count || 0) >= maxActivePairings) {
+          throw storeError(
+            "Too many extension connection requests are active. Wait for one to expire and try again.",
+            "PAIRING_LIMIT_REACHED",
+            429,
+          );
+        }
+        await client.query(
           `INSERT INTO extension_pairing_grants (
              id, code_hash, nonce_hash, clerk_user_id, clerk_session_id,
              extension_id, expires_at
@@ -63,8 +85,12 @@ export function createPostgresDeviceSessionStore({
             pairing.expiresAt,
           ],
         );
+        await client.query("COMMIT");
       } catch (error) {
+        await rollbackQuietly(client);
         throw normalizeStoreError(error);
+      } finally {
+        client.release();
       }
     },
 
@@ -74,6 +100,7 @@ export function createPostgresDeviceSessionStore({
       extensionId,
       now,
       session,
+      maxActiveDeviceSessions = 5,
     }) {
       const client = await database.connect();
       try {
@@ -95,6 +122,27 @@ export function createPostgresDeviceSessionStore({
             "The extension connection request is invalid or expired.",
             "PAIRING_INVALID",
             401,
+          );
+        }
+
+        await client.query(
+          "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+          [`device:${pairing.clerk_user_id}:${pairing.extension_id}`],
+        );
+        const active = await client.query(
+          `SELECT count(*)::integer AS count
+           FROM extension_device_sessions
+           WHERE clerk_user_id = $1
+             AND extension_id = $2
+             AND revoked_at IS NULL
+             AND refresh_expires_at > $3`,
+          [pairing.clerk_user_id, pairing.extension_id, now],
+        );
+        if (Number(active.rows[0]?.count || 0) >= maxActiveDeviceSessions) {
+          throw storeError(
+            "This account already has the maximum number of active extension sessions.",
+            "DEVICE_SESSION_LIMIT_REACHED",
+            429,
           );
         }
 

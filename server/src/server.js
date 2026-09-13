@@ -1,8 +1,8 @@
 import http from "node:http";
-import { readFileSync } from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { monitorEventLoopDelay } from "node:perf_hooks";
+import { isIP } from "node:net";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import pg from "pg";
 import { createAnalysisJobManager } from "./analysis-jobs.js";
@@ -34,10 +34,6 @@ import {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const projectDirectory = path.resolve(__dirname, "..");
-const serviceVersion = String(
-  JSON.parse(readFileSync(path.join(projectDirectory, "package.json"), "utf8"))
-    .version || "",
-);
 const { Pool } = pg;
 
 loadEnv(path.join(projectDirectory, ".env"));
@@ -162,6 +158,20 @@ export function createConfig(environment = process.env) {
       30000,
       300000,
     ),
+    extensionMaxActivePairingsPerUser: boundedInteger(
+      environment,
+      "EXTENSION_MAX_ACTIVE_PAIRINGS_PER_USER",
+      3,
+      1,
+      20,
+    ),
+    extensionMaxActiveDeviceSessionsPerUser: boundedInteger(
+      environment,
+      "EXTENSION_MAX_ACTIVE_DEVICE_SESSIONS_PER_USER",
+      5,
+      1,
+      20,
+    ),
     extensionAccessTtlMs: boundedInteger(
       environment,
       "EXTENSION_ACCESS_TTL_MS",
@@ -261,6 +271,20 @@ export function createConfig(environment = process.env) {
       1,
       100000,
     ),
+    analysisIngressRateLimitMaxRequests: boundedInteger(
+      environment,
+      "ANALYSIS_INGRESS_RATE_LIMIT_MAX_REQUESTS",
+      600,
+      1,
+      10000,
+    ),
+    analysisIngressMaxConcurrentRequests: boundedInteger(
+      environment,
+      "ANALYSIS_INGRESS_MAX_CONCURRENT_REQUESTS",
+      30,
+      1,
+      200,
+    ),
     maxConcurrentRequestsGlobal,
     maxDistributedConcurrentAnalyses: boundedInteger(
       environment,
@@ -343,6 +367,20 @@ export function createConfig(environment = process.env) {
       1,
       200,
     ),
+    controlPlaneIngressRateLimitMaxRequests: boundedInteger(
+      environment,
+      "CONTROL_PLANE_INGRESS_RATE_LIMIT_MAX_REQUESTS",
+      300,
+      1,
+      10000,
+    ),
+    controlPlaneIngressMaxConcurrentRequests: boundedInteger(
+      environment,
+      "CONTROL_PLANE_INGRESS_MAX_CONCURRENT_REQUESTS",
+      40,
+      1,
+      200,
+    ),
     performanceLogsEnabled: strictBooleanFrom(
       environment,
       "PERFORMANCE_LOGS_ENABLED",
@@ -359,6 +397,20 @@ export function createConfig(environment = process.env) {
       environment,
       "WEBHOOK_MAX_CONCURRENT_REQUESTS",
       10,
+      1,
+      100,
+    ),
+    webhookIngressRateLimitMaxRequests: boundedInteger(
+      environment,
+      "WEBHOOK_INGRESS_RATE_LIMIT_MAX_REQUESTS",
+      120,
+      1,
+      10000,
+    ),
+    webhookIngressMaxConcurrentRequests: boundedInteger(
+      environment,
+      "WEBHOOK_INGRESS_MAX_CONCURRENT_REQUESTS",
+      5,
       1,
       100,
     ),
@@ -919,6 +971,27 @@ export function createZenaianServer({
     maxTrackedUsers: 1,
     scope: "webhook",
   });
+  const analysisIngressRequestLimiter = new UserRateLimiter({
+    windowMs: 60000,
+    maxRequests: config.analysisIngressRateLimitMaxRequests,
+    maxConcurrent: config.analysisIngressMaxConcurrentRequests,
+    maxTrackedUsers: config.maxTrackedRateLimitUsers,
+    scope: "ingress",
+  });
+  const controlIngressRequestLimiter = new UserRateLimiter({
+    windowMs: 60000,
+    maxRequests: config.controlPlaneIngressRateLimitMaxRequests,
+    maxConcurrent: config.controlPlaneIngressMaxConcurrentRequests,
+    maxTrackedUsers: config.maxTrackedRateLimitUsers,
+    scope: "ingress",
+  });
+  const webhookIngressRequestLimiter = new UserRateLimiter({
+    windowMs: 60000,
+    maxRequests: config.webhookIngressRateLimitMaxRequests,
+    maxConcurrent: config.webhookIngressMaxConcurrentRequests,
+    maxTrackedUsers: config.maxTrackedRateLimitUsers,
+    scope: "ingress",
+  });
   const analysisMemoryLimiter = memoryLimiter || new WeightedCapacityLimiter({
     maxWeight: config.maxActiveAnalysisBytes,
     scope: "analysis-bytes",
@@ -1062,6 +1135,9 @@ export function createZenaianServer({
       analysisGlobalRequestLimiter.cleanupExpired?.();
       controlGlobalRequestLimiter.cleanupExpired?.();
       webhookRequestLimiter.cleanupExpired?.();
+      analysisIngressRequestLimiter.cleanupExpired?.();
+      controlIngressRequestLimiter.cleanupExpired?.();
+      webhookIngressRequestLimiter.cleanupExpired?.();
       accountRequestLimiter.cleanupExpired?.();
       analysisJobManager?.cleanup();
       void deviceSessionService?.maintenance?.().catch((error) => {
@@ -1098,6 +1174,7 @@ export function createZenaianServer({
       const requestId = randomUUID();
       const startedAt = Date.now();
       const url = new URL(request.url || "/", "http://api.invalid");
+      let releaseIngress = null;
 
       if (request.method === "OPTIONS") {
         try {
@@ -1119,6 +1196,18 @@ export function createZenaianServer({
       }
 
       try {
+        const clientKey = requestClientKey(request);
+        if (url.pathname === "/api/billing/webhook") {
+          releaseIngress = webhookIngressRequestLimiter.acquire(clientKey);
+        } else if (url.pathname.startsWith("/api/analyze")) {
+          releaseIngress = analysisIngressRequestLimiter.acquire(clientKey);
+        } else if (
+          url.pathname.startsWith("/api/") &&
+          url.pathname !== "/api/live" &&
+          url.pathname !== "/api/health"
+        ) {
+          releaseIngress = controlIngressRequestLimiter.acquire(clientKey);
+        }
         if (request.method === "GET" && url.pathname === "/api/live") {
           const live = lifecycleState === "ready";
           sendJson(
@@ -1129,8 +1218,6 @@ export function createZenaianServer({
             {
               ok: live,
               service: "zenaian-api",
-              version: serviceVersion,
-              lifecycle: lifecycleState,
             },
             requestId,
           );
@@ -1154,27 +1241,7 @@ export function createZenaianServer({
             degraded ? 503 : 200,
             {
               ok: !degraded,
-              version: serviceVersion,
               service: "zenaian-api",
-              authRequired: true,
-              persistentRequestStorage:
-                config.billingMode === "off"
-                  ? false
-                  : "billing-metadata-only",
-              billingMode: config.billingMode,
-              extensionDeviceAuth: Boolean(deviceSessionService),
-              privacyControls: Boolean(privacyService),
-              privacyReady: Boolean(privacyService?.ready),
-              maintenance,
-              readiness: {
-                status: degraded ? "degraded" : "ready",
-                lifecycle: lifecycleState,
-                database,
-              },
-              capacity: capacityMonitor.publicSnapshot(),
-              ...(config.deploymentRevision
-                ? { deploymentRevision: config.deploymentRevision }
-                : {}),
             },
             requestId,
           );
@@ -1242,9 +1309,12 @@ export function createZenaianServer({
           enforceOrigin(config, request);
           enforceWebsiteOrigin(config, request);
           requireDeviceSessionService(deviceSessionService);
-          const releaseGlobal = controlGlobalRequestLimiter.acquire("control-plane");
+          let releaseGlobal = null;
+          let releaseAccount = null;
           try {
             const auth = await authenticateRequest(request);
+            releaseGlobal = controlGlobalRequestLimiter.acquire("control-plane");
+            releaseAccount = accountRequestLimiter.acquire(auth.userId);
             await privacyService?.assertUserAllowed(auth.userId);
             const body = await readJsonBody(config, request);
             validatePairingCreationRequest(body);
@@ -1263,7 +1333,8 @@ export function createZenaianServer({
               requestId,
             );
           } finally {
-            releaseGlobal();
+            releaseAccount?.();
+            releaseGlobal?.();
           }
           return;
         }
@@ -1465,21 +1536,22 @@ export function createZenaianServer({
           requireDeviceSessionService(deviceSessionService);
           requireAnalysisJobManager(analysisJobManager);
           const admissionStartedAt = Date.now();
-          let releaseGlobal = analysisGlobalRequestLimiter.acquire("analysis");
+          let releaseGlobal = null;
           let releaseAdaptive = null;
           let releaseMemory = null;
           let releaseUser = null;
           let admissionTransferred = false;
           let body = null;
           try {
-            releaseAdaptive = adaptiveAnalysisLimiter.acquire();
-            releaseMemory = analysisMemoryLimiter.acquire(
-              analysisAdmissionWeight(config, request),
-            );
             const auth = await deviceSessionService.authenticateAccess(request);
             if (!auth.userAllowedChecked) {
               await privacyService?.assertUserAllowed(auth.userId);
             }
+            releaseGlobal = analysisGlobalRequestLimiter.acquire("analysis");
+            releaseAdaptive = adaptiveAnalysisLimiter.acquire();
+            releaseMemory = analysisMemoryLimiter.acquire(
+              analysisAdmissionWeight(config, request),
+            );
             releaseUser = userRateLimiter.acquire(auth.userId);
             body = await readJsonBody(config, request);
             validateAnalyzeRequest(config, body);
@@ -1722,34 +1794,31 @@ export function createZenaianServer({
           request.method === "POST" &&
           url.pathname === "/api/billing/webhook"
         ) {
-          const releaseWebhook = webhookRequestLimiter.acquire("billing-webhook");
-          try {
-            requireSingleRequestHeader(request, "webhook-id");
-            requireSingleRequestHeader(request, "webhook-timestamp");
-            requireSingleRequestHeader(request, "webhook-signature");
-            const rawBody = await readRawBody(
-              request,
-              config.billingWebhookMaxBytes,
-              config.requestBodyTimeoutMs,
-              "application/json",
-            );
-            const result = await billingService.handleWebhook({
-              rawBody,
-              webhookId: request.headers["webhook-id"],
-              webhookTimestamp: request.headers["webhook-timestamp"],
-              webhookSignature: request.headers["webhook-signature"],
-            });
-            sendJson(
-              config,
-              request,
-              response,
-              200,
-              { ok: true, ...result },
-              requestId,
-            );
-          } finally {
-            releaseWebhook();
-          }
+          requireSingleRequestHeader(request, "webhook-id");
+          requireSingleRequestHeader(request, "webhook-timestamp");
+          requireSingleRequestHeader(request, "webhook-signature");
+          const rawBody = await readRawBody(
+            request,
+            config.billingWebhookMaxBytes,
+            config.requestBodyTimeoutMs,
+            "application/json",
+          );
+          const result = await billingService.handleWebhook({
+            rawBody,
+            webhookId: request.headers["webhook-id"],
+            webhookTimestamp: request.headers["webhook-timestamp"],
+            webhookSignature: request.headers["webhook-signature"],
+            acquireVerifiedCapacity: () =>
+              webhookRequestLimiter.acquire("billing-webhook"),
+          });
+          sendJson(
+            config,
+            request,
+            response,
+            200,
+            { ok: true, ...result },
+            requestId,
+          );
           return;
         }
 
@@ -1948,16 +2017,17 @@ export function createZenaianServer({
 
         if (request.method === "POST" && url.pathname === "/api/analyze") {
           enforceOrigin(config, request);
-          const releaseGlobalLimit = analysisGlobalRequestLimiter.acquire("analysis");
+          let releaseGlobalLimit = null;
           let releaseAdaptive = null;
           let releaseMemory = null;
           try {
+            const auth = await authenticateRequest(request);
+            await privacyService?.assertUserAllowed(auth.userId);
+            releaseGlobalLimit = analysisGlobalRequestLimiter.acquire("analysis");
             releaseAdaptive = adaptiveAnalysisLimiter.acquire();
             releaseMemory = analysisMemoryLimiter.acquire(
               analysisAdmissionWeight(config, request),
             );
-            const auth = await authenticateRequest(request);
-            await privacyService?.assertUserAllowed(auth.userId);
             const releaseRateLimit = userRateLimiter.acquire(auth.userId);
             const downstreamController = new AbortController();
             const untrackAnalysis = accountAnalysisController.track(
@@ -2066,7 +2136,7 @@ export function createZenaianServer({
           } finally {
             releaseMemory?.();
             releaseAdaptive?.();
-            releaseGlobalLimit();
+            releaseGlobalLimit?.();
           }
           return;
         }
@@ -2111,6 +2181,8 @@ export function createZenaianServer({
           requestId,
           retryAfterSeconds ? { "Retry-After": retryAfterSeconds } : {},
         );
+      } finally {
+        releaseIngress?.();
       }
     },
   );
@@ -2547,6 +2619,9 @@ export function createDeviceSessionRuntime(
     clerkPublishableKey: config.clerkPublishableKey,
     clerkTimeoutMs: config.clerkTimeoutMs,
     pairingTtlMs: config.extensionPairingTtlMs,
+    maxActivePairingsPerUser: config.extensionMaxActivePairingsPerUser,
+    maxActiveDeviceSessionsPerUser:
+      config.extensionMaxActiveDeviceSessionsPerUser,
     accessTtlMs: config.extensionAccessTtlMs,
     refreshTtlMs: config.extensionRefreshTtlMs,
     refreshGraceMs: config.extensionRefreshGraceMs,
@@ -2892,6 +2967,21 @@ function httpError(status, message, code, extra = {}) {
 
 function requestOrigin(request) {
   return String(request.headers.origin || "").trim().replace(/\/$/, "");
+}
+
+function requestClientKey(request) {
+  const cloudflareAddress = String(
+    request.headers["cf-connecting-ip"] || "",
+  ).trim();
+  if (isIP(cloudflareAddress)) return cloudflareAddress;
+
+  const forwardedAddress = String(request.headers["x-forwarded-for"] || "")
+    .split(",", 1)[0]
+    .trim();
+  if (isIP(forwardedAddress)) return forwardedAddress;
+
+  const remoteAddress = String(request.socket?.remoteAddress || "").trim();
+  return isIP(remoteAddress) ? remoteAddress : "unidentified-client";
 }
 
 function isOriginAllowed(config, origin) {

@@ -40,6 +40,8 @@ export class UserRateLimiter {
       throw rateLimitError(
         this.scope === "global"
           ? "The analysis service is busy. Please try again shortly."
+          : this.scope === "ingress"
+            ? "Too many requests are already arriving from this network. Please retry shortly."
           : this.scope === "account"
             ? "Another account operation is already running. Please try again shortly."
             : this.scope === "webhook"
@@ -48,6 +50,8 @@ export class UserRateLimiter {
         1,
         this.scope === "global"
           ? "GLOBAL_CONCURRENCY_LIMITED"
+          : this.scope === "ingress"
+            ? "INGRESS_CONCURRENCY_LIMITED"
           : this.scope === "account"
             ? "ACCOUNT_OPERATION_BUSY"
             : this.scope === "webhook"
@@ -64,6 +68,8 @@ export class UserRateLimiter {
       throw rateLimitError(
         this.scope === "global"
           ? "The analysis service is receiving too many requests. Please try again shortly."
+          : this.scope === "ingress"
+            ? "Too many requests were received from this network. Please wait and try again."
           : this.scope === "account"
             ? "Too many account operations were requested. Please wait and try again."
             : this.scope === "webhook"
@@ -72,6 +78,8 @@ export class UserRateLimiter {
         retryAfterSeconds,
         this.scope === "global"
           ? "GLOBAL_RATE_LIMITED"
+          : this.scope === "ingress"
+            ? "INGRESS_RATE_LIMITED"
           : this.scope === "account"
             ? "ACCOUNT_RATE_LIMITED"
             : this.scope === "webhook"
