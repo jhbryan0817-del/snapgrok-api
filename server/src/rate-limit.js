@@ -40,6 +40,8 @@ export class UserRateLimiter {
       throw rateLimitError(
         this.scope === "global"
           ? "The analysis service is busy. Please try again shortly."
+          : this.scope === "authentication"
+            ? "The authentication service is busy. Please try again shortly."
           : this.scope === "ingress"
             ? "Too many requests are already arriving from this network. Please retry shortly."
           : this.scope === "account"
@@ -50,6 +52,8 @@ export class UserRateLimiter {
         1,
         this.scope === "global"
           ? "GLOBAL_CONCURRENCY_LIMITED"
+          : this.scope === "authentication"
+            ? "AUTHENTICATION_CONCURRENCY_LIMITED"
           : this.scope === "ingress"
             ? "INGRESS_CONCURRENCY_LIMITED"
           : this.scope === "account"
@@ -68,6 +72,8 @@ export class UserRateLimiter {
       throw rateLimitError(
         this.scope === "global"
           ? "The analysis service is receiving too many requests. Please try again shortly."
+          : this.scope === "authentication"
+            ? "The authentication service is receiving too many requests. Please try again shortly."
           : this.scope === "ingress"
             ? "Too many requests were received from this network. Please wait and try again."
           : this.scope === "account"
@@ -78,6 +84,8 @@ export class UserRateLimiter {
         retryAfterSeconds,
         this.scope === "global"
           ? "GLOBAL_RATE_LIMITED"
+          : this.scope === "authentication"
+            ? "AUTHENTICATION_RATE_LIMITED"
           : this.scope === "ingress"
             ? "INGRESS_RATE_LIMITED"
           : this.scope === "account"

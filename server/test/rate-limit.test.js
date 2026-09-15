@@ -95,6 +95,29 @@ test("uses distinct account-operation admission-control error codes", () => {
   );
 });
 
+test("uses distinct authentication admission-control error codes", () => {
+  const limiter = new UserRateLimiter({
+    windowMs: 60000,
+    maxRequests: 1,
+    maxConcurrent: 1,
+    scope: "authentication",
+  });
+
+  const release = limiter.acquire("network_1");
+  assert.throws(
+    () => limiter.acquire("network_1"),
+    (error) =>
+      error.status === 429 &&
+      error.code === "AUTHENTICATION_CONCURRENCY_LIMITED",
+  );
+  release();
+  assert.throws(
+    () => limiter.acquire("network_1"),
+    (error) =>
+      error.status === 429 && error.code === "AUTHENTICATION_RATE_LIMITED",
+  );
+});
+
 test("weighted capacity bounds aggregate in-flight analysis bytes", () => {
   const limiter = new WeightedCapacityLimiter({ maxWeight: 10 });
   const releaseFirst = limiter.acquire(6);

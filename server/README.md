@@ -82,6 +82,10 @@ endpoint, and gives harmless crawler requests explicit public responses.
   website creates a one-use pairing grant, and the resulting rotating device
   session is bound to the exact extension origin and live Clerk session.
 - Screenshots, prompts, answers, tokens, and page content are not stored.
+- Network ingress limits run before authentication. A separate bounded
+  authentication lane protects Clerk, device-session, pairing, and database
+  validation, while only successfully authenticated operations consume the
+  trusted control-plane budget.
 - A production analysis result is accepted only when xAI returns
   `x-zero-data-retention: true`; a missing or negative confirmation discards
   the response and releases the reserved quota operation. Repeated failures
@@ -136,13 +140,14 @@ Health Check: /api/live
 Node: 22.23.2
 ```
 
-The v6.5 capacity defaults are intentionally conservative for the current
-single Render Starter instance (0.5 CPU, 512 MiB RAM). Forty is a hard maximum;
-adaptive admission can temporarily lower it to protect latency:
+The current production launch baseline is intentionally conservative for the
+single Render Starter instance (0.5 CPU, 512 MiB RAM). Production is configured
+for 25 concurrent analyses; 40 remains only a tested code-level ceiling.
+Adaptive admission can temporarily lower the deployed limit to protect latency:
 
 ```text
-MAX_CONCURRENT_REQUESTS_GLOBAL=40
-DISTRIBUTED_MAX_CONCURRENT_ANALYSES=40
+MAX_CONCURRENT_REQUESTS_GLOBAL=25
+DISTRIBUTED_MAX_CONCURRENT_ANALYSES=25
 DISTRIBUTED_MAX_ANALYSIS_STARTS_PER_MINUTE=300
 MAX_ACTIVE_ANALYSIS_MB=96
 MAX_REQUEST_MB=2
@@ -154,9 +159,11 @@ EXTENSION_MAX_ACTIVE_DEVICE_SESSIONS_PER_USER=5
 ANALYSIS_INGRESS_RATE_LIMIT_MAX_REQUESTS=600
 ANALYSIS_INGRESS_MAX_CONCURRENT_REQUESTS=30
 CONTROL_PLANE_MAX_CONCURRENT_REQUESTS=80
+CONTROL_PLANE_AUTHENTICATION_RATE_LIMIT_MAX_REQUESTS=3000
+CONTROL_PLANE_AUTHENTICATION_MAX_CONCURRENT_REQUESTS=80
 CONTROL_PLANE_INGRESS_RATE_LIMIT_MAX_REQUESTS=300
 CONTROL_PLANE_INGRESS_MAX_CONCURRENT_REQUESTS=40
-DATABASE_POOL_MAX=10
+DATABASE_POOL_MAX=20
 ADAPTIVE_CONCURRENCY_ENABLED=true
 ADAPTIVE_MIN_CONCURRENT=10
 ADAPTIVE_RECOVERY_MS=30000
@@ -167,6 +174,11 @@ ADAPTIVE_SAMPLE_INTERVAL_MS=250
 ADAPTIVE_PRESSURE_SAMPLES=3
 DATABASE_READINESS_INTERVAL_MS=10000
 DATABASE_READINESS_FAILURE_THRESHOLD=2
+BILLING_MAINTENANCE_FAILURE_THRESHOLD=3
+OPERATIONAL_ALERT_WINDOW_MS=300000
+OPERATIONAL_SERVER_ERROR_THRESHOLD=5
+OPERATIONAL_RATE_LIMIT_THRESHOLD=50
+PROXY_TRUST_MODE=render
 WEBHOOK_RATE_LIMIT_MAX_REQUESTS=60
 WEBHOOK_MAX_CONCURRENT_REQUESTS=10
 WEBHOOK_INGRESS_RATE_LIMIT_MAX_REQUESTS=120
@@ -179,10 +191,9 @@ account export reports Grok 4.3 at 37 starts/second and Grok 4.5 at 150
 starts/second, so the 30/second local gate is conservative for that team; the
 production API key's team association remains unverified. `/api/health` exposes
 only aggregate readiness/adaptive status and limits; content-free performance
-logs add RSS, event-loop, and database-pool evidence. Follow the staged canary in
-[CAPACITY.md](CAPACITY.md) before keeping 40 under load or increasing it. The
-isolated probe supports 80 only as laboratory headroom, not as a production
-setting.
+logs add RSS, event-loop, and database-pool evidence. Follow [CAPACITY.md](CAPACITY.md)
+before increasing the deployed value above 25. The isolated probe supports 80
+only as laboratory headroom, not as a production setting.
 
 Migrations are a separate, intentional release step. Never retain either
 DDL-capable migration URL on the long-running Render API service. Run the
@@ -249,11 +260,13 @@ npm.cmd run privacy:preflight
 Do not deploy until the second result reports all of
 `privacyMigrationApplied`, `privacyTablesPresent`, `privacyRuntimeReady`,
 `safeToApplyPrivacyMigration`, and `safeForConfiguredBillingMode` as `true`.
-After deployment, `/api/health` must report the expected version,
-`privacyControls: true`, `privacyReady: true`, and
-`maintenance.status: healthy`. Complete one authenticated **View my data**,
-**Download file**, and account-deletion re-verification smoke test before
-treating the release as healthy.
+After deployment, `/api/health` must return HTTP 200 and `{ "ok": true }`; its
+public response intentionally omits deployment and maintenance details. Confirm
+the exact commit and detailed readiness in Render, then complete one
+authenticated **View my data**, **Download file**, and account-deletion
+re-verification smoke test before treating the release as healthy. Use
+[PRODUCTION_RELEASE_CHECKLIST.md](PRODUCTION_RELEASE_CHECKLIST.md) for every
+release.
 
 Migration 006 intentionally refuses to drop the three obsolete Lemon Squeezy
 tables if any rows remain. Review/archive real records, or delete only data
@@ -284,10 +297,17 @@ Production also requires an encrypted deletion ledger on a PostgreSQL database
 outside the main restore boundary. Follow `PRIVACY_RECOVERY_RUNBOOK.md` to
 migrate it, configure key rotation, replay post-restore deletions, and operate
 the ZDR latch. A main-database restore is incomplete until that replay has run.
+CI performs a disposable PostgreSQL dump/restore and deletion-ledger replay on
+every release check so the procedure cannot silently drift.
 
 Use the restricted internal PostgreSQL URL on Render; use direct external URLs
 only for the short-lived, trusted migration step. Never commit a populated
 `.env`.
+
+Operational thresholds, health monitoring, and the response matrix are in
+`PRODUCTION_OPERATIONS.md`. GitHub checks the aggregate API and public website
+health every ten minutes; keep Action-failure and Render unhealthy-service
+notifications enabled.
 
 ## Quota behavior
 

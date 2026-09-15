@@ -6,6 +6,8 @@ import {
   createConfig,
   createSnapGrokServer,
   publicMaintenanceDiagnostics,
+  requestClientKey,
+  validateNodeRuntime,
   validateRuntimeConfig,
 } from "../src/server.js";
 import { AdaptiveCapacityLimiter } from "../src/rate-limit.js";
@@ -222,6 +224,96 @@ test("health endpoint reveals no secret configuration", async () => {
   });
 });
 
+test("untrusted authentication cannot consume trusted control-plane capacity", async () => {
+  const authenticationLimiter = trackingLimiter();
+  const trustedLimiter = trackingLimiter();
+  const unauthorized = Object.assign(new Error("Unauthorized."), {
+    status: 401,
+    code: "AUTH_REQUIRED",
+  });
+  const deviceSessions = {
+    async exchangePairing() { throw unauthorized; },
+    async maintenance() {},
+    async close() {},
+  };
+
+  await withServer({
+    authenticate: async (request) => {
+      if (request.headers.authorization !== "Bearer good-token") {
+        throw unauthorized;
+      }
+      return { userId: "user_test", sessionId: "sess_test" };
+    },
+    billing: billingStub(),
+    deviceSessions,
+    controlAuthenticationLimiter: authenticationLimiter,
+    controlGlobalLimiter: trustedLimiter,
+  }, async (baseUrl) => {
+    const invalidPairing = await fetch(
+      `${baseUrl}/api/extension/pairings/exchange`,
+      {
+        method: "POST",
+        headers: {
+          Origin: EXTENSION_ORIGIN,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          pairingCode: `ssp_${"a".repeat(43)}`,
+          nonce: "n".repeat(43),
+        }),
+      },
+    );
+    assert.equal(invalidPairing.status, 401);
+
+    const invalidAccount = await fetch(`${baseUrl}/api/billing/status`, {
+      headers: { Origin: EXTENSION_ORIGIN, Authorization: "Bearer bad-token" },
+    });
+    assert.equal(invalidAccount.status, 401);
+
+    const validAccount = await fetch(`${baseUrl}/api/billing/status`, {
+      headers: { Origin: EXTENSION_ORIGIN, Authorization: "Bearer good-token" },
+    });
+    assert.equal(validAccount.status, 200);
+  });
+
+  assert.equal(authenticationLimiter.acquisitions, 3);
+  assert.equal(authenticationLimiter.releases, 3);
+  assert.equal(trustedLimiter.acquisitions, 1);
+  assert.equal(trustedLimiter.releases, 1);
+});
+
+test("proxy trust is explicit and ignores spoofable forwarding headers by default", () => {
+  const request = {
+    headers: {
+      "cf-connecting-ip": "203.0.113.8",
+      "x-forwarded-for": "198.51.100.7, 192.0.2.9",
+    },
+    socket: { remoteAddress: "127.0.0.1" },
+  };
+  assert.equal(requestClientKey(request), "127.0.0.1");
+  assert.equal(requestClientKey(request, "render"), "203.0.113.8");
+  assert.equal(requestClientKey({
+    ...request,
+    headers: { "x-forwarded-for": "198.51.100.7, 192.0.2.9" },
+  }, "render"), "127.0.0.1");
+  assert.equal(requestClientKey({
+    ...request,
+    headers: { "x-forwarded-for": "198.51.100.7, 192.0.2.9" },
+  }, "forwarded"), "198.51.100.7");
+});
+
+test("startup accepts only the pinned Node runtime", () => {
+  assert.equal(validateNodeRuntime("22.23.2"), "22.23.2");
+  assert.throws(
+    () => validateNodeRuntime("22.13.1"),
+    /expected 22\.23\.2/,
+  );
+  assert.throws(
+    () => validateNodeRuntime("23.0.0"),
+    /expected 22\.23\.2/,
+  );
+});
+
 test("liveness and crawler routes are cheap public endpoints", async () => {
   await withServer({}, async (baseUrl) => {
     const live = await fetch(`${baseUrl}/api/live`);
@@ -287,6 +379,34 @@ test("health fails closed after the cached database readiness probe degrades", a
     server.close();
     await once(server, "close");
   }
+});
+
+test("health exposes repeated server errors as an aggregate operational alarm", async () => {
+  const config = createConfig({
+    ...baseEnvironment(),
+    OPERATIONAL_SERVER_ERROR_THRESHOLD: "1",
+  });
+  await withServer({
+    config,
+    analyze: async () => {
+      throw Object.assign(new Error("provider unavailable"), {
+        status: 502,
+        code: "XAI_UNAVAILABLE",
+      });
+    },
+  }, async (baseUrl) => {
+    const failed = await fetch(
+      `${baseUrl}/api/analyze`,
+      requestOptions(validBody()),
+    );
+    assert.equal(failed.status, 502);
+    const health = await fetch(`${baseUrl}/api/health`);
+    assert.equal(health.status, 503);
+    assert.deepEqual(await health.json(), {
+      ok: false,
+      service: "zenaian-api",
+    });
+  });
 });
 
 test("adaptive pressure lowers analysis admission without blocking health", async () => {
@@ -410,6 +530,32 @@ test("health degrades for overdue or repeatedly partial deletions", async () => 
     const payload = await response.json();
     assert.equal(response.status, 503);
     assert.deepEqual(payload, { ok: false, service: "zenaian-api" });
+  });
+});
+
+test("health degrades only after repeated billing maintenance failures", async () => {
+  let shouldFail = true;
+  const maintenanceError = Object.assign(new Error("billing timeout"), {
+    code: "WHOP_REQUEST_FAILED",
+    providerStatus: 504,
+  });
+  await withServer({
+    billing: billingStub({
+      async maintenance() {
+        if (shouldFail) throw maintenanceError;
+        return { reconciled: true };
+      },
+    }),
+  }, async (baseUrl, server) => {
+    await assert.rejects(server.runBillingMaintenance(), maintenanceError);
+    assert.equal((await fetch(`${baseUrl}/api/health`)).status, 200);
+    await assert.rejects(server.runBillingMaintenance(), maintenanceError);
+    await assert.rejects(server.runBillingMaintenance(), maintenanceError);
+    assert.equal((await fetch(`${baseUrl}/api/health`)).status, 503);
+
+    shouldFail = false;
+    await server.runBillingMaintenance();
+    assert.equal((await fetch(`${baseUrl}/api/health`)).status, 200);
   });
 });
 
@@ -1775,6 +1921,16 @@ test("security-sensitive configuration fails closed on typos", () => {
     /CONTROL_PLANE_MAX_CONCURRENT_REQUESTS must be an integer/,
   );
   assert.throws(
+    () => createConfig({
+      CONTROL_PLANE_AUTHENTICATION_MAX_CONCURRENT_REQUESTS: "0",
+    }),
+    /CONTROL_PLANE_AUTHENTICATION_MAX_CONCURRENT_REQUESTS must be an integer/,
+  );
+  assert.throws(
+    () => createConfig({ PROXY_TRUST_MODE: "trust-everything" }),
+    /PROXY_TRUST_MODE must be one of/,
+  );
+  assert.throws(
     () => createConfig({ PERFORMANCE_LOGS_ENABLED: "maybe" }),
     /PERFORMANCE_LOGS_ENABLED must be true or false/,
   );
@@ -1790,6 +1946,10 @@ test("production capacity defaults are bounded and database coordinated", () => 
   assert.equal(config.adaptivePressureSamples, 3);
   assert.equal(config.shutdownTimeoutMs, 25000);
   assert.equal(config.webhookRateLimitMaxRequests, 60);
+  assert.equal(config.controlPlaneAuthenticationMaxConcurrentRequests, 80);
+  assert.equal(config.operationalServerErrorThreshold, 5);
+  assert.equal(config.operationalRateLimitThreshold, 50);
+  assert.equal(config.proxyTrustMode, "socket");
 });
 
 test("production configuration forbids mock inference and HTTP origins", () => {
@@ -1828,6 +1988,7 @@ test("NODE_ENV=production enables production Clerk enforcement by default", () =
   });
   assert.equal(config.requireProductionClerk, true);
   assert.equal(config.requireXaiZdr, true);
+  assert.equal(config.proxyTrustMode, "render");
   assert.throws(
     () => validateRuntimeConfig(config),
     /requires matching sk_live_ and pk_live_/,
@@ -1983,6 +2144,23 @@ function requestOptions(body) {
       "Content-Type": "application/json",
     },
     body: JSON.stringify(body),
+  };
+}
+
+function trackingLimiter() {
+  return {
+    acquisitions: 0,
+    releases: 0,
+    acquire() {
+      this.acquisitions += 1;
+      let released = false;
+      return () => {
+        if (released) return;
+        released = true;
+        this.releases += 1;
+      };
+    },
+    cleanupExpired() {},
   };
 }
 

@@ -68,6 +68,37 @@ jobs:
           PRIVACY_DELETION_LEDGER_RUNTIME_ROLE: zenaian_ci_ledger_runtime
           PRIVACY_DELETION_LEDGER_ENCRYPTION_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
           PRIVACY_DELETION_LEDGER_ENCRYPTION_KEY_VERSION: "1"
+      - name: Exercise database restore and deletion-ledger replay
+        shell: bash
+        env:
+          MAIN_DATABASE_CONTAINER: ${{ job.services.main-database.id }}
+          RECOVERY_DRILL_DATABASE_URL: postgresql://zenaian_ci_main_runtime:MainRuntimePasswordForCiOnly1234567890@127.0.0.1:5432/zenaian_test_main
+          PRIVACY_DELETION_LEDGER_DATABASE_URL: postgresql://zenaian_ci_ledger_runtime:LedgerRuntimePasswordForCiOnly123456789@127.0.0.1:5433/zenaian_test_ledger
+          PRIVACY_DELETION_LEDGER_ENCRYPTION_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+          PRIVACY_DELETION_LEDGER_ENCRYPTION_KEY_VERSION: "1"
+          PRIVACY_ARCHIVE_HMAC_KEY: BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
+          BILLING_MODE: test
+        run: |
+          set -euo pipefail
+          node scripts/recovery-drill-fixture.js seed
+          docker exec "$MAIN_DATABASE_CONTAINER" \
+            pg_dump --username postgres --format custom \
+            --file /tmp/zenaian-recovery.dump zenaian_test_main
+          node scripts/recovery-drill-fixture.js record
+          docker exec "$MAIN_DATABASE_CONTAINER" \
+            createdb --username postgres zenaian_test_restore
+          docker exec "$MAIN_DATABASE_CONTAINER" \
+            pg_restore --username postgres --dbname zenaian_test_restore \
+            --no-owner --exit-on-error /tmp/zenaian-recovery.dump
+          export DATABASE_URL="postgresql://zenaian_ci_main_runtime:MainRuntimePasswordForCiOnly1234567890@127.0.0.1:5432/zenaian_test_restore"
+          npm run privacy:replay-deletions -- \
+            --after=2000-01-01T00:00:00.000Z --dry-run
+          npm run privacy:replay-deletions -- \
+            --after=2000-01-01T00:00:00.000Z
+          npm run privacy:replay-deletions -- \
+            --after=2000-01-01T00:00:00.000Z
+          export RECOVERY_DRILL_DATABASE_URL="$DATABASE_URL"
+          node scripts/recovery-drill-fixture.js verify
       - run: npm audit --omit=dev --audit-level=low
 
   website:

@@ -75,6 +75,16 @@ database only after its Clerk ID has been encrypted into this external ledger.
 Do not restore the external deletion ledger to the main database restore
 point. Its purpose is to retain the deletions that happened after that point.
 
+## Automated recovery drill
+
+The release workflow creates a disposable PostgreSQL dump before a synthetic
+deletion, records that deletion in the separate encrypted ledger, restores the
+old dump into a new database, runs the replay preview and apply commands, and
+verifies that the resurrected device row is gone and its durable deletion block
+is present. This is a real dump/restore/replay exercise against disposable CI
+databases and makes recovery regressions fail the release gate. It does not
+modify or restore either Render production database.
+
 ## External ledger retention and key rotation
 
 Deletion receipts and retention-purge markers expire after 400 days. This is

@@ -35,6 +35,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const projectDirectory = path.resolve(__dirname, "..");
 const { Pool } = pg;
+const EXPECTED_NODE_VERSION = "22.23.2";
 
 loadEnv(path.join(projectDirectory, ".env"));
 
@@ -367,6 +368,20 @@ export function createConfig(environment = process.env) {
       1,
       200,
     ),
+    controlPlaneAuthenticationRateLimitMaxRequests: boundedInteger(
+      environment,
+      "CONTROL_PLANE_AUTHENTICATION_RATE_LIMIT_MAX_REQUESTS",
+      3000,
+      1,
+      100000,
+    ),
+    controlPlaneAuthenticationMaxConcurrentRequests: boundedInteger(
+      environment,
+      "CONTROL_PLANE_AUTHENTICATION_MAX_CONCURRENT_REQUESTS",
+      80,
+      1,
+      200,
+    ),
     controlPlaneIngressRateLimitMaxRequests: boundedInteger(
       environment,
       "CONTROL_PLANE_INGRESS_RATE_LIMIT_MAX_REQUESTS",
@@ -385,6 +400,27 @@ export function createConfig(environment = process.env) {
       environment,
       "PERFORMANCE_LOGS_ENABLED",
       productionRuntime,
+    ),
+    operationalAlertWindowMs: boundedInteger(
+      environment,
+      "OPERATIONAL_ALERT_WINDOW_MS",
+      300000,
+      60000,
+      3600000,
+    ),
+    operationalServerErrorThreshold: boundedInteger(
+      environment,
+      "OPERATIONAL_SERVER_ERROR_THRESHOLD",
+      5,
+      1,
+      10000,
+    ),
+    operationalRateLimitThreshold: boundedInteger(
+      environment,
+      "OPERATIONAL_RATE_LIMIT_THRESHOLD",
+      50,
+      1,
+      100000,
     ),
     webhookRateLimitMaxRequests: boundedInteger(
       environment,
@@ -441,6 +477,12 @@ export function createConfig(environment = process.env) {
       30000,
       1000,
       120000,
+    ),
+    proxyTrustMode: enumFrom(
+      environment,
+      "PROXY_TRUST_MODE",
+      productionRuntime ? "render" : "socket",
+      new Set(["render", "forwarded", "socket"]),
     ),
     headersTimeoutMs: boundedInteger(
       environment,
@@ -576,6 +618,13 @@ export function createConfig(environment = process.env) {
       900000,
       300000,
       86400000,
+    ),
+    billingMaintenanceFailureThreshold: boundedInteger(
+      environment,
+      "BILLING_MAINTENANCE_FAILURE_THRESHOLD",
+      3,
+      1,
+      20,
     ),
     billingWebhookRetentionDays: boundedInteger(
       environment,
@@ -913,6 +962,7 @@ export function createZenaianServer({
   limiter,
   globalLimiter,
   controlGlobalLimiter,
+  controlAuthenticationLimiter,
   memoryLimiter,
   adaptiveLimiter,
   mainDatabasePool,
@@ -964,6 +1014,15 @@ export function createZenaianServer({
       maxTrackedUsers: 1,
       scope: "global",
     });
+  const controlAuthenticationRequestLimiter =
+    controlAuthenticationLimiter ||
+    new UserRateLimiter({
+      windowMs: config.rateLimitWindowMs,
+      maxRequests: config.controlPlaneAuthenticationRateLimitMaxRequests,
+      maxConcurrent: config.controlPlaneAuthenticationMaxConcurrentRequests,
+      maxTrackedUsers: 1,
+      scope: "authentication",
+    });
   const webhookRequestLimiter = new UserRateLimiter({
     windowMs: 60000,
     maxRequests: config.webhookRateLimitMaxRequests,
@@ -1012,6 +1071,7 @@ export function createZenaianServer({
     config,
     databasePool: runtimeMainDatabasePool,
   });
+  const operationalErrorMonitor = createOperationalErrorMonitor({ config });
   const accountRequestLimiter = new UserRateLimiter({
     windowMs: 60000,
     maxRequests: 6,
@@ -1101,8 +1161,79 @@ export function createZenaianServer({
     deletionBacklog: null,
     zdrSafety: null,
   };
+  const billingMaintenanceState = {
+    consecutiveFailures: 0,
+    degraded: false,
+  };
   let lifecycleState = "ready";
   let privacyMaintenancePromise = null;
+  let billingMaintenancePromise = null;
+  const admitAuthenticatedControl = async (authenticateOperation) => {
+    const releaseAuthentication = controlAuthenticationRequestLimiter.acquire(
+      "control-authentication",
+    );
+    try {
+      const value = await authenticateOperation();
+      return {
+        value,
+        releaseControl: controlGlobalRequestLimiter.acquire("control-plane"),
+      };
+    } finally {
+      releaseAuthentication();
+    }
+  };
+  const admitAuthenticationOnly = async (authenticateOperation) => {
+    const releaseAuthentication = controlAuthenticationRequestLimiter.acquire(
+      "control-authentication",
+    );
+    try {
+      return await authenticateOperation();
+    } finally {
+      releaseAuthentication();
+    }
+  };
+  const runBillingMaintenance = () => {
+    if (!billingService.maintenance) return Promise.resolve(null);
+    if (billingMaintenancePromise) return billingMaintenancePromise;
+    billingMaintenancePromise = Promise.resolve()
+      .then(() => billingService.maintenance())
+      .then((result) => {
+        const recovered = billingMaintenanceState.degraded;
+        billingMaintenanceState.consecutiveFailures = 0;
+        billingMaintenanceState.degraded = false;
+        if (recovered) {
+          console.info(JSON.stringify({
+            timestamp: new Date().toISOString(),
+            event: "operational_alert_recovered",
+            operation: "billing_maintenance",
+          }));
+        }
+        return result;
+      })
+      .catch((error) => {
+        billingMaintenanceState.consecutiveFailures += 1;
+        const newlyDegraded =
+          !billingMaintenanceState.degraded &&
+          billingMaintenanceState.consecutiveFailures >=
+            config.billingMaintenanceFailureThreshold;
+        billingMaintenanceState.degraded ||= newlyDegraded;
+        if (newlyDegraded) {
+          console.error(JSON.stringify({
+            timestamp: new Date().toISOString(),
+            event: "operational_alert",
+            operation: "billing_maintenance",
+            code: publicErrorCode(error),
+            consecutiveFailures: billingMaintenanceState.consecutiveFailures,
+            ...publicMaintenanceDiagnostics(error),
+          }));
+        }
+        throw error;
+      })
+      .finally(() => {
+        billingMaintenancePromise = null;
+      });
+    return billingMaintenancePromise;
+  };
   const runPrivacyMaintenance = () => {
     if (!privacyService?.maintenance) return Promise.resolve(null);
     if (privacyMaintenancePromise) return privacyMaintenancePromise;
@@ -1134,6 +1265,7 @@ export function createZenaianServer({
       userRateLimiter.cleanupExpired?.();
       analysisGlobalRequestLimiter.cleanupExpired?.();
       controlGlobalRequestLimiter.cleanupExpired?.();
+      controlAuthenticationRequestLimiter.cleanupExpired?.();
       webhookRequestLimiter.cleanupExpired?.();
       analysisIngressRequestLimiter.cleanupExpired?.();
       controlIngressRequestLimiter.cleanupExpired?.();
@@ -1150,7 +1282,7 @@ export function createZenaianServer({
           }),
         );
       });
-      void billingService.maintenance?.().catch((error) => {
+      void runBillingMaintenance().catch((error) => {
         console.error(
           JSON.stringify({
             timestamp: new Date().toISOString(),
@@ -1196,7 +1328,7 @@ export function createZenaianServer({
       }
 
       try {
-        const clientKey = requestClientKey(request);
+        const clientKey = requestClientKey(request, config.proxyTrustMode);
         if (url.pathname === "/api/billing/webhook") {
           releaseIngress = webhookIngressRequestLimiter.acquire(clientKey);
         } else if (url.pathname.startsWith("/api/analyze")) {
@@ -1230,7 +1362,10 @@ export function createZenaianServer({
             privacyMaintenanceState,
           );
           const database = databaseReadinessMonitor.publicSnapshot();
+          const operationalErrors = operationalErrorMonitor.snapshot();
           const degraded = maintenance.status === "degraded" ||
+            billingMaintenanceState.degraded ||
+            operationalErrors.degraded ||
             database.status === "degraded" ||
             database.status === "pending" ||
             lifecycleState !== "ready";
@@ -1312,8 +1447,11 @@ export function createZenaianServer({
           let releaseGlobal = null;
           let releaseAccount = null;
           try {
-            const auth = await authenticateRequest(request);
-            releaseGlobal = controlGlobalRequestLimiter.acquire("control-plane");
+            const admission = await admitAuthenticatedControl(
+              () => authenticateRequest(request),
+            );
+            const auth = admission.value;
+            releaseGlobal = admission.releaseControl;
             releaseAccount = accountRequestLimiter.acquire(auth.userId);
             await privacyService?.assertUserAllowed(auth.userId);
             const body = await readJsonBody(config, request);
@@ -1345,26 +1483,23 @@ export function createZenaianServer({
         ) {
           enforceOrigin(config, request);
           requireDeviceSessionService(deviceSessionService);
-          const releaseGlobal = controlGlobalRequestLimiter.acquire("control-plane");
-          try {
+          const session = await admitAuthenticationOnly(async () => {
             const body = await readJsonBody(config, request);
             validatePairingExchangeRequest(body);
-            const session = await deviceSessionService.exchangePairing({
+            return deviceSessionService.exchangePairing({
               pairingCode: body.pairingCode,
               nonce: body.nonce,
               requestOrigin: requestOrigin(request),
             });
-            sendJson(
-              config,
-              request,
-              response,
-              200,
-              { ok: true, ...session },
-              requestId,
-            );
-          } finally {
-            releaseGlobal();
-          }
+          });
+          sendJson(
+            config,
+            request,
+            response,
+            200,
+            { ok: true, ...session },
+            requestId,
+          );
           return;
         }
 
@@ -1374,25 +1509,22 @@ export function createZenaianServer({
         ) {
           enforceOrigin(config, request);
           requireDeviceSessionService(deviceSessionService);
-          const releaseGlobal = controlGlobalRequestLimiter.acquire("control-plane");
-          try {
+          const session = await admitAuthenticationOnly(async () => {
             const body = await readJsonBody(config, request);
             validateRefreshRequest(body);
-            const session = await deviceSessionService.refresh({
+            return deviceSessionService.refresh({
               refreshToken: body.refreshToken,
               requestOrigin: requestOrigin(request),
             });
-            sendJson(
-              config,
-              request,
-              response,
-              200,
-              { ok: true, ...session },
-              requestId,
-            );
-          } finally {
-            releaseGlobal();
-          }
+          });
+          sendJson(
+            config,
+            request,
+            response,
+            200,
+            { ok: true, ...session },
+            requestId,
+          );
           return;
         }
 
@@ -1404,9 +1536,11 @@ export function createZenaianServer({
         ) {
           enforceOrigin(config, request);
           requireDeviceSessionService(deviceSessionService);
-          const releaseGlobal = controlGlobalRequestLimiter.acquire("control-plane");
+          const { value: auth, releaseControl: releaseGlobal } =
+            await admitAuthenticatedControl(
+              () => deviceSessionService.authenticateAccess(request),
+            );
           try {
-            const auth = await deviceSessionService.authenticateAccess(request);
             if (request.method === "POST") {
               const body = await readJsonBody(config, request);
               requireEmptyObject(body, "Extension session verification request");
@@ -1437,9 +1571,11 @@ export function createZenaianServer({
         ) {
           enforceOrigin(config, request);
           requireDeviceSessionService(deviceSessionService);
-          const releaseGlobal = controlGlobalRequestLimiter.acquire("control-plane");
+          const { value: auth, releaseControl: releaseGlobal } =
+            await admitAuthenticatedControl(
+              () => deviceSessionService.authenticateAccess(request),
+            );
           try {
-            const auth = await deviceSessionService.authenticateAccess(request);
             if (request.method === "POST") {
               const body = await readJsonBody(config, request);
               requireEmptyObject(body, "Extension session revocation request");
@@ -1468,9 +1604,11 @@ export function createZenaianServer({
         ) {
           enforceOrigin(config, request);
           requireDeviceSessionService(deviceSessionService);
-          const releaseGlobal = controlGlobalRequestLimiter.acquire("control-plane");
+          const { value: auth, releaseControl: releaseGlobal } =
+            await admitAuthenticatedControl(
+              () => deviceSessionService.authenticateAccess(request),
+            );
           try {
-            const auth = await deviceSessionService.authenticateAccess(request);
             if (!auth.userAllowedChecked) {
               await privacyService?.assertUserAllowed(auth.userId);
             }
@@ -1496,9 +1634,9 @@ export function createZenaianServer({
           enforceOrigin(config, request);
           enforceWebsiteOrigin(config, request);
           requireDeviceSessionService(deviceSessionService);
-          const releaseGlobal = controlGlobalRequestLimiter.acquire("control-plane");
+          const { value: auth, releaseControl: releaseGlobal } =
+            await admitAuthenticatedControl(() => authenticateRequest(request));
           try {
-            const auth = await authenticateRequest(request);
             const body = await readJsonBody(config, request);
             if (Object.keys(body).length !== 0) {
               throw httpError(
@@ -1543,7 +1681,9 @@ export function createZenaianServer({
           let admissionTransferred = false;
           let body = null;
           try {
-            const auth = await deviceSessionService.authenticateAccess(request);
+            const auth = await admitAuthenticationOnly(
+              () => deviceSessionService.authenticateAccess(request),
+            );
             if (!auth.userAllowedChecked) {
               await privacyService?.assertUserAllowed(auth.userId);
             }
@@ -1611,10 +1751,11 @@ export function createZenaianServer({
           enforceOrigin(config, request);
           requireDeviceSessionService(deviceSessionService);
           requireAnalysisJobManager(analysisJobManager);
-          const releaseControl =
-            controlGlobalRequestLimiter.acquire("control-plane");
+          const { value: auth, releaseControl } =
+            await admitAuthenticatedControl(
+              () => deviceSessionService.authenticateAccess(request),
+            );
           try {
-            const auth = await deviceSessionService.authenticateAccess(request);
             if (!auth.userAllowedChecked) {
               await privacyService?.assertUserAllowed(auth.userId);
             }
@@ -1680,10 +1821,11 @@ export function createZenaianServer({
           enforceOrigin(config, request);
           requireDeviceSessionService(deviceSessionService);
           requireAnalysisJobManager(analysisJobManager);
-          const releaseControl =
-            controlGlobalRequestLimiter.acquire("control-plane");
+          const { value: auth, releaseControl } =
+            await admitAuthenticatedControl(
+              () => deviceSessionService.authenticateAccess(request),
+            );
           try {
-            const auth = await deviceSessionService.authenticateAccess(request);
             if (!auth.userAllowedChecked) {
               await privacyService?.assertUserAllowed(auth.userId);
             }
@@ -1727,9 +1869,9 @@ export function createZenaianServer({
           enforceOrigin(config, request);
           enforceWebsiteOrigin(config, request);
           requirePrivacyService(privacyService);
-          const releaseGlobal = controlGlobalRequestLimiter.acquire("control-plane");
+          const { value: auth, releaseControl: releaseGlobal } =
+            await admitAuthenticatedControl(() => authenticateRequest(request));
           try {
-            const auth = await authenticateRequest(request);
             const releaseAccount = accountRequestLimiter.acquire(auth.userId);
             try {
               requireRecentAuthentication(
@@ -1761,9 +1903,9 @@ export function createZenaianServer({
           enforceOrigin(config, request);
           enforceWebsiteOrigin(config, request);
           requirePrivacyService(privacyService);
-          const releaseGlobal = controlGlobalRequestLimiter.acquire("control-plane");
+          const { value: auth, releaseControl: releaseGlobal } =
+            await admitAuthenticatedControl(() => authenticateRequest(request));
           try {
-            const auth = await authenticateRequest(request);
             const releaseAccount = accountRequestLimiter.acquire(auth.userId);
             try {
               requireRecentAuthentication(
@@ -1827,10 +1969,9 @@ export function createZenaianServer({
           url.pathname === "/api/billing/status"
         ) {
           enforceOrigin(config, request);
-          const releaseGlobalLimit =
-            controlGlobalRequestLimiter.acquire("control-plane");
+          const { value: auth, releaseControl: releaseGlobalLimit } =
+            await admitAuthenticatedControl(() => authenticateRequest(request));
           try {
-            const auth = await authenticateRequest(request);
             if (privacyService?.seedSubjectIdentity) {
               await privacyService.seedSubjectIdentity(auth.userId);
             } else {
@@ -1857,10 +1998,9 @@ export function createZenaianServer({
         ) {
           enforceOrigin(config, request);
           enforceBillingWebsiteOrigin(config, request);
-          const releaseGlobalLimit =
-            controlGlobalRequestLimiter.acquire("control-plane");
+          const { value: auth, releaseControl: releaseGlobalLimit } =
+            await admitAuthenticatedControl(() => authenticateRequest(request));
           try {
-            const auth = await authenticateRequest(request);
             await privacyService?.assertUserAllowed(auth.userId);
             const history = await billingService.paymentHistory(auth.userId);
             sendJson(
@@ -1883,10 +2023,9 @@ export function createZenaianServer({
         ) {
           enforceOrigin(config, request);
           enforceBillingWebsiteOrigin(config, request);
-          const releaseGlobalLimit =
-            controlGlobalRequestLimiter.acquire("control-plane");
+          const { value: auth, releaseControl: releaseGlobalLimit } =
+            await admitAuthenticatedControl(() => authenticateRequest(request));
           try {
-            const auth = await authenticateRequest(request);
             const releaseAccount = accountRequestLimiter.acquire(auth.userId);
             try {
               const profile = await privacyService?.ensureSubjectIdentity(
@@ -1925,10 +2064,9 @@ export function createZenaianServer({
         ) {
           enforceOrigin(config, request);
           enforceBillingWebsiteOrigin(config, request);
-          const releaseGlobalLimit =
-            controlGlobalRequestLimiter.acquire("control-plane");
+          const { value: auth, releaseControl: releaseGlobalLimit } =
+            await admitAuthenticatedControl(() => authenticateRequest(request));
           try {
-            const auth = await authenticateRequest(request);
             const releaseAccount = accountRequestLimiter.acquire(auth.userId);
             try {
               await privacyService?.assertUserAllowed(auth.userId);
@@ -1961,10 +2099,9 @@ export function createZenaianServer({
         ) {
           enforceOrigin(config, request);
           enforceBillingWebsiteOrigin(config, request);
-          const releaseGlobalLimit =
-            controlGlobalRequestLimiter.acquire("control-plane");
+          const { value: auth, releaseControl: releaseGlobalLimit } =
+            await admitAuthenticatedControl(() => authenticateRequest(request));
           try {
-            const auth = await authenticateRequest(request);
             const releaseAccount = accountRequestLimiter.acquire(auth.userId);
             try {
               await privacyService?.assertUserAllowed(auth.userId);
@@ -1993,10 +2130,9 @@ export function createZenaianServer({
 
         if (request.method === "GET" && url.pathname === "/api/balance") {
           enforceOrigin(config, request);
-          const releaseGlobalLimit = controlGlobalRequestLimiter.acquire("control-plane");
+          const { value: auth, releaseControl: releaseGlobalLimit } =
+            await admitAuthenticatedControl(() => authenticateRequest(request));
           try {
-            const auth = await authenticateRequest(request);
-
             if (!config.adminUserIds.has(auth.userId)) {
               throw httpError(404, "Not found.", "NOT_FOUND");
             }
@@ -2021,7 +2157,9 @@ export function createZenaianServer({
           let releaseAdaptive = null;
           let releaseMemory = null;
           try {
-            const auth = await authenticateRequest(request);
+            const auth = await admitAuthenticationOnly(
+              () => authenticateRequest(request),
+            );
             await privacyService?.assertUserAllowed(auth.userId);
             releaseGlobalLimit = analysisGlobalRequestLimiter.acquire("analysis");
             releaseAdaptive = adaptiveAnalysisLimiter.acquire();
@@ -2148,6 +2286,7 @@ export function createZenaianServer({
         const status = normalizeHttpStatus(error?.status);
         const retryAfterSeconds = Number(error?.retryAfterSeconds) || 0;
         const errorCode = publicErrorCode(error);
+        operationalErrorMonitor.record(status);
 
         console.error(
           JSON.stringify({
@@ -2223,11 +2362,13 @@ export function createZenaianServer({
   server.analysisJobManager = analysisJobManager;
   server.privacyService = privacyService;
   server.runPrivacyMaintenance = runPrivacyMaintenance;
+  server.runBillingMaintenance = runBillingMaintenance;
   server.initializeReadiness = databaseReadinessMonitor.initialize;
   server.capacitySnapshot = capacityMonitor.snapshot;
   server.readinessSnapshot = () => ({
     lifecycle: lifecycleState,
     database: databaseReadinessMonitor.publicSnapshot(),
+    operationalErrors: operationalErrorMonitor.snapshot(),
   });
   server.shutdown = ({ timeoutMs = config.shutdownTimeoutMs } = {}) => {
     if (shutdownPromise) return shutdownPromise;
@@ -2332,6 +2473,86 @@ function settleBeforeDeadline(promise, deadline) {
 // Compatibility aliases preserve the established test and integration API.
 export const createSneakSolveServer = createZenaianServer;
 export const createSnapGrokServer = createZenaianServer;
+
+function createOperationalErrorMonitor({ config, now = Date.now }) {
+  let windowStartedAt = now();
+  let serverErrors = 0;
+  let rateLimits = 0;
+  let serverErrorAlerted = false;
+  let rateLimitAlerted = false;
+
+  function rollover() {
+    const timestamp = now();
+    if (windowStartedAt + config.operationalAlertWindowMs > timestamp) return;
+    if (serverErrorAlerted || rateLimitAlerted) {
+      console.info(JSON.stringify({
+        timestamp: new Date(timestamp).toISOString(),
+        event: "operational_alert_recovered",
+        operation: "http_errors",
+      }));
+    }
+    windowStartedAt = timestamp;
+    serverErrors = 0;
+    rateLimits = 0;
+    serverErrorAlerted = false;
+    rateLimitAlerted = false;
+  }
+
+  function alert(category, count, threshold) {
+    console.error(JSON.stringify({
+      timestamp: new Date(now()).toISOString(),
+      event: "operational_alert",
+      operation: "http_errors",
+      category,
+      count,
+      threshold,
+      windowMs: config.operationalAlertWindowMs,
+    }));
+  }
+
+  return {
+    record(status) {
+      rollover();
+      if (status >= 500) {
+        serverErrors += 1;
+        if (
+          !serverErrorAlerted &&
+          serverErrors >= config.operationalServerErrorThreshold
+        ) {
+          serverErrorAlerted = true;
+          alert(
+            "http_5xx",
+            serverErrors,
+            config.operationalServerErrorThreshold,
+          );
+        }
+      }
+      if (status === 429) {
+        rateLimits += 1;
+        if (
+          !rateLimitAlerted &&
+          rateLimits >= config.operationalRateLimitThreshold
+        ) {
+          rateLimitAlerted = true;
+          alert(
+            "http_429",
+            rateLimits,
+            config.operationalRateLimitThreshold,
+          );
+        }
+      }
+    },
+    snapshot() {
+      rollover();
+      return {
+        degraded: serverErrorAlerted || rateLimitAlerted,
+        serverErrors,
+        rateLimits,
+        windowStartedAt,
+      };
+    },
+  };
+}
 
 function createCapacityMonitor({ config, limiter, databasePool }) {
   const eventLoop = monitorEventLoopDelay({ resolution: 20 });
@@ -2969,19 +3190,25 @@ function requestOrigin(request) {
   return String(request.headers.origin || "").trim().replace(/\/$/, "");
 }
 
-function requestClientKey(request) {
+export function requestClientKey(request, proxyTrustMode = "socket") {
+  const remoteAddress = String(request.socket?.remoteAddress || "").trim();
+  const fallback = isIP(remoteAddress) ? remoteAddress : "unidentified-client";
+
+  if (proxyTrustMode === "socket") return fallback;
+
   const cloudflareAddress = String(
     request.headers["cf-connecting-ip"] || "",
   ).trim();
   if (isIP(cloudflareAddress)) return cloudflareAddress;
+
+  if (proxyTrustMode !== "forwarded") return fallback;
 
   const forwardedAddress = String(request.headers["x-forwarded-for"] || "")
     .split(",", 1)[0]
     .trim();
   if (isIP(forwardedAddress)) return forwardedAddress;
 
-  const remoteAddress = String(request.socket?.remoteAddress || "").trim();
-  return isIP(remoteAddress) ? remoteAddress : "unidentified-client";
+  return fallback;
 }
 
 function isOriginAllowed(config, origin) {
@@ -3701,7 +3928,18 @@ export function publicMaintenanceDiagnostics(error) {
   return result;
 }
 
+export function validateNodeRuntime(version = process.versions.node) {
+  const actual = String(version || "").trim();
+  if (actual !== EXPECTED_NODE_VERSION) {
+    throw new Error(
+      `Unsupported Node.js runtime ${actual || "unknown"}; expected ${EXPECTED_NODE_VERSION}.`,
+    );
+  }
+  return actual;
+}
+
 async function startServer() {
+  validateNodeRuntime();
   const config = createConfig();
   validateRuntimeConfig(config);
   const server = createZenaianServer({ config });
@@ -3734,6 +3972,7 @@ async function startServer() {
   process.once("SIGINT", () => shutdown("SIGINT"));
   server.listen(config.port, "0.0.0.0", () => {
     console.log(`Zenaian server is listening on port ${config.port}`);
+    console.log(`Node.js runtime: ${process.versions.node}`);
     console.log(`Model: ${config.mockMode ? "mock-xai" : config.model}`);
     console.log("Clerk authentication and active-session checks: required");
     console.log(`Allowed origins configured: ${config.allowedOrigins.size}`);
