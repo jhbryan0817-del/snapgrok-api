@@ -22,14 +22,12 @@ export function SiteFooter() {
 
         <div className="footer-business-details" aria-label="Business information">
           <div className="footer-business-row">
-            <p><strong>Business name</strong><span>[BUSINESS NAME]</span></p>
-            <p><strong>Representative</strong><span>[REPRESENTATIVE NAME]</span></p>
-            <p><strong>Contact point</strong><span>[BUSINESS PHONE / BUSINESS EMAIL]</span></p>
+            <p><strong>Business name</strong><span>제나이안</span></p>
+            <p><strong>Registration Number</strong><span>532-11-03077</span></p>
+            <p><strong>Contact point</strong><span>info@zenaian.com</span></p>
           </div>
           <div className="footer-business-row">
-            <p><strong>Business address</strong><span>[BUSINESS ADDRESS]</span></p>
-            <p><strong>Business ID</strong><span>[BUSINESS ID]</span></p>
-            <p><strong>Mail-order report</strong><span>[REPORT NUMBER / FILING AUTHORITY]</span></p>
+            <p><strong>Business address</strong><span>101-904, Hongjaechun-ro, Seodaemun-gu, Seoul</span></p>
           </div>
         </div>
 
