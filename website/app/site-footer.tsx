@@ -27,7 +27,7 @@ export function SiteFooter() {
             <p><strong>Contact point</strong><span>info@zenaian.com</span></p>
           </div>
           <div className="footer-business-row">
-            <p><strong>Business address</strong><span>101-904, Hongjaechun-ro, Seodaemun-gu, Seoul</span></p>
+            <p><strong>Business address</strong><span>101-904, 136 Hongjaechun-ro, Seodaemun-gu, Seoul</span></p>
           </div>
         </div>
 
