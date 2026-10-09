@@ -442,9 +442,7 @@ export default function PrivacyPage() {
             <p>
               We may update this policy when the service, providers, law or
               data practices change. Material changes will be identified by a
-              revised date and any notice/consent required by law. Contact: <a href="mailto:privacy@zenaian.com">privacy@zenaian.com</a>.
-              Operator: [LEGAL OPERATOR NAME / ADDRESS / BUSINESS REGISTRATION].
-              Privacy responsible person: [CPO DETAILS].
+              revised date and any notice/consent required by law.
             </p>
           </section>
         </div>
