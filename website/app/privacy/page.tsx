@@ -95,7 +95,7 @@ export default function PrivacyPage() {
           privacy-support communications.
         </p>
         <div className="policy-meta">
-          <span>Effective: [EFFECTIVE DATE]</span>
+          <span>Effective: October 12, 2026</span>
           <span>Last updated: August 14, 2026</span>
         </div>
       </section>
@@ -123,10 +123,9 @@ export default function PrivacyPage() {
             <span>01</span>
             <h2>Who we are and scope</h2>
             <p>
-              Zenaian is operated by [LEGAL OPERATOR NAME], [LEGAL FORM],
-              Republic of Korea, with address [KOREAN BUSINESS ADDRESS].
-              Privacy contact: <a href="mailto:privacy@zenaian.com">privacy@zenaian.com</a>.
-              Privacy responsible person / CPO: [NAME / TITLE / CONTACT].
+              Zenaian (제나이안) is a registered business entity (532-11-03077) based in 
+              Republic of Korea.
+              With concerns in regards to privacy, please reach us at: <a href="mailto:privacy@zenaian.com">privacy@zenaian.com</a>.
             </p>
             <p>
               This Privacy Policy applies to www.zenaian.com, the Zenaian
