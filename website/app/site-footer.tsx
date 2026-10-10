@@ -15,7 +15,7 @@ export function SiteFooter() {
             <Link href="/careers">Careers</Link>
             <Link href="/privacy">Privacy Policy</Link>
             <Link href="/terms">Terms of Service</Link>
-            <a href="mailto:sneaksolve@gmail.com">Contact Us</a>
+            <a href="mailto:info@zenaian.com">Contact Us</a>
             <Link href="/account">Account</Link>
           </nav>
         </div>

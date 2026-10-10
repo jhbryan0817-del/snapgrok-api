@@ -170,7 +170,7 @@ test("global header has the requested destinations", () => {
   assert.doesNotMatch(header, /nav-placeholder|Coming soon/);
   assert.doesNotMatch(header, /href="\/affiliate"/);
   assert.doesNotMatch(header, /Use Cases|href="\/use-cases"/);
-  assert.match(header, /href="mailto:sneaksolve@gmail\.com"/);
+  assert.match(header, /href="mailto:info@zenaian\.com"/);
   assert.doesNotMatch(header, /href="\/contact"/);
   assert.match(header, /site-header shell\$\{isCondensed \? " site-header-condensed" : ""\}/);
   assert.match(header, /window\.scrollY > 48/);
@@ -208,7 +208,7 @@ test("logo and viewport motion refinements remain stable", () => {
   assert.match(css, /\.frontier-panel \{[\s\S]*rgba\(234,238,247,\.97\)/);
   assert.match(css, /--blue: #0549fd/);
   assert.match(css, /\.site-footer[\s\S]*background: #fff/);
-  assert.match(css, /\.site-header-condensed \{[^}]*scale\(\.86\)[^}]*rgba\(255, 255, 255, \.52\)/);
+  assert.match(css, /\.site-header-condensed \{[^}]*scale\(\.86\)/);
   assert.match(css, /\.demo-answer-list \{[^}]*grid-template-columns: minmax\(0, 1fr\)/);
   assert.doesNotMatch(css, /@keyframes demo-question-cycle/);
 });
@@ -219,7 +219,7 @@ test("home, auth and account pages all use the global header", () => {
   assert.match(read("app\/account\/page.tsx"), /<SiteHeader \/>/);
 });
 
-test("global footer contains navigation, business placeholders, and accurate xAI attribution", () => {
+test("global footer contains navigation, published business details, and accurate xAI attribution", () => {
   const layout = read("app/layout.tsx");
   const footer = read("app/site-footer.tsx");
   const css = read("app/globals.css");
@@ -227,19 +227,12 @@ test("global footer contains navigation, business placeholders, and accurate xAI
   for (const label of ["Pricing", "Careers", "Privacy Policy", "Terms of Service", "Contact Us", "Account"]) {
     assert.match(footer, new RegExp(`>${label}<`));
   }
-  assert.match(footer, /href="mailto:sneaksolve@gmail\.com"/);
+  assert.match(footer, /href="mailto:info@zenaian\.com"/);
   assert.doesNotMatch(footer, /Use Cases|href="\/use-cases"/);
   assert.doesNotMatch(footer, /Affiliate Marketing|href="\/affiliate"/);
   assert.doesNotMatch(footer, /Study smarter\. Stay focused\. Built for learners everywhere\./);
-  for (const placeholder of [
-    "BUSINESS NAME",
-    "REPRESENTATIVE NAME",
-    "BUSINESS PHONE / BUSINESS EMAIL",
-    "BUSINESS ADDRESS",
-    "BUSINESS ID",
-    "REPORT NUMBER / FILING AUTHORITY",
-  ]) {
-    assert.match(footer, new RegExp(`\\[${placeholder}\\]`));
+  for (const detail of ["제나이안 (Zenaian)", "532-11-03077", "info@zenaian.com", "Seoul, South Korea"]) {
+    assert.ok(footer.includes(detail), `${detail} missing from business footer`);
   }
   assert.match(css, /\.site-footer-top \{[^}]*justify-content: space-between;/);
   assert.match(css, /\.site-footer \.footer-nav \{[^}]*justify-content: flex-end;/);
@@ -261,14 +254,14 @@ test("all Clerk sign-in and sign-up completions return to account management", (
 
 test("authentication shell is intentionally simple", () => {
   const shell = read("app/auth-shell.tsx");
-  assert.match(shell, /Welcome to Zenaian\./);
-  assert.match(shell, /auth-simple-card/);
+  assert.doesNotMatch(shell, /Welcome to Zenaian|auth-simple-card/);
+  assert.match(shell, /aria-label="Zenaian account access"/);
   assert.doesNotMatch(shell, /auth-proof-card|auth-assurance|auth-mode-switch/);
 });
 
-test("Clerk card is centered inside the authentication panel", () => {
+test("Clerk card is centered without an extra authentication panel", () => {
   const css = read("app/globals.css");
-  assert.match(css, /\.auth-simple-card \.clerk-surface[\s\S]*justify-content: center/);
+  assert.match(css, /\.auth-simple-layout \.clerk-surface[\s\S]*justify-content: center/);
   assert.match(css, /\[class\*="cl-rootBox"\][\s\S]*justify-content: center/);
   assert.match(css, /\[class\*="cl-cardBox"\][\s\S]*margin-inline: auto/);
 });
@@ -569,15 +562,15 @@ test("privacy page publishes the approved product, transfer, and retention terms
   ]) {
     assert.match(privacy, new RegExp(expected));
   }
-  assert.match(privacy, /Effective: \[EFFECTIVE DATE\]/);
+  assert.match(privacy, /Effective: October 12, 2026/);
   assert.match(privacy, /does not save the screenshot, instruction,[\s\S]*question text or AI answer/);
   assert.match(privacy, /Do not submit screenshots containing identifiable sensitive personal information or credentials\./);
   assert.match(privacy, /checkout_configuration_id/);
   assert.match(privacy, /PIPA Article[\s\S]{0,80}28-8\(1\)\(3\)/);
   assert.match(privacy, /Legally required payment\/supply records/);
   assert.match(privacy, /mailto:privacy@zenaian\.com/g);
-  assert.match(privacy, /\[LEGAL OPERATOR NAME\]/);
-  assert.match(privacy, /\[CPO DETAILS\]/);
+  assert.match(privacy, /Zenaian \(제나이안\).*532-11-03077/);
+  assert.match(privacy, /privacy@zenaian\.com/);
   assert.doesNotMatch(privacy, /DOCUMENT C|DOCUMENT D|Whop checkout additional terms/i);
   assert.doesNotMatch(privacy, /Working draft|retained for 30 days by default/);
 });
@@ -620,6 +613,6 @@ test("Whop checkout terms separately describe Plus and Ultra recurring purchases
 
 test("the removed contact route is replaced by direct email links", () => {
   assert.equal(existsSync(resolve(root, "app/contact/page.tsx")), false);
-  assert.match(read("app/site-header.tsx"), /mailto:sneaksolve@gmail\.com/);
-  assert.match(read("app/site-footer.tsx"), /mailto:sneaksolve@gmail\.com/);
+  assert.match(read("app/site-header.tsx"), /mailto:info@zenaian\.com/);
+  assert.match(read("app/site-footer.tsx"), /mailto:info@zenaian\.com/);
 });

@@ -91,17 +91,17 @@ test("account deletion requires four acknowledgements and exact typed DELETE", (
   assert.match(panel, /rolling provider backups age out/);
 });
 
-test("signup clearly represents 19+ acceptance without collecting date of birth", () => {
-  const notice = read("app/sign-up-legal-notice.tsx");
+test("signup keeps Clerk authentication and terms without a duplicate notice", () => {
   const signup = read("app/sign-up/page.tsx");
   const account = read("app/account/page.tsx");
+  const terms = read("app/terms/page.tsx");
 
-  assert.match(notice, /confirm you are at least 19/);
-  assert.match(notice, /href="\/terms"/);
-  assert.match(notice, /href="\/privacy"/);
-  assert.match(signup, /<SignUpLegalNotice \/>/);
-  assert.match(account, /<SignUpLegalNotice \/>/);
-  assert.doesNotMatch(`${notice}\n${signup}\n${account}`, /date of birth|birthdate|dob/i);
+  assert.match(terms, /19 years old/);
+  for (const source of [signup, account]) {
+    assert.match(source, /<SignUp[\s\S]*routing="hash"/);
+    assert.match(source, /forceRedirectUrl="\/account"/);
+    assert.doesNotMatch(source, /SignUpLegalNotice|signup-flow|date of birth|birthdate|dob/i);
+  }
 });
 
 test("website adds no analytics SDK, behavioral telemetry, or consent banner", () => {

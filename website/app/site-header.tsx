@@ -40,7 +40,7 @@ export function SiteHeader({ activeItem }: { activeItem?: HeaderItem }) {
         <Link className={activeItem === "pricing" ? "active" : ""} href="/pricing">Pricing</Link>
         <Link className={activeItem === "privacy" ? "active" : ""} href="/privacy">Privacy Policy</Link>
         <Link className={activeItem === "careers" ? "active" : ""} href="/careers">Careers</Link>
-        <a href="mailto:sneaksolve@gmail.com">
+        <a href="mailto:info@zenaian.com">
           Contact Us
         </a>
       </nav>

@@ -5,7 +5,6 @@ import { useSyncExternalStore } from "react";
 import { AuthShell } from "../auth-shell";
 import { BrandLogo } from "../brand-logo";
 import { BillingStatusProvider } from "../billing-status-context";
-import { SignUpLegalNotice } from "../sign-up-legal-notice";
 import { SiteHeader } from "../site-header";
 import { BillingPanel } from "./billing-panel";
 import { BillingPanelBoundary } from "./billing-panel-boundary";
@@ -48,15 +47,12 @@ export default function AccountPage() {
     return (
       <AuthShell>
         {mode === "sign-up" ? (
-          <div className="signup-flow">
-            <SignUp
-              routing="hash"
-              signInUrl="/account?mode=sign-in"
-              forceRedirectUrl="/account"
-              fallbackRedirectUrl="/account"
-            />
-            <SignUpLegalNotice />
-          </div>
+          <SignUp
+            routing="hash"
+            signInUrl="/account?mode=sign-in"
+            forceRedirectUrl="/account"
+            fallbackRedirectUrl="/account"
+          />
         ) : (
           <SignIn
             routing="hash"

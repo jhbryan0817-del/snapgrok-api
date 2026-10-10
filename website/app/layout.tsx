@@ -8,9 +8,9 @@ import "./globals.css";
 import "./v6-14-1.css";
 
 const siteOrigin = configuredSiteOrigin();
-const title = "Zenaian | Study Smarter, Score Higher";
-const description = "Zenaian is a fast, reliable, and private Chrome MCQ assistant with secure website-based account management.";
-const socialImage = `${siteOrigin}/og-zenaian.png`;
+const title = "Zenaian | Ask in Silence, Stay Focused";
+const description = "Analyze on-screen multiple-choice questions with Zenaian, the Chrome MCQ assistant. Get answers without leaving your tab.";
+const socialImage = `${siteOrigin}/og-zenaian-2026.png`;
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteOrigin),
@@ -28,7 +28,7 @@ export const metadata: Metadata = {
     siteName: "Zenaian",
     type: "website",
     url: siteOrigin,
-    images: [{ url: socialImage, width: 1536, height: 1024, alt: "Zenaian — Ask in silence. Stay focused." }],
+    images: [{ url: socialImage, width: 1200, height: 630, alt: "Zenaian — Ask in Silence, Stay Focused. Your Chrome MCQ assistant." }],
   },
   twitter: { card: "summary_large_image", title, description, images: [socialImage] },
 };
