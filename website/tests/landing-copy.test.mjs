@@ -33,7 +33,7 @@ test("approved landing copy is present", () => {
   assert.match(page, /#1 AI-Powered MCQ Assistant Tool/);
   assert.match(page, /Ask in Silence/);
   assert.match(page, /Stay Focused/);
-  assert.match(page, /Install Zenaian/);
+  assert.match(page, /Add to Chrome/);
   assert.match(
     page,
     /Analyze on-screen multiple-choice questions with Zenaian[\s\S]*Get accurate answers instantly without leaving your tab\./,
