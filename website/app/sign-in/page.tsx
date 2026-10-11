@@ -1,17 +1,12 @@
 "use client";
 
-import { SignIn } from "@clerk/react";
 import { AuthShell } from "../auth-shell";
+import { SignInForm } from "../sign-in-form";
 
 export default function SignInPage() {
   return (
     <AuthShell>
-      <SignIn
-        routing="hash"
-        signUpUrl="/account?mode=sign-up"
-        forceRedirectUrl="/account"
-        fallbackRedirectUrl="/account"
-      />
+      <SignInForm />
     </AuthShell>
   );
 }

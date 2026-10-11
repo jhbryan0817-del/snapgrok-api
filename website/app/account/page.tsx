@@ -1,11 +1,12 @@
 "use client";
 
-import { SignIn, SignUp, UserProfile, useUser } from "@clerk/react";
+import { SignUp, UserProfile, useUser } from "@clerk/react";
 import { useSyncExternalStore } from "react";
 import { AuthShell } from "../auth-shell";
 import { BrandLogo } from "../brand-logo";
 import { BillingStatusProvider } from "../billing-status-context";
 import { SiteHeader } from "../site-header";
+import { SignInForm } from "../sign-in-form";
 import { BillingPanel } from "./billing-panel";
 import { BillingPanelBoundary } from "./billing-panel-boundary";
 import { PrivacyPanel } from "./privacy-panel";
@@ -54,12 +55,7 @@ export default function AccountPage() {
             fallbackRedirectUrl="/account"
           />
         ) : (
-          <SignIn
-            routing="hash"
-            signUpUrl="/account?mode=sign-up"
-            forceRedirectUrl="/account"
-            fallbackRedirectUrl="/account"
-          />
+          <SignInForm />
         )}
       </AuthShell>
     );

@@ -3,6 +3,7 @@
 import { useAuth } from "@clerk/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useBillingStatus } from "../billing-status-context";
+import { ChromeIcon } from "../chrome-icon";
 import {
   createExtensionPairing,
   ZENAIAN_EXTENSION_ID,
@@ -10,6 +11,9 @@ import {
 
 const EXTENSION_CHECK_TIMEOUT_MS = 3500;
 const EXTENSION_CONNECT_TIMEOUT_MS = 20000;
+// Replace this public setting with the published listing URL when it is available.
+const CHROME_WEB_STORE_URL =
+  process.env.NEXT_PUBLIC_CHROME_WEB_STORE_URL || "https://chromewebstore.google.com/";
 
 type ExtensionState = "checking" | "connected" | "installed" | "missing";
 type RuntimeResponse = {
@@ -46,7 +50,12 @@ export function AccountReadiness() {
       const ping = await sendExtensionMessage(
         { type: "SNEAKSOLVE_EXTENSION_PING" },
         EXTENSION_CHECK_TIMEOUT_MS,
-      );
+      ).catch((pingError) => {
+        if (pingError instanceof Error && /Receiving end does not exist|Could not establish connection|not available/i.test(pingError.message)) {
+          return undefined;
+        }
+        throw pingError;
+      });
       if (!ping?.installed) {
         setExtensionState("missing");
         return;
@@ -116,6 +125,20 @@ export function AccountReadiness() {
     error,
   });
 
+  if (extensionState === "missing") {
+    return (
+      <a
+        className="primary-button account-install-button"
+        href={CHROME_WEB_STORE_URL}
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        <ChromeIcon />
+        <span>Add to Chrome</span>
+      </a>
+    );
+  }
+
   return (
     <div
       className={`account-status-card account-status-${readiness.tone} account-status-kind-${readiness.kind}`}
@@ -149,15 +172,6 @@ function resolveReadiness({
       kind: "system",
       title: "Checking Account",
       detail: "",
-    } as const;
-  }
-
-  if (extensionState === "missing") {
-    return {
-      tone: "blocked",
-      kind: "extension",
-      title: "Extension Uninstalled",
-      detail: "Install the extension to continue.",
     } as const;
   }
 
