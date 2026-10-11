@@ -24,8 +24,8 @@ export default function TermsPage() {
           subscriptions.
         </p>
         <div className="policy-meta">
-          <span>Effective: [EFFECTIVE DATE]</span>
-          <span>Last updated: August 14, 2026</span>
+          <span>Effective: October 12, 2026</span>
+          <span>Last updated: October 12, 2026</span>
         </div>
       </section>
 
@@ -78,6 +78,17 @@ export default function TermsPage() {
               are identified as AI-generated as well.
             </p>
             <p>
+              When you deliberately use a capture shortcut, the extension
+              captures the visible webpage or your selected region and sends
+              that image and any optional instruction over HTTPS to the
+              Zenaian API and xAI for the requested analysis. Captures do not
+              run automatically in the background. Zenaian does not save this
+              content as a persistent application database record; production
+              inference requires xAI Zero Data Retention. The
+              <Link href="/privacy"> Privacy Policy</Link> describes the
+              processing, providers, retention and your controls in detail.
+            </p>
+            <p>
               AI output can be inaccurate, incomplete, outdated or unsuitable.
               You are responsible for deciding whether and how to use it.
               Zenaian is not professional legal, medical, financial,
@@ -120,8 +131,9 @@ export default function TermsPage() {
             <span>05</span>
             <h2>Billing, taxes and automatic renewal</h2>
             <p>
-              Paid subscriptions are purchased through Whop. [LEGAL OPERATOR
-              NAME] is the supplier of Zenaian. Whop provides payment services
+              Paid subscriptions are purchased through Whop. Zenaian
+              (제나이안), registration number 532-11-03077, is the supplier
+              of Zenaian. Whop provides payment services
               and acts in the limited merchant-of-record/tax capacities
               described in its then-current terms. Whop Buyer Terms also apply
               to your purchase.
@@ -209,6 +221,15 @@ export default function TermsPage() {
               secure and lawfully operate the requested service. The Privacy
               Policy explains the transient screenshot architecture and xAI ZDR.
             </p>
+            <p>
+              You can stop future captures by not invoking a capture shortcut,
+              disabling Zenaian in Chrome&apos;s extension settings, or
+              uninstalling it. Disabling or uninstalling the extension does
+              not delete your website account or cancel a paid subscription;
+              use the account interface for those actions. Browser permissions
+              authorize browser capabilities and do not replace any separate
+              disclosure or consent required for processing your information.
+            </p>
           </section>
 
           <section id="intellectual-property">
@@ -273,7 +294,7 @@ export default function TermsPage() {
               without depriving a consumer of mandatory protections that
               applicable law does not permit the parties to waive.
               Jurisdiction and venue will be determined by applicable
-              procedural/consumer law unless [LEGAL OPERATOR NAME] later
+              procedural/consumer law unless Zenaian later
               publishes a lawful agreed forum clause reviewed for the target launch.
             </p>
           </section>
@@ -284,8 +305,10 @@ export default function TermsPage() {
             <p>
               We may update these Terms prospectively. Material changes receive
               a revised date and any notice/acceptance required by law.
-              Contact: [SUPPORT EMAIL] and <a href="mailto:privacy@zenaian.com">privacy@zenaian.com</a>.
-              Operator details: [LEGAL OPERATOR NAME / ADDRESS / REGISTRATION].
+              Support: <a href="mailto:info@zenaian.com">info@zenaian.com</a>.
+              Privacy: <a href="mailto:privacy@zenaian.com">privacy@zenaian.com</a>.
+              Operator: Zenaian (제나이안), registration number 532-11-03077,
+              101-904, 136 Hongjaechun-ro, Seodaemun-gu, Seoul, South Korea.
             </p>
           </section>
         </div>
