@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { SiteHeader } from "../site-header";
 
 export const metadata: Metadata = {
@@ -96,7 +97,7 @@ export default function PrivacyPage() {
         </p>
         <div className="policy-meta">
           <span>Effective: October 11, 2026</span>
-          <span>Last updated: October 11, 2026</span>
+          <span>Last updated: October 12, 2026</span>
         </div>
       </section>
 
@@ -183,6 +184,16 @@ export default function PrivacyPage() {
               invoke a configured capture action. It is not designed to
               continuously record your screen, collect browsing history, or
               build a history of questions you view.
+            </p>
+            <p>
+              Before a selected capture, the extension checks the current tab&apos;s URL
+              locally to reject unsupported or restricted pages. That URL is
+              not included in the analysis request or stored as browsing
+              history. The selected-area overlay runs only after you request
+              a selected capture. Chrome&apos;s local extension storage holds
+              your preferences, optional instruction, device credentials,
+              cached account status and temporary operation state; it does
+              not persist captured images.
             </p>
             <p>
               The captured image and optional instruction are transmitted over
@@ -297,6 +308,13 @@ export default function PrivacyPage() {
               the corresponding core service. You may avoid further capture
               processing at any time by not invoking a capture and may delete
               your account as described below.
+            </p>
+            <p>
+              To stop future captures, do not invoke a capture shortcut, disable
+              Zenaian at chrome://extensions, or uninstall it. Disabling or
+              uninstalling the extension does not delete your Zenaian account
+              or cancel subscription renewal. Manage renewal or account
+              deletion on the <Link href="/account">account page</Link>.
             </p>
           </section>
 

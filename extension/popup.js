@@ -19,9 +19,6 @@ const elements = {
   zoneShortcut: document.querySelector("#zoneShortcut"),
   editInstruction: document.querySelector("#editInstruction"),
   message: document.querySelector("#message"),
-  captureConsent: document.querySelector("#captureConsent"),
-  enableCaptureConsent: document.querySelector("#enableCaptureConsent"),
-  disableCaptureConsent: document.querySelector("#disableCaptureConsent"),
 };
 
 let settingsInitialized = false;
@@ -32,12 +29,6 @@ elements.editShortcuts.addEventListener("click", openShortcutManager);
 elements.editInstruction.addEventListener("click", openInstructionEditor);
 elements.signIn.addEventListener("click", () => openWebsite("/account?mode=sign-in&source=extension"));
 elements.manageAccount.addEventListener("click", () => openWebsite("/account"));
-elements.enableCaptureConsent.addEventListener("click", () => {
-  void updateCaptureConsent(true).catch(showError);
-});
-elements.disableCaptureConsent.addEventListener("click", () => {
-  void updateCaptureConsent(false).catch(showError);
-});
 
 chrome.runtime.onMessage.addListener((message) => {
   if (message?.type !== "SNAPGROK_AUTH_STATE_CHANGED" || !message.snapshot) return false;
@@ -82,7 +73,7 @@ async function renderAuth(snapshot) {
   elements.brandIntro.hidden = snapshot.isSignedIn;
   elements.accountDivider.hidden = !snapshot.isSignedIn;
   elements.accountStrip.hidden = !snapshot.isSignedIn;
-  await renderCaptureConsent(snapshot.isSignedIn);
+  elements.signedInView.hidden = !snapshot.isSignedIn;
   elements.signedOutView.hidden = snapshot.isSignedIn;
 
   if (!snapshot.isSignedIn) {
@@ -104,21 +95,6 @@ async function renderAuth(snapshot) {
     settingsInitialized = true;
     await initializeSettings();
   }
-}
-
-async function renderCaptureConsent(isSignedIn) {
-  const accepted = isSignedIn && await SnapGrokSettings.hasCaptureConsent();
-  elements.captureConsent.hidden = !isSignedIn || accepted;
-  elements.signedInView.hidden = !isSignedIn || !accepted;
-  elements.disableCaptureConsent.hidden = !isSignedIn || !accepted;
-}
-
-async function updateCaptureConsent(accepted) {
-  await SnapGrokSettings.setCaptureConsent(accepted);
-  await renderCaptureConsent(true);
-  elements.message.textContent = accepted
-    ? ""
-    : "Future captures are disabled until you agree again.";
 }
 
 function delay(milliseconds) {
@@ -225,8 +201,6 @@ function showError(error) {
   elements.accountDivider.hidden = true;
   elements.accountStrip.hidden = true;
   elements.signedInView.hidden = true;
-  elements.captureConsent.hidden = true;
-  elements.disableCaptureConsent.hidden = true;
   elements.signedOutView.hidden = false;
   elements.message.textContent = "Account status could not be loaded. Please reopen Zenaian and try again.";
 }

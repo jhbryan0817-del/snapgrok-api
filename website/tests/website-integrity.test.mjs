@@ -558,7 +558,7 @@ test("privacy page publishes the approved product, transfer, and retention terms
     "Whop",
     "PostgreSQL",
     "Zero Data Retention",
-    "Last updated: October 11, 2026",
+    "Last updated: October 12, 2026",
   ]) {
     assert.match(privacy, new RegExp(expected));
   }
@@ -590,8 +590,9 @@ test("terms publish the approved generative-AI, eligibility, and billing terms",
   assert.match(terms, /at least[\s\S]{0,80}19 years old/i);
   assert.match(terms, /Do not submit screenshots containing identifiable sensitive personal information or credentials\./);
   assert.match(terms, /mailto:privacy@zenaian\.com/g);
-  assert.match(terms, /\[LEGAL OPERATOR NAME\]/);
-  assert.match(terms, /\[SUPPORT EMAIL\]/);
+  assert.match(terms, /Zenaian[\s\S]{0,80}\(제나이안\)[\s\S]{0,80}532-11-03077/);
+  assert.match(terms, /mailto:info@zenaian\.com/);
+  assert.doesNotMatch(terms, /\[LEGAL OPERATOR NAME|\[SUPPORT EMAIL|\[EFFECTIVE DATE/);
   assert.doesNotMatch(terms, /DOCUMENT C|DOCUMENT D|Whop checkout additional terms/i);
   assert.doesNotMatch(terms, /Working draft|at least 13 years old/);
 });
