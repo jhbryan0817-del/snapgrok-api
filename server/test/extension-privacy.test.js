@@ -11,7 +11,7 @@ test("extension keeps the required generative-AI and sensitive-data notices", as
   ]);
   const manifest = JSON.parse(manifestText);
 
-  assert.match(manifest.description, /proposed answers generated with xAI Grok/i);
+  assert.match(manifest.description, /proposed answers through the Chrome extension icon/i);
   assert.match(
     popup,
     /uses generative AI \(xAI Grok\) to generate proposed answers from submitted screenshots/i,

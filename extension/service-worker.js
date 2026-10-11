@@ -327,6 +327,12 @@ async function handleCommand(command) {
     throw new Error("Sign in to Zenaian from the extension popup before capturing a question.");
   }
 
+  // A shortcut can be used without ever opening the popup. Require the
+  // in-product disclosure before reading or transmitting any screenshot.
+  if (!await SnapGrokSettings.hasCaptureConsent()) {
+    throw new Error("Open Zenaian and agree to AI capture processing before using a capture shortcut.");
+  }
+
   const settings = await SnapGrokSettings.getSettings();
   const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
 
