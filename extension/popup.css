@@ -348,14 +348,21 @@ kbd {
 .privacy-note {
   margin-top: 9px;
   padding: 5px 3px 1px;
-  color: #7a8291;
-  font-size: 7px;
+  color: #667085;
+  font-size: 9px;
   line-height: 1.5;
   text-align: center;
 }
 .privacy-note p { margin: 0; }
 .privacy-copy p + p { margin-top: 4px; }
 .privacy-note .privacy-warning { color: #8a4b13; font-weight: 400; }
+.privacy-note a, .capture-consent a { color: #0549fd; }
+.privacy-control { display: block; margin: 6px auto 0; padding: 3px; border: 0; color: #0549fd; background: transparent; font: inherit; text-decoration: underline; }
+.capture-consent { display: block; padding: 16px; }
+.capture-consent h2 { margin: 0 0 9px; }
+.capture-consent p { margin: 8px 0; color: #344054; font-size: 12px; line-height: 1.5; }
+.capture-consent a { display: inline-block; margin: 3px 0 12px; font-size: 12px; }
+.capture-consent .primary-button { display: block; width: 100%; }
 .copyright { margin-top: 8px !important; color: #98a2b3; font-size: 7.5px; letter-spacing: .02em; }
 .message { min-height: 0; margin: 7px 2px 0; color: #b42318; font-size: 11px; text-align: center; }
 .message:empty { display: none; }

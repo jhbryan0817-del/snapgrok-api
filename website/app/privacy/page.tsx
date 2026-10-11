@@ -13,8 +13,8 @@ const transferRows = [
     location: "United States - Virginia",
     information:
       "Account identifiers, extension-session/usage/billing metadata; transient screenshot/instruction in server RAM",
-    purpose: "API and PostgreSQL hosting, security and recovery",
-    timing: "At service requests / continuous hosting over encrypted connections",
+    purpose: "Website, API and PostgreSQL hosting, security and recovery",
+    timing: "At HTTPS website/API requests and continuous hosting",
     retention:
       "Zenaian schedule; native logs up to 30 days depending plan; database recovery copies roll for the provider plan window.",
   },
@@ -51,7 +51,7 @@ const transferRows = [
   {
     recipient: "Google Workspace / Google LLC",
     location:
-      "[PLANNED CONFIGURATION: United States for covered data at rest; service/support processing may occur in countries on Google's current subprocessor list]",
+      "United States and other locations where Google and its subprocessors provide Workspace services; Zenaian does not claim a US-only mailbox data region",
     information: "Privacy/support emails you choose to send",
     purpose: "Privacy/support communications",
     timing: "When you email privacy@zenaian.com",
@@ -95,8 +95,8 @@ export default function PrivacyPage() {
           privacy-support communications.
         </p>
         <div className="policy-meta">
-          <span>Effective: October 12, 2026</span>
-          <span>Last updated: August 14, 2026</span>
+          <span>Effective: October 11, 2026</span>
+          <span>Last updated: October 11, 2026</span>
         </div>
       </section>
 
@@ -231,6 +231,17 @@ export default function PrivacyPage() {
               <li>respond to privacy/consumer requests; and</li>
               <li>comply with transaction-retention, accounting, tax, consumer-protection and other legal duties.</li>
             </ul>
+            <p>
+              Zenaian&apos;s use of information received through the Chrome
+              extension complies with the Chrome Web Store User Data Policy,
+              including its Limited Use requirements. We use and transfer
+              this information only to provide the extension&apos;s disclosed
+              features and necessary operational or security functions. We
+              do not sell it or use it for advertising. Human access is
+              limited to your consent for specific information, necessary
+              security investigations, legal requirements, or aggregated and
+              anonymized information for internal operations.
+            </p>
           </section>
 
           <section id="providers">
@@ -268,16 +279,13 @@ export default function PrivacyPage() {
               </table>
             </div>
             <p>
-              Domestic website hosting: www.zenaian.com is hosted through
-              Hosting.kr / Megazone Co., Ltd. in the Republic of Korea.
-              Hosting.kr describes its Linux hosting as AWS-based. On the
-              current evidence, Zenaian treats this as domestic entrusted
-              processing rather than a Zenaian overseas transfer. The host
-              receives ordinary website requests and provider-native
-              access/security logs; Zenaian does not place its account
-              database, screenshot analysis data, or behavioral analytics on
-              the website host. Visitor-statistics packages and raw-log
-              archiving are disabled by Zenaian by default.
+              Website hosting: www.zenaian.com is served by Render in
+              Virginia, United States. Render receives ordinary website
+              requests and provider-native access/security logs. The website
+              service does not store screenshots or an account database;
+              authenticated application requests use the separate Zenaian
+              API and its databases. Zenaian does not add behavioral
+              advertising trackers or third-party visitor analytics.
             </p>
             <p>
               For the overseas processors above, Zenaian relies on PIPA Article

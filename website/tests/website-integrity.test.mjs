@@ -558,11 +558,11 @@ test("privacy page publishes the approved product, transfer, and retention terms
     "Whop",
     "PostgreSQL",
     "Zero Data Retention",
-    "Last updated: August 14, 2026",
+    "Last updated: October 11, 2026",
   ]) {
     assert.match(privacy, new RegExp(expected));
   }
-  assert.match(privacy, /Effective: October 12, 2026/);
+  assert.match(privacy, /Effective: October 11, 2026/);
   assert.match(privacy, /does not save the screenshot, instruction,[\s\S]*question text or AI answer/);
   assert.match(privacy, /Do not submit screenshots containing identifiable sensitive personal information or credentials\./);
   assert.match(privacy, /checkout_configuration_id/);

@@ -66,6 +66,14 @@
         <small>The website will open in a new tab. Reopen this popup after signing in.</small>
       </section>
 
+      <section id="captureConsent" class="auth-card capture-consent" aria-labelledby="captureConsentHeading" hidden>
+        <h2 id="captureConsentHeading">Before your first capture</h2>
+        <p>When you use a capture shortcut, your screenshot and optional instruction are sent over HTTPS to Zenaian's server and xAI to generate a proposed answer.</p>
+        <p>Capture runs only when you request it. Zenaian does not save captured content, and production processing requires xAI Zero Data Retention. AI answers can be wrong; verify them yourself.</p>
+        <a href="https://www.zenaian.com/privacy" target="_blank" rel="noopener noreferrer">Read the Privacy Policy</a>
+        <button id="enableCaptureConsent" class="primary-button" type="button">Agree and enable captures</button>
+      </section>
+
       <div id="signedInView" hidden>
       <section class="section-block capture-section" aria-label="Capture options">
         <button id="editShortcuts" class="primary-button capture-edit" type="button">Edit</button>
@@ -122,8 +130,10 @@
       <footer class="privacy-note" aria-label="AI and privacy notice">
         <div class="privacy-copy">
           <p>Zenaian uses generative AI (xAI Grok) to generate proposed answers from submitted screenshots.</p>
-          <p>Screenshots are transmitted only when you initiate a capture; the extension does not save them.</p>
+          <p>Only captures you request and optional instructions are sent to Zenaian and xAI over HTTPS; captured content is processed transiently, not saved.</p>
           <p class="privacy-warning">Do not submit screenshots containing identifiable sensitive personal information or credentials.</p>
+          <a href="https://www.zenaian.com/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a>
+          <button id="disableCaptureConsent" class="privacy-control" type="button" hidden>Disable future captures</button>
         </div>
         <p class="copyright">© 2026 Zenaian. All rights reserved</p>
       </footer>
