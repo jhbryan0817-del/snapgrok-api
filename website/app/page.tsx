@@ -186,37 +186,42 @@ export default async function HomePage() {
 
           <article className="feature-card study-model-card interactive-card">
             <div className="feature-copy">
-              <h3>Powered by Grok 4.5</h3>
+              <h3>Powered by Grok 4.7</h3>
               <p>Zenaian strives for accurate, instant answers from a frontier AI model.</p>
             </div>
-            <div className="benchmark-visual benchmark-visual-duo" aria-label="Grok 4.5 software engineering and response-speed comparisons">
+            <div className="benchmark-visual benchmark-visual-duo" aria-label="Grok 4.7 electrical engineering and response-speed comparisons">
               <section className="benchmark-chart benchmark-orb benchmark-swe" aria-labelledby="swe-marathon-title">
                 <span className="benchmark-crown" aria-hidden="true">♕</span>
                 <div className="benchmark-heading">
-                  <strong id="swe-marathon-title">SWE Marathon</strong>
-                  <span>pass@1 resolution · higher is better</span>
+                  <strong id="swe-marathon-title">EEBench</strong>
+                  <span>electrical engineering · higher is better</span>
                 </div>
-                <div className="benchmark-row benchmark-row-grok"><span>Grok 4.5</span><i><b className="bar-100" /></i><em>29%</em></div>
-                <div className="benchmark-row"><span>Opus 4.8</span><i><b className="bar-90" /></i><em>26%</em></div>
-                <div className="benchmark-row"><span>Fable</span><i><b className="bar-83" /></i><em>24%</em></div>
-                <div className="benchmark-row"><span>Opus 4.7</span><i><b className="bar-55" /></i><em>16%</em></div>
+                <div className="benchmark-row benchmark-row-grok" title="Grok 4.7, xhigh effort"><span>Grok 4.7</span><i><b className="bar-100" /></i><em>64%</em></div>
+                <div className="benchmark-row" title="Fable 5.1, max effort"><span>Fable 5.1</span><i><b className="bar-90" style={{ width: "88.125%" }} /></i><em>56.4%</em></div>
+                <div className="benchmark-row" title="Grok 4.6, high effort"><span>Grok 4.6</span><i><b className="bar-83" style={{ width: "82.8125%" }} /></i><em>53%</em></div>
+                <div className="benchmark-row" title="GPT-5.6 Sol, max effort"><span>GPT-5.6 Sol</span><i><b className="bar-55" style={{ width: "61.5625%" }} /></i><em>39.4%</em></div>
               </section>
               <section className="benchmark-chart benchmark-orb benchmark-speed" aria-labelledby="response-speed-title">
                 <span className="benchmark-speed-badge" aria-hidden="true"><LightningIcon /></span>
                 <div className="benchmark-heading">
                   <strong id="response-speed-title">Response speed</strong>
-                  <span>time to first answer token · lower is better</span>
+                  <span>time to first token · lower is better</span>
                 </div>
-                <div className="benchmark-row benchmark-row-grok"><span>Grok 4.5</span><i><b className="speed-bar-grok" /></i><em>8s</em></div>
-                <div className="benchmark-row"><span>Opus 4.8</span><i><b className="speed-bar-opus" /></i><em>16s</em></div>
-                <div className="benchmark-row"><span>GPT-5.5</span><i><b className="speed-bar-gpt55" /></i><em>94s</em></div>
-                <div className="benchmark-row"><span>Fable 5</span><i><b className="speed-bar-fable" /></i><em>124s</em></div>
-                <div className="benchmark-row"><span>GPT-5.6 Sol</span><i><b className="speed-bar-sol" /></i><em>134s</em></div>
+                <div className="benchmark-row benchmark-row-grok" title="Grok 4.7, high effort: 48.93 seconds"><span>Grok 4.7</span><i><b className="speed-bar-grok" style={{ width: "37.12%" }} /></i><em>49s</em></div>
+                <div className="benchmark-row" title="Opus 4.8, max effort: 35.83 seconds"><span>Opus 4.8</span><i><b className="speed-bar-opus" style={{ width: "27.27%" }} /></i><em>36s</em></div>
+                <div className="benchmark-row" title="GPT-5.5, xhigh effort: 66.06 seconds"><span>GPT-5.5</span><i><b className="speed-bar-gpt55" style={{ width: "50%" }} /></i><em>66s</em></div>
+                <div className="benchmark-row" title="Fable 5, max effort with Opus 4.8 fallback: 132.22 seconds"><span>Fable 5</span><i><b className="speed-bar-fable" style={{ width: "100%" }} /></i><em>132s</em></div>
+                <div className="benchmark-row" title="GPT-5.6 Sol, max effort: 122.85 seconds"><span>GPT-5.6 Sol</span><i><b className="speed-bar-sol" style={{ width: "93.18%" }} /></i><em>123s</em></div>
               </section>
             </div>
             <small className="model-disclaimer">
-              SWE figures reported by xAI; competitor figures are drawn from published system cards or benchmark leaderboards. {" "}
-              <a href="https://x.ai/news/grok-4-5" target="_blank" rel="noreferrer">View source</a>. Speed figures: Artificial Analysis independent API measurements, August 2026. Zenaian is independent and is not endorsed by xAI.
+              EEBench figures reported by xAI: Grok 4.7 xhigh, Grok 4.6 high, and competitors at max effort. {" "}
+              <a href="https://x.ai/news/grok-4-7" target="_blank" rel="noreferrer">View source</a>. Speed figures: Artificial Analysis API measurements, checked October 11, 2026, rounded to seconds ({" "}
+              <a href="https://artificialanalysis.ai/models/grok-4-7-high" target="_blank" rel="noreferrer">Grok high</a>, {" "}
+              <a href="https://artificialanalysis.ai/models/claude-opus-4-8" target="_blank" rel="noreferrer">Opus max</a>, {" "}
+              <a href="https://artificialanalysis.ai/models/gpt-5-5" target="_blank" rel="noreferrer">GPT-5.5 xhigh</a>, {" "}
+              <a href="https://artificialanalysis.ai/models/claude-fable-5" target="_blank" rel="noreferrer">Fable max with fallback</a>, {" "}
+              <a href="https://artificialanalysis.ai/models/gpt-5-6-sol" target="_blank" rel="noreferrer">Sol max</a>). These benchmarks do not measure Zenaian response time or MCQ accuracy. Zenaian is independent and is not endorsed by xAI.
             </small>
           </article>
         </div>

@@ -312,8 +312,8 @@ notifications enabled.
 ## Quota behavior
 
 - Free: 5 per UTC day, Grok 4.3.
-- Plus: 200 per successful subscription cycle, Grok 4.3.
-- Ultra: 300 per successful subscription cycle, Grok 4.5.
+- Plus: 300 per successful subscription cycle, Grok 4.3.
+- Ultra: 500 per successful subscription cycle, Grok 4.7.
 - Successful xAI results consume; technical failure releases; inconclusive
   consumes.
 - A stable operation UUID prevents duplicate consumption.

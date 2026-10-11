@@ -13,7 +13,7 @@ AI, including xAI Grok, to generate proposed answers to user-initiated
 screenshot captures. AI output is not guaranteed to be correct, and the
 service is for lawful, authorized use only.
 
-PLUS ACCESS: Plus provides up to 200 successful question analyses per monthly
+PLUS ACCESS: Plus provides up to 300 successful question analyses per monthly
 subscription period. Digital access starts after payment and entitlement are
 confirmed. Unused questions expire at period end, do not roll over, and have no
 cash value unless mandatory law requires otherwise.
@@ -61,7 +61,7 @@ AI, including xAI Grok, to generate proposed answers to user-initiated
 screenshot captures. AI output is not guaranteed to be correct, and the
 service is for lawful, authorized use only.
 
-ULTRA ACCESS: Ultra provides up to 300 successful question analyses per
+ULTRA ACCESS: Ultra provides up to 500 successful question analyses per
 monthly subscription period. Digital access starts after payment and
 entitlement are confirmed. Unused questions expire at period end, do not roll
 over, and have no cash value unless mandatory law requires otherwise.

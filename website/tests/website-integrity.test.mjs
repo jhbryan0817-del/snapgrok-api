@@ -68,7 +68,7 @@ test("redesigned landing page includes the requested product workflow", () => {
   assert.match(studyWorkflow, /motion-next-question/);
   assert.match(page, /Trusted by 20,000\+ Users/);
   assert.doesNotMatch(page, /className="stats-panel|Active Users|Questions Solved/);
-  assert.match(page, /Powered by Grok 4\.5/);
+  assert.match(page, /Powered by Grok 4\.7/);
   assert.match(page, /Zenaian strives for accurate, instant answers from a frontier AI model\./);
   assert.match(page, /benchmark-speed-badge/);
   assert.match(page, /privacy-heading[\s\S]*<LockIcon \/>[\s\S]*Privacy &amp; Security/);
@@ -77,7 +77,7 @@ test("redesigned landing page includes the requested product workflow", () => {
   assert.match(page, /Production inference requires xAI Zero Data Retention \(ZDR\)/);
   assert.match(page, /request fails closed instead of falling back to ordinary-retention inference/);
   assert.match(page, /study-intelligence-panel[\s\S]*study-speed-card[\s\S]*study-model-card/);
-  assert.match(page, /SWE Marathon/);
+  assert.match(page, /EEBench/);
   assert.match(page, /benchmark-visual benchmark-visual-duo/);
   assert.match(page, /Response speed/);
   assert.match(page, /not endorsed by xAI/);
@@ -332,10 +332,10 @@ test("pricing retains the approved plans and uses the secure checkout client", (
   assert.match(pricing, /<span className="section-kicker">SIMPLE PRICING<\/span>[\s\S]*<h1 className="page-section-title">Plan Upgrades<\/h1>/);
   assert.doesNotMatch(pricing, /Choose Your Plan|Pick What Suits You|Start with five questions a day/);
   assert.match(pricing, /5 questions every day/);
-  assert.match(pricing, /200 questions every month/);
   assert.match(pricing, /300 questions every month/);
+  assert.match(pricing, /500 questions every month/);
   assert.match(pricing, /Grok 4\.3/);
-  assert.match(pricing, /Grok 4\.5/);
+  assert.match(pricing, /Grok 4\.7/);
   assert.match(pricing, /Everything offered in the Free plan/);
   assert.match(pricing, /More flexible usage/);
   assert.doesNotMatch(pricing, /40x the Free monthly capacity/);
@@ -598,8 +598,8 @@ test("terms publish the approved generative-AI, eligibility, and billing terms",
 
 test("Whop checkout terms separately describe Plus and Ultra recurring purchases", () => {
   const checkoutTerms = read("WHOP_CHECKOUT_TERMS.md");
-  assert.match(checkoutTerms, /Plus provides up to 200 successful question analyses/);
-  assert.match(checkoutTerms, /Ultra provides up to 300 successful question analyses/);
+  assert.match(checkoutTerms, /Plus provides up to 300 successful question analyses/);
+  assert.match(checkoutTerms, /Ultra provides up to 500 successful question analyses/);
   assert.match(checkoutTerms, /must be at least 19 years old/g);
   assert.match(checkoutTerms, /Tax behavior is exclusive/g);
   assert.match(checkoutTerms, /E-Commerce Act Article 17/g);

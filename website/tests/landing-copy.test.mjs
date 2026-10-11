@@ -90,7 +90,7 @@ test("approved landing copy is present", () => {
   assert.match(studyWorkflow, /motion-next-question/);
   assert.match(studyWorkflow, /aria-label="Attach a file"/);
   assert.match(studyWorkflow, /aria-label="Send message"/);
-  assert.match(page, /Powered by Grok 4\.5/);
+  assert.match(page, /Powered by Grok 4\.7/);
   assert.match(page, /Zenaian strives for accurate, instant answers from a frontier AI model\./);
   assert.match(page, /benchmark-speed-badge/);
   assert.match(page, /privacy-heading[\s\S]*<LockIcon \/>[\s\S]*Privacy &amp; Security/);
@@ -116,7 +116,7 @@ test("approved landing copy is present", () => {
     "The FAQ section must be the final landing-page section after privacy.",
   );
   assert.match(page, /study-intelligence-panel[\s\S]*study-speed-card[\s\S]*study-model-card/);
-  assert.match(page, /SWE Marathon/);
+  assert.match(page, /EEBench/);
   assert.match(page, /benchmark-visual benchmark-visual-duo/);
   assert.match(page, /Response speed/);
   assert.match(page, /not endorsed by xAI/);
@@ -149,11 +149,11 @@ test("pricing preview includes all three requested plans", () => {
     "5 questions every day",
     "Plus",
     "US$7",
-    "200 questions every month",
+    "300 questions every month",
     "Ultra",
     "US$10",
-    "300 questions every month",
-    "Grok 4.5",
+    "500 questions every month",
+    "Grok 4.7",
   ]) {
     assert.match(pricing, new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }

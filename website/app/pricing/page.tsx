@@ -26,7 +26,7 @@ const plans = [
     name: "Plus",
     price: "US$7",
     cadence: "per month",
-    allowance: "200 questions every month",
+    allowance: "300 questions every month",
     reset: "Resets monthly",
     model: "Grok 4.3",
     modelCopy:
@@ -43,14 +43,14 @@ const plans = [
     name: "Ultra",
     price: "US$10",
     cadence: "per month",
-    allowance: "300 questions every month",
+    allowance: "500 questions every month",
     reset: "Resets monthly",
-    model: "Grok 4.5",
+    model: "Grok 4.7",
     modelCopy:
       "Frontier-grade intelligence for brutal, multi-step problems where ordinary reasoning reaches its limit.",
     features: [
       "Our highest monthly capacity",
-      "Advanced Grok 4.5 model access",
+      "Advanced Grok 4.7 model access",
       "Built for the hardest questions",
     ],
     cta: "Choose Ultra",
