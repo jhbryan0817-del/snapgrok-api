@@ -475,24 +475,27 @@ img { display: block; max-width: 100%; }
   margin-inline: auto !important;
 }
 
-.auth-simple-layout .clerk-surface > .sign-in-card {
+.auth-simple-layout .clerk-surface > .sign-in-card,
+.auth-simple-layout .cl-signUp-root .cl-cardBox {
   width: min(100%, 460px);
   min-height: 560px;
-  padding: 40px;
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 24px;
   border: 1px solid rgba(8, 23, 52, .12);
   border-radius: 12px;
   background: #fff;
   box-shadow: 0 4px 12px rgba(8, 23, 52, .08);
   font-size: 14px;
 }
+.auth-simple-layout .clerk-surface > .sign-in-card { padding: 40px; gap: 24px; }
 .sign-in-card-heading { text-align: center; }
-.sign-in-card-heading h1 { margin: 0; font-size: 19px; font-weight: 700; }
-.sign-in-card-heading p { margin: 8px 0 0; color: var(--muted); line-height: 1.5; }
-.sign-in-google {
+.sign-in-card-heading h1,
+.auth-simple-layout .cl-signUp-root .cl-headerTitle { margin: 0; color: var(--ink); font-size: 19px; font-weight: 700; }
+.sign-in-card-heading p,
+.auth-simple-layout .cl-signUp-root .cl-headerSubtitle { margin: 8px 0 0; color: var(--muted); font-size: 14px; line-height: 1.5; }
+.sign-in-google,
+.auth-simple-layout .cl-signUp-root .cl-socialButtonsBlockButton {
   min-height: 38px;
   display: flex;
   align-items: center;
@@ -502,14 +505,22 @@ img { display: block; max-width: 100%; }
   border-radius: 7px;
   background: #fff;
   color: var(--ink);
+  box-shadow: none;
   cursor: pointer;
 }
-.sign-in-google svg { width: 18px; height: 18px; flex-shrink: 0; }
+.sign-in-google-icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  background: url("https://img.clerk.com/static/google.svg") center / contain no-repeat;
+}
 .sign-in-divider { display: flex; align-items: center; gap: 18px; color: var(--muted); font-size: 12px; }
 .sign-in-divider::before, .sign-in-divider::after { content: ""; height: 1px; flex: 1; background: rgba(8, 23, 52, .1); }
 .sign-in-fields { display: grid; gap: 9px; }
-.sign-in-fields label { font-size: 13px; font-weight: 600; }
-.sign-in-fields input {
+.sign-in-fields label,
+.auth-simple-layout .cl-signUp-root .cl-formFieldLabel { color: var(--ink); font-size: 13px; font-weight: 600; }
+.sign-in-fields input,
+.auth-simple-layout .cl-signUp-root .cl-formFieldInput {
   width: 100%;
   min-height: 42px;
   padding: 9px 12px;
@@ -517,7 +528,10 @@ img { display: block; max-width: 100%; }
   border-radius: 7px;
   background: #fff;
   color: var(--ink);
+  box-shadow: none;
 }
+.sign-in-fields input::placeholder,
+.auth-simple-layout .cl-signUp-root .cl-formFieldInput::placeholder { color: var(--muted); opacity: 1; }
 .sign-in-password-label { margin-top: 12px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .sign-in-password-label button { padding: 0; border: 0; background: transparent; color: var(--blue); font-size: 12px; cursor: pointer; }
 .sign-in-password-input { position: relative; }
@@ -533,16 +547,18 @@ img { display: block; max-width: 100%; }
   font-size: 12px;
   cursor: pointer;
 }
-.sign-in-submit {
+.sign-in-submit,
+.auth-simple-layout .cl-signUp-root .cl-formButtonPrimary {
   min-height: 42px;
-  margin-top: 15px;
   border: 0;
   border-radius: 7px;
   background: var(--blue);
   color: #fff;
+  box-shadow: none;
   font-weight: 600;
   cursor: pointer;
 }
+.sign-in-submit { margin-top: 15px; }
 .sign-in-google:disabled, .sign-in-submit:disabled, .sign-in-alternative:disabled { opacity: .6; cursor: wait; }
 .sign-in-fields input:focus-visible, .sign-in-card button:focus-visible, .sign-in-card a:focus-visible,
 .account-install-button:focus-visible { outline: 2px solid var(--blue); outline-offset: 3px; }
@@ -553,9 +569,51 @@ img { display: block; max-width: 100%; }
 .auth-simple-layout .clerk-surface > .sign-in-clerk-flow { flex-direction: column; align-items: center; gap: 16px; }
 .sign-in-back-link { padding: 0; border: 0; background: transparent; color: var(--blue); font-size: 13px; cursor: pointer; }
 
+/* Style Clerk's existing signup form without changing fields, terms, or verification. */
+.auth-simple-layout .cl-signUp-root .cl-card {
+  margin: 0;
+  padding: 40px 40px 24px;
+  gap: 24px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.auth-simple-layout .cl-signUp-root .cl-form { gap: 24px; }
+.auth-simple-layout .cl-signUp-root .cl-socialButtonsBlockButtonText { color: var(--ink); font-size: 14px; font-weight: 400; }
+.auth-simple-layout .cl-signUp-root .cl-dividerLine { background: rgba(8, 23, 52, .1); }
+.auth-simple-layout .cl-signUp-root .cl-dividerText { color: var(--muted); font-size: 12px; }
+.auth-simple-layout .cl-signUp-root .cl-formFieldInput { font-size: 14px; }
+.auth-simple-layout .cl-signUp-root .cl-formFieldInput__password { padding-right: 40px; }
+.auth-simple-layout .cl-signUp-root .cl-formFieldInput[aria-invalid="true"] { border-color: #a52237; }
+.auth-simple-layout .cl-signUp-root .cl-formFieldInputShowPasswordButton { color: var(--muted); }
+.auth-simple-layout .cl-signUp-root .cl-formButtonPrimary { font-size: 14px; }
+.auth-simple-layout .cl-signUp-root .cl-formButtonPrimary::after { background: none; }
+.auth-simple-layout .cl-signUp-root .cl-formFieldCheckboxLabel { color: var(--ink); font-size: 13px; }
+.auth-simple-layout .cl-signUp-root .cl-formFieldCheckboxLabel a,
+.auth-simple-layout .cl-signUp-root .cl-footerActionLink { color: var(--blue); }
+.auth-simple-layout .cl-signUp-root .cl-formFieldCheckboxInput:checked { background: var(--blue); border-color: var(--blue); }
+.auth-simple-layout .cl-signUp-root .cl-footer {
+  margin: 0;
+  padding: 0 40px 24px;
+  gap: 16px;
+  background: transparent;
+}
+.auth-simple-layout .cl-signUp-root .cl-footerAction,
+.auth-simple-layout .cl-signUp-root .cl-footerItem { padding: 0; border: 0; }
+.auth-simple-layout .cl-signUp-root .cl-footerActionText { color: var(--muted); font-size: 13px; }
+.auth-simple-layout .cl-signUp-root .cl-footerActionLink { font-size: 13px; font-weight: 600; }
+.auth-simple-layout .cl-signUp-root .cl-formFieldInput:focus-visible,
+.auth-simple-layout .cl-signUp-root button:focus-visible,
+.auth-simple-layout .cl-signUp-root a:focus-visible { outline: 2px solid var(--blue); outline-offset: 3px; }
+
 @media (max-width: 600px) {
   .auth-simple-layout .clerk-surface > .sign-in-card { min-height: 540px; padding: 32px 24px; gap: 22px; }
-  .sign-in-fields input { font-size: 16px; }
+  .auth-simple-layout .cl-signUp-root .cl-cardBox { min-height: 540px; }
+  .auth-simple-layout .cl-signUp-root .cl-card { padding: 32px 24px 24px; gap: 22px; }
+  .auth-simple-layout .cl-signUp-root .cl-footer { padding-inline: 24px; }
+  .sign-in-fields input,
+  .auth-simple-layout .cl-signUp-root .cl-formFieldInput { font-size: 16px; }
 }
 
 /* The signed-in menu is portalled to <body>, so the demo cannot clip or cover it. */
