@@ -9,16 +9,16 @@ export const BILLING_PLANS = Object.freeze({
   plus: Object.freeze({
     id: "plus",
     name: "Plus",
-    allowance: 200,
+    allowance: 300,
     cadence: "billing_period",
     model: "grok-4.3",
   }),
   ultra: Object.freeze({
     id: "ultra",
     name: "Ultra",
-    allowance: 300,
+    allowance: 500,
     cadence: "billing_period",
-    model: "grok-4.5",
+    model: "grok-4.7",
   }),
 });
 

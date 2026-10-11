@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { createHmac } from "node:crypto";
+import { createHmac, randomUUID } from "node:crypto";
 import test from "node:test";
 import { createBillingService } from "../src/billing-service.js";
 
@@ -653,6 +653,46 @@ test("a canceled renewal can be reactivated while its paid period is active", as
   assert.equal(uncanceledId, "mem_membership123456");
   assert.equal(result.cancelAtPeriodEnd, false);
   assert.equal(result.renewsAt, "2026-08-27T12:00:00.000Z");
+});
+
+test("larger paid allowances preserve current-cycle usage and route Ultra to Grok 4.7", async () => {
+  for (const scenario of [
+    { plan: "plus", allowance: 300, previousAllowance: 200, model: "grok-4.3", subscription: subscriptionRecord() },
+    { plan: "ultra", allowance: 500, previousAllowance: 300, model: "grok-4.7", subscription: subscriptionRecord({
+      providerPlanId: "plan_FZknYvJ1uz41F",
+      providerProductId: "prod_kIiWFLHOWhrWa",
+    }) },
+  ]) {
+    let reservationInput;
+    const service = createBillingService({
+      config: testConfig(),
+      store: fakeStore({
+        async listSubscriptions() { return [scenario.subscription]; },
+        async getUsagePeriod() {
+          return { allowance: scenario.previousAllowance, consumed: scenario.previousAllowance, reserved: 1 };
+        },
+        async reserveUsage(input) {
+          reservationInput = input;
+          return { operationId: input.operationId };
+        },
+      }),
+      whopClient: fakeWhop(),
+      now: () => NOW,
+    });
+    const status = await service.status(TESTER);
+    assert.equal(status.plan.id, scenario.plan);
+    assert.equal(status.usage.allowance, scenario.allowance);
+    assert.equal(status.usage.consumed, scenario.previousAllowance);
+    assert.equal(status.usage.remaining, scenario.allowance - scenario.previousAllowance - 1);
+    const access = await service.reserveAnalysis({
+      userId: TESTER,
+      operationId: randomUUID(),
+      defaultModel: "grok-4.5",
+    });
+    assert.equal(access.model, scenario.model);
+    assert.equal(reservationInput.period.allowance, scenario.allowance);
+    assert.equal(reservationInput.period.endsAt.toISOString(), "2026-08-27T12:00:00.000Z");
+  }
 });
 
 test("a legacy overlapping account falls back safely when Ultra is revoked", async () => {

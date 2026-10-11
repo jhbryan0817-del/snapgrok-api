@@ -90,7 +90,7 @@ test("paid period keys remain stable throughout one Whop billing period", () => 
     now: new Date("2026-07-27T00:00:00.000Z"),
   });
   assert.equal(first.key, retry.key);
-  assert.equal(first.allowance, 200);
+  assert.equal(first.allowance, 300);
   assert.equal(first.model, "grok-4.3");
 });
 

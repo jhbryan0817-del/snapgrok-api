@@ -925,7 +925,7 @@ export function validateRuntimeConfig(config) {
         "BILLING_WEBSITE_ORIGIN must be included in ALLOWED_ORIGINS and CLERK_AUTHORIZED_PARTIES.",
       );
     }
-    for (const requiredModel of ["grok-4.3", "grok-4.5"]) {
+    for (const requiredModel of ["grok-4.3", "grok-4.7"]) {
       if (!config.allowedModels.has(requiredModel)) {
         throw new Error(
           `Billing requires ${requiredModel} in ALLOWED_XAI_MODELS.`,
