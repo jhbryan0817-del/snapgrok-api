@@ -475,6 +475,89 @@ img { display: block; max-width: 100%; }
   margin-inline: auto !important;
 }
 
+.auth-simple-layout .clerk-surface > .sign-in-card {
+  width: min(100%, 460px);
+  min-height: 560px;
+  padding: 40px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 24px;
+  border: 1px solid rgba(8, 23, 52, .12);
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 4px 12px rgba(8, 23, 52, .08);
+  font-size: 14px;
+}
+.sign-in-card-heading { text-align: center; }
+.sign-in-card-heading h1 { margin: 0; font-size: 19px; font-weight: 700; }
+.sign-in-card-heading p { margin: 8px 0 0; color: var(--muted); line-height: 1.5; }
+.sign-in-google {
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  border: 1px solid rgba(8, 23, 52, .14);
+  border-radius: 7px;
+  background: #fff;
+  color: var(--ink);
+  cursor: pointer;
+}
+.sign-in-google svg { width: 18px; height: 18px; flex-shrink: 0; }
+.sign-in-divider { display: flex; align-items: center; gap: 18px; color: var(--muted); font-size: 12px; }
+.sign-in-divider::before, .sign-in-divider::after { content: ""; height: 1px; flex: 1; background: rgba(8, 23, 52, .1); }
+.sign-in-fields { display: grid; gap: 9px; }
+.sign-in-fields label { font-size: 13px; font-weight: 600; }
+.sign-in-fields input {
+  width: 100%;
+  min-height: 42px;
+  padding: 9px 12px;
+  border: 1px solid rgba(8, 23, 52, .2);
+  border-radius: 7px;
+  background: #fff;
+  color: var(--ink);
+}
+.sign-in-password-label { margin-top: 12px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.sign-in-password-label button { padding: 0; border: 0; background: transparent; color: var(--blue); font-size: 12px; cursor: pointer; }
+.sign-in-password-input { position: relative; }
+.sign-in-password-input input { padding-right: 64px; }
+.sign-in-password-input button {
+  position: absolute;
+  inset: 1px 1px 1px auto;
+  padding-inline: 12px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+.sign-in-submit {
+  min-height: 42px;
+  margin-top: 15px;
+  border: 0;
+  border-radius: 7px;
+  background: var(--blue);
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+}
+.sign-in-google:disabled, .sign-in-submit:disabled, .sign-in-alternative:disabled { opacity: .6; cursor: wait; }
+.sign-in-fields input:focus-visible, .sign-in-card button:focus-visible, .sign-in-card a:focus-visible,
+.account-install-button:focus-visible { outline: 2px solid var(--blue); outline-offset: 3px; }
+.sign-in-error { margin: 4px 0 0; color: #a52237; font-size: 13px; line-height: 1.5; }
+.sign-in-alternative { align-self: center; padding: 0; border: 0; background: transparent; color: var(--blue); font-size: 12px; cursor: pointer; }
+.sign-in-card-footer { margin: 0; text-align: center; color: var(--muted); font-size: 13px; }
+.sign-in-card-footer a { margin-left: 4px; color: var(--blue); font-weight: 600; }
+.auth-simple-layout .clerk-surface > .sign-in-clerk-flow { flex-direction: column; align-items: center; gap: 16px; }
+.sign-in-back-link { padding: 0; border: 0; background: transparent; color: var(--blue); font-size: 13px; cursor: pointer; }
+
+@media (max-width: 600px) {
+  .auth-simple-layout .clerk-surface > .sign-in-card { min-height: 540px; padding: 32px 24px; gap: 22px; }
+  .sign-in-fields input { font-size: 16px; }
+}
+
 /* The signed-in menu is portalled to <body>, so the demo cannot clip or cover it. */
 .account-popover-portal {
   position: fixed;
@@ -2285,10 +2368,13 @@ img { display: block; max-width: 100%; }
 }
 .brand .brand-logo > .brand-logo-image {
   position: static;
+  display: block;
   width: 100%;
   max-width: 100%;
   height: 100%;
   object-fit: contain;
+  /* Center the artwork, whose vertical bounds are 11–150px in a 207px asset. */
+  transform: translateY(calc(100% * 22.5 / 207));
   border: 0;
   border-radius: 0;
   box-shadow: none;
@@ -3046,6 +3132,19 @@ img { display: block; max-width: 100%; }
   flex: 0 0 auto;
   stroke: none;
 }
+
+.primary-button.account-install-button {
+  width: max-content;
+  max-width: 100%;
+  min-height: 38px;
+  padding: 8px 14px;
+  gap: 9px;
+  border-radius: 10px;
+  font-size: 12px;
+  white-space: nowrap;
+  box-shadow: 0 10px 24px rgba(7, 9, 13, .14);
+}
+.primary-button.account-install-button svg.chrome-icon { width: 18px; height: 18px; }
 
 /* Hero alignment refinements. */
 .toolbar-icon-processing {

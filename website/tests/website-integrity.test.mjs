@@ -245,7 +245,7 @@ test("global footer contains navigation, published business details, and accurat
 });
 
 test("all Clerk sign-in and sign-up completions return to account management", () => {
-  for (const path of ["app/sign-in/page.tsx", "app/sign-up/page.tsx", "app/account/page.tsx"]) {
+  for (const path of ["app/sign-in-form.tsx", "app/sign-up/page.tsx", "app/account/page.tsx"]) {
     const source = read(path);
     assert.match(source, /forceRedirectUrl="\/account"/);
     assert.match(source, /fallbackRedirectUrl="\/account"/);
@@ -476,7 +476,7 @@ test("account readiness combines extension installation and server quota state",
   assert.match(readiness, /SNEAKSOLVE_EXTENSION_PAIR/);
   assert.match(readiness, /status\.usage\.remaining <= 0/);
   assert.match(readiness, /Ready - Pin Extension/);
-  assert.match(readiness, /Extension Uninstalled/);
+  assert.match(readiness, /Add to Chrome/);
   assert.match(readiness, /Usage Limit Reached/);
   assert.doesNotMatch(account, /localGreeting|Good morning|Good afternoon|Good evening|user\?\.firstName|\{greeting\}\./);
   assert.match(account, /VIEW YOUR DETAILS/);
