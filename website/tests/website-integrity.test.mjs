@@ -468,7 +468,7 @@ test("account readiness combines extension installation and server quota state",
   assert.match(panel, /billing-panel-status[\s\S]*<AccountReadiness \/>/);
   assert.doesNotMatch(account, /account-header-status|account-summary-grid|Extension access|Security controls|Quick sign out/);
   assert.match(extensionApi, /NEXT_PUBLIC_EXTENSION_ID/);
-  assert.match(read(".env.example"), /jjgjlopdpefphgappfmkkkpiknpnoijb/);
+  assert.match(read(".env.example"), /gjofjefbhibmdjchpjlicihpaeihfpkp/);
   // Protocol message names remain stable so an updated website can still
   // coordinate safely with extension installs during the brand migration.
   assert.match(readiness, /SNEAKSOLVE_EXTENSION_PING/);

@@ -51,6 +51,18 @@ v6.5.1 accepts both Whop's documented literal webhook secret and the
 Standard Webhooks `whsec_` serialization, adds a process-only Render liveness
 endpoint, and gives harmless crawler requests explicit public responses.
 
+## Chrome Web Store identity
+
+The first Store draft uses Item ID `gjofjefbhibmdjchpjlicihpaeihfpkp`.
+Set `EXTENSION_IDS` to include that exact ID and `ALLOWED_ORIGINS` to include
+`chrome-extension://gjofjefbhibmdjchpjlicihpaeihfpkp` alongside the existing
+website origin. Rebuild the website with the same `NEXT_PUBLIC_EXTENSION_ID`.
+The API already validates these environment-driven allowlists at startup;
+changing the Store identity does not require weakening authentication or CORS.
+Keep an older development ID only while its installed development build is
+still needed, and remove it after migration. The source extension manifest now
+contains the Store-assigned public key so new unpacked builds use the Store ID.
+
 ## API routes
 
 | Route | Authentication | Purpose |

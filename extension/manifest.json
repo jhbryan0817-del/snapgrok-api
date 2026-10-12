@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "description": "Capture visible or selected multiple-choice questions and receive proposed answers through the Chrome extension icon.",
   "minimum_chrome_version": "109",
-  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAvHmfxNHhTBY+sriO5tNsX8dPlk1rwsxfDb3XPI2eqkCCUYlIPgx0PGDpFzU6lWakIbP/hesqUrcdC6LCgzT3k9Gs4XnXrgtt8VBTG0a7ADnXH+mDKv+Bt0m0NGqe0HR+0XRcSLzbifpeDrGnb2hDWMmjeH335Uns0OmFAcW2oM4jHiZdbb4uaVPRL6kzwJ2Xz4yyYjdQE101nhI2N9qDV+jMX8PvzratnAn6qObs2/YtLq+BJDBpfN+yqlOiVrjn9cANokdKhhXsyXki0uWNaqsS7Oa+1rY/7+rpjNJqQUKR2316ahQ3+2em9VrYiKZY5jGh9caRpnf54HuIsKvG6wIDAQAB",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEApOSxngqm7E7pewj+Ll5I0LLrdLRi3Kt3C0aYgu0yK2LzvJt58jfc7vxGk77jjBeXZESXmwtFWJRxIbLF13wmxOLHgWePnqGI7jugzT4DqtbbhPoa8mZsxkjvrLtEvg930XB5IpRQGj6FeXBP0h1Gu1PydUwF2+G1ToE8jqlOVNjLxgnzsthpO6ugTaiwF7Ia/zfcPApBN/MLfTPA8PqFtShPzeFclJuhdcFs2MYpHAwyhPJXVyg0VZrUrv+djtlx2XtMHFiUD6BZP9sLf1OCxKA28aWwoCX616wniSRcB8lXxfL4qIntWydQN+h4nxYv2pUbDMVZTBHT1QRCo06wjwIDAQAB",
   "permissions": [
     "activeTab",
     "storage",
