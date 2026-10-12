@@ -10,36 +10,15 @@ Capture visible or selected multiple-choice questions and receive proposed answe
 
 ## Detailed description — paste into Store listing
 
-Zenaian helps you review multiple-choice practice questions using AI. Capture the visible webpage or select only the question you want to analyze, then read proposed answer labels through the Chrome extension icon.
+Zenaian is a compact study companion for reviewing multiple-choice practice questions. Capture the visible webpage or select just the question you want to review, and receive proposed answer labels through the Chrome extension icon. Keep your attention on the question while using a quick second opinion to support practice and revision.
 
-HOW IT WORKS
-• Pin Zenaian to your Chrome toolbar and sign in at www.zenaian.com.
-• Use Ctrl+Shift+Z to capture the visible webpage, or Ctrl+Shift+X to select a region. On macOS, use Command instead of Ctrl. You can change shortcuts in Chrome's extension shortcut settings.
-• The icon shows processing, a proposed single or multiple answer, an inconclusive result, or an error. Hover over the icon for the AI-generated result label.
-• Add an optional custom instruction through the extension popup.
+Use keyboard shortcuts for visible-page or selected-region capture, and add a custom instruction when more context would help. The icon shows processing and answer states, while the popup explains the controls and results. A Zenaian account and internet connection are required; a free daily allowance and optional paid plans are available on our website. Verify proposed answers against your own reasoning.
 
-ACCOUNT AND PLANS
-A Zenaian account and internet connection are required. The free plan includes five questions per UTC day. Optional paid subscriptions are purchased on the Zenaian website: Plus includes 300 questions per monthly billing period; Ultra includes 500. See www.zenaian.com/pricing for current pricing, models and renewal terms. No paid subscription is required to use the free allowance.
-
-AI AND PRIVACY
-Captures occur only when you invoke a capture shortcut. The captured image and optional instruction are sent over HTTPS to the Zenaian API and xAI Grok to generate a proposed answer. Zenaian does not save captured images, instructions, question text or AI answers as persistent application database records; production inference requires xAI Zero Data Retention. Account, authentication, usage and subscription information are processed to operate the service. A current-tab URL check for selected capture happens locally, without sending the URL in the analysis request or building browsing history. Captured content is not sold or used for advertising.
-
-AI answers may be wrong. Verify proposed answers yourself. Use Zenaian only where AI assistance is permitted. Do not submit screenshots containing identifiable sensitive personal information or credentials. Selected capture is unavailable on certain protected browser pages.
-
-PERMISSIONS
-activeTab: temporary access to the tab when you invoke capture.
-scripting: the locally packaged overlay for selecting a capture region.
-storage: local preferences, credentials, cached account status and temporary operation state.
-alarms: resume polling and clear expired operation indicators, without starting captures.
-API host access: authenticated HTTPS communication with the Zenaian backend.
-
-Disable or uninstall Zenaian through Chrome's extension settings to stop future extension use. This does not cancel a website subscription or delete your Zenaian account; manage those on the account page.
-
+Website: https://www.zenaian.com
+Plans: https://www.zenaian.com/pricing
 Privacy: https://www.zenaian.com/privacy
 Terms: https://www.zenaian.com/terms
 Support: support@zenaian.com
-
-Zenaian is an independent product and is not affiliated with or endorsed by xAI or Google. Grok is a trademark of xAI.
 
 ## Listing fields
 
@@ -47,9 +26,9 @@ Zenaian is an independent product and is not affiliated with or endorsed by xAI 
 |---|---|
 | Language | English |
 | Homepage | https://www.zenaian.com |
-| Support | https://www.zenaian.com/account and support@zenaian.com |
+| Support | https://www.zenaian.com and support@zenaian.com |
 | Privacy policy | https://www.zenaian.com/privacy |
-| Category | Choose the closest Education/Study tools or Productivity category available in the dashboard. |
+| Category | Education |
 | Pricing declaration | Free installation with optional paid subscriptions on the website. Answer the dashboard's paid-feature questions accordingly. |
 
 ## Privacy practices — paste into purpose and justification fields
@@ -68,7 +47,7 @@ Zenaian is an independent product and is not affiliated with or endorsed by xAI 
 
 **Remote code:** No. Executable scripts and styles are packaged locally. Remote AI responses are answer data, not executable code.
 
-**Data categories:** Declare Personally identifiable information, Authentication information, Website content, and User activity. Include Web history for the local current-tab URL handling, with the explanation that selected capture uses the URL locally for restricted-page checks and does not transmit it in analysis requests or retain browsing history. Screenshots may contain incidental information; warn users to avoid sensitive content. Do not declare “no data collected” merely because content is transient. Whop checkout handles optional payments outside the extension; Zenaian retains minimum billing-state records, not full card numbers. Review the dashboard's exact category wording against these facts.
+**Data categories:** Declare Personally identifiable information, Authentication information, Financial and payment information, Location, Web history, User activity, and Website content. Financial/payment covers the connected service's minimum Whop transaction and subscription records, without card numbers. Location covers IP addresses used for ingress rate limiting, without GPS or location profiling. Web history covers the local current-tab URL check, without history API access, URL transmission in analysis requests, or a retained browsing history. User activity covers local pointer coordinates for the selection overlay and necessary usage/operation counts. Health information and Personal communications are not intended inputs or requested integrations; screenshots can contain incidental content, and the UI tells users to avoid sensitive personal information and credentials. See DATA-USAGE-REVIEW.md for the complete category audit.
 
 The Limited Use certifications should reflect the actual implementation: no sale of user data, no use beyond the disclosed purpose and necessary operation/security, and no use for creditworthiness/lending decisions. These certifications do not establish that the product's separate disclosure flow satisfies Google's requirements.
 
@@ -91,16 +70,13 @@ Prepared brand artwork:
 
 The promotional artwork illustrates the brand; it is not a screenshot. Keep the current packaged icon to preserve the extension's interface. Google's square-icon guide recommends 96×96 artwork within a 128×128 transparent canvas; the existing icon fills more of that canvas. This is an artwork-guideline consideration, not evidence that a code change guarantees approval.
 
-At least one actual product screenshot is still required, at 1280×800 or 640×400. Capture the real installed extension with a dedicated test account and a synthetic practice question. Suggested captions:
-1. “Choose visible-page or selected-region capture.”
-2. “Read proposed AI answers through the extension icon.”
-3. “Add context with a custom instruction.”
+One genuine screenshot is prepared: zenaian-store-screenshot-support-1280x800.png. It shows the actual installed Store-ID extension signed in as support@zenaian.com. The popup pixels were cropped from a native Chrome capture and resized onto a plain light canvas; no interface, account state or text was fabricated.
 
 Do not upload a mocked QA preview as an actual product screenshot. Avoid personal email addresses, real assessment material and claims of guaranteed accuracy or speed.
 
-## Remaining disclosure issue — resolve before submitting
+## Disclosure review consideration — current UI retained
 
-The current signup agreement links only to Terms and Privacy. The original extension UI is restored, including its existing AI/privacy footer, without a new consent screen. Google says a prominent disclosure cannot exist only in legal documents or the Store listing and must precede a specific affirmative agreement within the product UI. The present flow remains a material disclosure-review risk. This is separate from legal enforceability of the Terms and from Chrome's browser permission prompt.
+The current signup agreement links only to Terms and Privacy. The original extension UI is restored, including its existing AI/privacy footer, without a new consent screen. Google says a prominent disclosure cannot exist only in legal documents or the Store listing and must precede a specific affirmative agreement within the product UI. The user has chosen to submit the existing flow and respond to reviewer feedback. Its compliance remains a review uncertainty; no additional consent interface is requested. This is separate from legal enforceability of the Terms and from Chrome's browser permission prompt.
 
 Suggested text for a future prominent notice alongside the existing signup agreement (prepared only; not inserted into the interface):
 
