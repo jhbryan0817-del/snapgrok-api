@@ -12,13 +12,13 @@ From the repository root, run:
 ./extension/package.ps1 -OutputPath C:/path/to/zenaian-chrome-1.0.0.zip
 ```
 
-Choose a new output path. The script packages only the 15 runtime files and 52 required icons. It preserves the existing public manifest key, puts `manifest.json` at the ZIP root, and excludes tests, packaging tools, unused fonts, and source artwork. It prints the SHA-256 digest for the resulting ZIP. Do not include a private signing key or any server credentials.
+Choose a new output path. The script packages only the 15 runtime files and 52 required icons. It removes `key` from the upload manifest while preserving the source manifest's public key for the existing unpacked development ID. It puts `manifest.json` at the ZIP root and excludes tests, packaging tools, unused fonts, and source artwork. It prints the SHA-256 digest for the resulting ZIP. Do not include a private signing key or any server credentials.
 
 ## Verify identity before submitting
 
 The current development public key derives the extension ID `jjgjlopdpefphgappfmkkkpiknpnoijb`. The website build setting `NEXT_PUBLIC_EXTENSION_ID`, API setting `EXTENSION_IDS`, and the API's permitted Chrome-extension origin must agree with the installed extension's ID.
 
-A manifest key keeps an unpacked development ID stable; do not assume it chooses the first Web Store item's ID. Upload the ZIP as a draft first and compare its Item ID. If it differs, keep the draft and update the production configuration for that exact store ID before submission. Copy the draft's public key from Package → View public key into the local manifest when testing unpacked builds, so they use the store ID. Preserve the existing development mapping only if it remains needed; never replace the allowlist with a wildcard. No private key is needed for this comparison. Once the listing is published, set the website's `NEXT_PUBLIC_CHROME_WEB_STORE_URL` to its actual listing URL and rebuild the website so its install buttons open this item.
+A manifest key keeps an unpacked development ID stable. The Store upload omits it and the Web Store assigns the item's identity. Upload the ZIP as a draft first and compare its Item ID. If it differs, keep the draft and update the production configuration for that exact store ID before submission. Copy the draft's public key from Package → View public key into the local manifest when testing unpacked builds, so they use the store ID; the packaging script still omits that field from uploads. Preserve the existing development mapping only if it remains needed; never replace the allowlist with a wildcard. No private key is needed for this comparison. Once the listing is published, set the website's `NEXT_PUBLIC_CHROME_WEB_STORE_URL` to its actual listing URL and rebuild the website so its install buttons open this item.
 
 [Google's extension identity instructions](https://developer.chrome.com/docs/extensions/reference/manifest/key)
 

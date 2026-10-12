@@ -11,6 +11,13 @@ if ($manifest.manifest_version -ne 3 -or $manifest.description.Length -gt 132) {
     throw 'The extension manifest is not valid for this release.'
 }
 
+# Keep the public key in the source manifest for the existing unpacked ID.
+# The Web Store upload manifest must omit it; the Store assigns the item ID.
+$manifest.PSObject.Properties.Remove('key')
+$uploadManifestBytes = [Text.UTF8Encoding]::new($false).GetBytes(
+    ($manifest | ConvertTo-Json -Depth 20) + "`n"
+)
+
 # Use an explicit runtime allowlist. Tests, packaging tools, unused fonts,
 # source artwork, credentials and repository metadata never enter the ZIP.
 $runtimeFiles = @(
@@ -40,9 +47,16 @@ try {
     foreach ($file in $files | Sort-Object) {
         $entry = $archive.CreateEntry($file, [IO.Compression.CompressionLevel]::Optimal)
         $entryStream = $entry.Open()
-        $sourceStream = [IO.File]::OpenRead((Join-Path $extensionRoot $file))
-        try { $sourceStream.CopyTo($entryStream) }
-        finally { $sourceStream.Dispose(); $entryStream.Dispose() }
+        try {
+            if ($file -eq 'manifest.json') {
+                $entryStream.Write($uploadManifestBytes, 0, $uploadManifestBytes.Length)
+            } else {
+                $sourceStream = [IO.File]::OpenRead((Join-Path $extensionRoot $file))
+                try { $sourceStream.CopyTo($entryStream) }
+                finally { $sourceStream.Dispose() }
+            }
+        }
+        finally { $entryStream.Dispose() }
     }
 }
 finally { $archive.Dispose(); $stream.Dispose() }
