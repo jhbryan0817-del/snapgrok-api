@@ -37,7 +37,7 @@ Disable or uninstall Zenaian through Chrome's extension settings to stop future 
 
 Privacy: https://www.zenaian.com/privacy
 Terms: https://www.zenaian.com/terms
-Support: info@zenaian.com
+Support: support@zenaian.com
 
 Zenaian is an independent product and is not affiliated with or endorsed by xAI or Google. Grok is a trademark of xAI.
 
@@ -47,7 +47,7 @@ Zenaian is an independent product and is not affiliated with or endorsed by xAI 
 |---|---|
 | Language | English |
 | Homepage | https://www.zenaian.com |
-| Support | https://www.zenaian.com/account and info@zenaian.com |
+| Support | https://www.zenaian.com/account and support@zenaian.com |
 | Privacy policy | https://www.zenaian.com/privacy |
 | Category | Choose the closest Education/Study tools or Productivity category available in the dashboard. |
 | Pricing declaration | Free installation with optional paid subscriptions on the website. Answer the dashboard's paid-feature questions accordingly. |
@@ -78,7 +78,7 @@ Install the submitted extension, pin its icon, open the popup and choose “Log 
 
 Open an ordinary HTTPS practice page showing one synthetic multiple-choice question. Use Ctrl+Shift+Z to capture the visible page. Use Ctrl+Shift+X for selected capture, then drag over the question. macOS uses Command instead of Ctrl. Wait for processing to finish, then hover over the extension icon to see the proposed AI-generated answer label. The popup's legend explains the icon states. Use Edit to change shortcuts or the optional custom instruction.
 
-The free allowance is five questions per UTC day; completed inconclusive responses also use allowance. No paid purchase is required. Captures require internet/backend availability. Selected capture cannot inject an overlay on browser-owned/protected pages. Please contact info@zenaian.com for access or pairing problems.
+The free allowance is five questions per UTC day; completed inconclusive responses also use allowance. No paid purchase is required. Captures require internet/backend availability. Selected capture cannot inject an overlay on browser-owned/protected pages. Please contact support@zenaian.com for access or pairing problems.
 
 Supply an ordinary test account with a working login and enough allowance in the private dashboard field. Do not publish credentials or place them in the ZIP/repository. Do not disable authentication or bypass quotas for review.
 

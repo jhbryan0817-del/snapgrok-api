@@ -123,7 +123,7 @@ NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_live_Y2xlcmsuemVuYWlhbi5jb20k
 NEXT_PUBLIC_CLERK_FRONTEND_API_URL=https://clerk.zenaian.com
 NEXT_PUBLIC_SITE_URL=https://www.zenaian.com
 NEXT_PUBLIC_API_URL=https://snapgrok-api.onrender.com
-NEXT_PUBLIC_EXTENSION_ID=jjgjlopdpefphgappfmkkkpiknpnoijb
+NEXT_PUBLIC_EXTENSION_ID=gjofjefbhibmdjchpjlicihpaeihfpkp
 ```
 
 Do not add server secrets to the website. Deploy, open
