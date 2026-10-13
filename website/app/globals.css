@@ -488,7 +488,7 @@ img { display: block; max-width: 100%; }
   box-shadow: 0 4px 12px rgba(8, 23, 52, .08);
   font-size: 14px;
 }
-.auth-simple-layout .clerk-surface > .sign-in-card { padding: 40px; gap: 24px; }
+.auth-simple-layout .clerk-surface > .sign-in-card { min-height: 0; padding: 40px; gap: 24px; }
 .sign-in-card-heading { text-align: center; }
 .sign-in-card-heading h1,
 .auth-simple-layout .cl-signUp-root .cl-headerTitle { margin: 0; color: var(--ink); font-size: 19px; font-weight: 700; }
@@ -559,11 +559,10 @@ img { display: block; max-width: 100%; }
   cursor: pointer;
 }
 .sign-in-submit { margin-top: 15px; }
-.sign-in-google:disabled, .sign-in-submit:disabled, .sign-in-alternative:disabled { opacity: .6; cursor: wait; }
+.sign-in-google:disabled, .sign-in-submit:disabled { opacity: .6; cursor: wait; }
 .sign-in-fields input:focus-visible, .sign-in-card button:focus-visible, .sign-in-card a:focus-visible,
 .account-install-button:focus-visible { outline: 2px solid var(--blue); outline-offset: 3px; }
 .sign-in-error { margin: 4px 0 0; color: #a52237; font-size: 13px; line-height: 1.5; }
-.sign-in-alternative { align-self: center; padding: 0; border: 0; background: transparent; color: var(--blue); font-size: 12px; cursor: pointer; }
 .sign-in-card-footer { margin: 0; text-align: center; color: var(--muted); font-size: 13px; }
 .sign-in-card-footer a { margin-left: 4px; color: var(--blue); font-weight: 600; }
 .auth-simple-layout .clerk-surface > .sign-in-clerk-flow { flex-direction: column; align-items: center; gap: 16px; }
@@ -608,7 +607,7 @@ img { display: block; max-width: 100%; }
 .auth-simple-layout .cl-signUp-root a:focus-visible { outline: 2px solid var(--blue); outline-offset: 3px; }
 
 @media (max-width: 600px) {
-  .auth-simple-layout .clerk-surface > .sign-in-card { min-height: 540px; padding: 32px 24px; gap: 22px; }
+  .auth-simple-layout .clerk-surface > .sign-in-card { padding: 32px 24px; gap: 22px; }
   .auth-simple-layout .cl-signUp-root .cl-cardBox { min-height: 540px; }
   .auth-simple-layout .cl-signUp-root .cl-card { padding: 32px 24px 24px; gap: 22px; }
   .auth-simple-layout .cl-signUp-root .cl-footer { padding-inline: 24px; }
