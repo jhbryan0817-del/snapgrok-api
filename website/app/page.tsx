@@ -102,7 +102,10 @@ export default async function HomePage() {
 
         <div className="hero-followup reveal reveal-second" data-animate>
           <div className="hero-actions">
-            <Link className="primary-button" href="/account?mode=sign-up">
+            <Link
+              className="primary-button"
+              href={process.env.NEXT_PUBLIC_CHROME_WEB_STORE_URL || "https://chromewebstore.google.com/detail/gjofjefbhibmdjchpjlicihpaeihfpkp"}
+            >
               <ChromeIcon />
               <span>Add to Chrome</span>
             </Link>
