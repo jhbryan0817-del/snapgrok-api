@@ -32,6 +32,10 @@ export function ZenaianClerkProvider({
           fontFamily: '"Segoe UI Variable", Aptos, "Segoe UI", Arial, sans-serif',
           borderRadius: "0.75rem",
         },
+        // The existing auth cards use the site header's logo. Clerk's
+        // hosted portal keeps its own branding from the Dashboard.
+        signIn: { elements: { logoBox: { display: "none" } } },
+        signUp: { elements: { logoBox: { display: "none" } } },
         elements: {
           // Account deletion intentionally uses a high application overlay.
           // Clerk's reverification prompt must remain above it so a server
