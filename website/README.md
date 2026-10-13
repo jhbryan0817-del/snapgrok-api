@@ -46,6 +46,8 @@ Production Clerk Dashboard settings complement the code:
   of `public/favicon.svg`; public support is `support@zenaian.com`.
 
 The embedded flows use the website font and shared Clerk appearance settings.
+Embedded sign-in/up cards hide Clerk's logo box and keep the original card
+layout, using only the existing site header logo.
 Hosted Account Portal pages use Dashboard branding. Custom 404, page-error,
 and root-error screens use a recovery component that does not depend on Clerk,
 so it can render even when authentication or the root layout fails.
