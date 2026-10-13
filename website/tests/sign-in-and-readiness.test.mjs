@@ -210,7 +210,7 @@ test("missing extension and Chrome's no-receiver error show a clickable Chrome i
   for (const runtime of [undefined, { lastError: { message: "Receiving end does not exist" }, sendMessage: (_id, _message, callback) => callback() }]) {
     const tree = await readinessHarness(runtime).check();
     assert.equal(tree.type, "a");
-    assert.equal(tree.props.href, "https://chromewebstore.google.com/");
+    assert.equal(tree.props.href, "https://chromewebstore.google.com/detail/gjofjefbhibmdjchpjlicihpaeihfpkp");
     assert.match(tree.props.className, /account-install-button/);
     assert.equal(find(tree, (node) => node.type === "span").props.children, "Add to Chrome");
     assert.equal(nodes(tree).some((node) => node.props.className === "account-status-dot"), false);

@@ -11,9 +11,8 @@ import {
 
 const EXTENSION_CHECK_TIMEOUT_MS = 3500;
 const EXTENSION_CONNECT_TIMEOUT_MS = 20000;
-// Replace this public setting with the published listing URL when it is available.
 const CHROME_WEB_STORE_URL =
-  process.env.NEXT_PUBLIC_CHROME_WEB_STORE_URL || "https://chromewebstore.google.com/";
+  process.env.NEXT_PUBLIC_CHROME_WEB_STORE_URL || "https://chromewebstore.google.com/detail/gjofjefbhibmdjchpjlicihpaeihfpkp";
 
 type ExtensionState = "checking" | "connected" | "installed" | "missing";
 type RuntimeResponse = {
