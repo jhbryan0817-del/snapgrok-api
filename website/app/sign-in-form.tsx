@@ -196,10 +196,6 @@ export function SignInForm() {
           {submitting ? "Signing in…" : "Continue"}
         </button>
       </form>
-      <button className="sign-in-alternative" type="button" disabled={busy}
-        onClick={() => { setPassword(""); setAlternativeSignIn(true); }}>
-        Use another sign-in method
-      </button>
       <p className="sign-in-card-footer">
         Don’t have an account? <Link href="/account?mode=sign-up">Sign up</Link>
       </p>
