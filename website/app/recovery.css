@@ -1,0 +1,68 @@
+.recovery-page {
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  color: #07090d;
+  background: #f7f9fc;
+  font-family: "Segoe UI Variable", Aptos, "Segoe UI", Arial, sans-serif;
+  font-size: 15px;
+  font-weight: 500;
+  font-stretch: expanded;
+  letter-spacing: .008em;
+}
+.recovery-page, .recovery-page * { box-sizing: border-box; }
+.recovery-page a { text-decoration: none; }
+.recovery-header {
+  width: min(1200px, 100%);
+  margin: 0 auto;
+  padding: 28px 30px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+}
+.recovery-header .brand-logo { display: block; width: 154px; height: 36px; }
+.recovery-header .brand-logo img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.recovery-account-link { color: #0549fd; font-size: 14px; font-weight: 600; }
+.recovery-content {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  padding: 36px 24px 90px;
+}
+.recovery-card {
+  width: min(100%, 520px);
+  padding: 44px 36px;
+  border: 1px solid rgba(8, 23, 52, .12);
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 4px 12px rgba(8, 23, 52, .08);
+  text-align: center;
+}
+.recovery-label { color: #0549fd; font-size: 12px; font-weight: 700; letter-spacing: .1em; }
+.recovery-card h1 { margin: 18px 0 14px; font-size: 28px; font-weight: 700; line-height: 1.25; }
+.recovery-card p { margin: 0; color: #5e6674; font-size: 14px; line-height: 1.7; }
+.recovery-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; margin-top: 28px; }
+.recovery-actions button, .recovery-primary-link, .recovery-secondary-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  padding: 10px 20px;
+  border: 1px solid #0549fd;
+  border-radius: 7px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.recovery-actions button, .recovery-primary-link { color: #fff; background: #0549fd; }
+.recovery-secondary-link { color: #0549fd; background: #fff; }
+.recovery-support-link { display: inline-block; margin-top: 24px; color: #5e6674; font-size: 13px; }
+.recovery-page a:focus-visible, .recovery-page button:focus-visible { outline: 2px solid #0549fd; outline-offset: 3px; }
+@media (max-width: 600px) {
+  .recovery-header { padding: 24px 20px; }
+  .recovery-header .brand-logo { width: 124px; height: 30px; }
+  .recovery-card { padding: 36px 24px; }
+  .recovery-card h1 { font-size: 25px; }
+}

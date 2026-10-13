@@ -105,6 +105,8 @@ export default async function HomePage() {
             <Link
               className="primary-button"
               href={process.env.NEXT_PUBLIC_CHROME_WEB_STORE_URL || "https://chromewebstore.google.com/detail/gjofjefbhibmdjchpjlicihpaeihfpkp"}
+              target="_blank"
+              rel="noopener noreferrer"
             >
               <ChromeIcon />
               <span>Add to Chrome</span>
