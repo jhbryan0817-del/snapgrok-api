@@ -138,6 +138,8 @@ export function SignInForm() {
           signUpUrl="/account?mode=sign-up"
           forceRedirectUrl="/account"
           fallbackRedirectUrl="/account"
+          signUpForceRedirectUrl="/account"
+          signUpFallbackRedirectUrl="/account"
           initialValues={{ emailAddress }}
         />
         <button className="sign-in-back-link" type="button" disabled={busy} onClick={() => {

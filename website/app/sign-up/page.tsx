@@ -11,6 +11,8 @@ export default function SignUpPage() {
         signInUrl="/account?mode=sign-in"
         forceRedirectUrl="/account"
         fallbackRedirectUrl="/account"
+        signInForceRedirectUrl="/account"
+        signInFallbackRedirectUrl="/account"
       />
     </AuthShell>
   );

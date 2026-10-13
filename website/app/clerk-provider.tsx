@@ -15,8 +15,23 @@ export function ZenaianClerkProvider({
       nonce={nonce}
       signInUrl="/sign-in"
       signUpUrl="/sign-up"
+      signInForceRedirectUrl="/account"
+      signUpForceRedirectUrl="/account"
+      signInFallbackRedirectUrl="/account"
+      signUpFallbackRedirectUrl="/account"
       afterSignOutUrl="/"
       appearance={{
+        variables: {
+          colorPrimary: "#0549fd",
+          colorBackground: "#ffffff",
+          colorForeground: "#07090d",
+          colorMutedForeground: "#5e6674",
+          colorInput: "#ffffff",
+          colorInputForeground: "#07090d",
+          colorDanger: "#a52237",
+          fontFamily: '"Segoe UI Variable", Aptos, "Segoe UI", Arial, sans-serif',
+          borderRadius: "0.75rem",
+        },
         elements: {
           // Account deletion intentionally uses a high application overlay.
           // Clerk's reverification prompt must remain above it so a server

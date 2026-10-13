@@ -26,6 +26,30 @@ request a random pairing nonce, deliver a one-use server grant, and clear local
 auth on sign-out. It cannot request screenshots, credentials, settings, custom
 context, or capture actions.
 
+## Authentication routes and branding
+
+All website sign-in and sign-up completions, including transitions between the
+two flows, force `/account`. The SSO callback explicitly resumes unfinished
+signup at `/sign-up#/continue`; email, MFA, password recovery, and Protect
+checks also resume in the embedded hash-routed Clerk components. Clerk still
+enforces its required verification and legal acceptance steps.
+
+Production Clerk Dashboard settings complement the code:
+
+- Paths: Home URL `https://www.zenaian.com/account`, sign-in
+  `https://www.zenaian.com/sign-in`, sign-up `https://www.zenaian.com/sign-up`,
+  and signing out `https://www.zenaian.com/`.
+- Account Portal: both after-sign-in and after-sign-up fallback URLs are
+  `https://www.zenaian.com/account`; use Light mode, primary `#0549FD`,
+  background `#F7F9FC`, and the default card elevation.
+- Application branding: upload `public/zenaian-logo-user.png` and a PNG export
+  of `public/favicon.svg`; public support is `support@zenaian.com`.
+
+The embedded flows use the website font and shared Clerk appearance settings.
+Hosted Account Portal pages use Dashboard branding. Custom 404, page-error,
+and root-error screens use a recovery component that does not depend on Clerk,
+so it can render even when authentication or the root layout fails.
+
 ## Billing client boundary
 
 - Clerk remains the website session authority; Clerk credentials never enter

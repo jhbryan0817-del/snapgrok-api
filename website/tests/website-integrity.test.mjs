@@ -250,6 +250,14 @@ test("all Clerk sign-in and sign-up completions return to account management", (
     assert.match(source, /forceRedirectUrl="\/account"/);
     assert.match(source, /fallbackRedirectUrl="\/account"/);
   }
+  const provider = read("app/clerk-provider.tsx");
+  for (const prop of ["signInForceRedirectUrl", "signUpForceRedirectUrl", "signInFallbackRedirectUrl", "signUpFallbackRedirectUrl"]) {
+    assert.ok(provider.includes(`${prop}="/account"`));
+  }
+  for (const path of ["app/sign-up/page.tsx", "app/account/page.tsx"]) {
+    assert.match(read(path), /signInForceRedirectUrl="\/account"/);
+  }
+  assert.match(read("app/sign-in-form.tsx"), /signUpForceRedirectUrl="\/account"/);
 });
 
 test("authentication shell is intentionally simple", () => {

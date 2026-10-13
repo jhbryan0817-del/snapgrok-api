@@ -43,7 +43,7 @@ function componentHarness(path, dependencies, window = {}, env = {}) {
   const component = Object.values(exports)[0];
   return {
     callbacks, effects,
-    render() { cursor = 0; callbacks.length = 0; effects.length = 0; return component(); },
+    render(props) { cursor = 0; callbacks.length = 0; effects.length = 0; return component(props); },
   };
 }
 
@@ -241,6 +241,45 @@ test("an installed extension with a pairing error stays disconnected, rather tha
   const tree = await readinessHarness(runtime).check();
   assert.equal(tree.type, "div");
   assert.equal(find(tree, (node) => node.type === "strong").props.children, "Extension Disconnected");
+});
+
+test("OAuth callbacks keep unfinished signup and verification on the themed website", () => {
+  const Callback = () => null;
+  const harness = componentHarness("sign-in/sso-callback/page.tsx", {
+    "@clerk/react": { AuthenticateWithRedirectCallback: Callback },
+    "../../auth-shell": { AuthShell: () => null },
+  });
+  const callback = find(harness.render(), (node) => node.type === Callback);
+  assert.equal(callback.props.continueSignUpUrl, "/sign-up#/continue");
+  assert.equal(callback.props.firstFactorUrl, "/sign-in#/factor-one");
+  assert.equal(callback.props.secondFactorUrl, "/sign-in#/factor-two");
+  assert.equal(callback.props.resetPasswordUrl, "/sign-in#/reset-password");
+  assert.equal(callback.props.verifyEmailAddressUrl, "/sign-up#/verify-email-address");
+  assert.equal(callback.props.verifyPhoneNumberUrl, "/sign-up#/verify-phone-number");
+  assert.equal(callback.props.signInProtectCheckUrl, "/sign-in#/protect-check");
+  assert.equal(callback.props.signUpProtectCheckUrl, "/sign-up#/protect-check");
+  for (const name of ["signInForceRedirectUrl", "signUpForceRedirectUrl", "signInFallbackRedirectUrl", "signUpFallbackRedirectUrl"]) {
+    assert.equal(callback.props[name], "/account");
+  }
+});
+
+test("page and root failures offer retry without exposing exception details", () => {
+  const Recovery = () => null;
+  for (const path of ["error.tsx", "global-error.tsx"]) {
+    let retries = 0;
+    const reset = () => { retries += 1; };
+    const harness = componentHarness(path, { "./recovery-page": { RecoveryPage: Recovery } });
+    const page = harness.render({ error: new Error("private-provider-detail"), reset });
+    const recovery = find(page, (node) => node.type === Recovery);
+    assert.equal(recovery.props.onRetry, reset);
+    assert.doesNotMatch(`${recovery.props.title} ${recovery.props.detail}`, /private-provider-detail/);
+    recovery.props.onRetry();
+    assert.equal(retries, 1);
+    if (path === "global-error.tsx") {
+      assert.equal(page.type, "html");
+      assert.equal(find(page, (node) => node.type === "link").props.href, "/favicon.svg");
+    }
+  }
 });
 
 test("a ping timeout remains a connection error rather than claiming the extension is uninstalled", async () => {
