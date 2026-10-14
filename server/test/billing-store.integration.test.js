@@ -110,6 +110,8 @@ test(
         await verifyAtomicQuota(store);
         integrationPhase = "verify durable inference budgets";
         await verifyInferenceBudgets(store);
+        integrationPhase = "verify shared-pool privacy guard";
+        await verifySharedPoolGuard(scopedUrl);
         integrationPhase = "verify checkout and membership mapping";
         await verifyCheckoutAndMembershipMapping(store, scopedUrl);
         integrationPhase = "verify deleted checkout tombstone";
@@ -300,6 +302,27 @@ async function verifyLegacyLedgerRetentionBackfill(database) {
      WHERE request_id = '00000000-0000-4000-8000-000000000001'`,
   );
   assert.equal(result.rows[0]?.correct, true);
+}
+
+async function verifySharedPoolGuard(connectionString) {
+  const pool = new Pool({ connectionString, max: 1, connectionTimeoutMillis: 500,
+    statement_timeout: 3000, query_timeout: 3000 });
+  const privacy = createPostgresPrivacyStore({ pool, providerMode: "test",
+    hmacKey: Buffer.alloc(32, 7).toString("base64url"), hmacKeyVersion: 1 });
+  const billing = createPostgresBillingStore({ pool, providerMode: "test",
+    deletionGuard: (userId, { client } = {}) => privacy.isDeletionBlocked(userId, { client }),
+  });
+  const userId = "user_SharedPoolGuard123";
+  const period = { key: "test:shared-pool", allowance: 5,
+    startsAt: new Date("2026-07-27T00:00:00Z"), endsAt: new Date("2026-07-28T00:00:00Z") };
+  try {
+    const reservation = await billing.reserveUsage({ userId, operationId: randomUUID(),
+      planId: "free", model: "grok-4.3", period });
+    await billing.consumeInferenceBudget(userId, [{ userId, key: "attempts:shared-pool",
+      limit: 15, code: "ANALYSIS_ATTEMPT_LIMITED", startsAt: period.startsAt, endsAt: period.endsAt }]);
+    assert.equal((await billing.getUsagePeriod(userId, "attempts:shared-pool")).consumed, 1);
+    await billing.releaseUsage(reservation.operationId, userId);
+  } finally { await pool.end(); }
 }
 
 async function verifyInferenceBudgets(store) {

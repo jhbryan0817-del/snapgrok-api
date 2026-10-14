@@ -8,6 +8,15 @@ const USER_ID = "user_PrivacyStore123";
 const HMAC_KEY = Buffer.alloc(32, 7).toString("base64url");
 const NOW = new Date("2026-08-15T00:00:00.000Z");
 
+test("billing transaction deletion checks reuse the held client without another pool checkout", async () => {
+  const store = privacyStore({ query() { assert.fail("must not request another pooled connection"); } });
+  const client = { async query(sql) {
+    assert.match(sql, /privacy_request_audit/);
+    return { rows: [{ state: "complete" }] };
+  } };
+  assert.equal(await store.isDeletionBlocked(USER_ID, { client }), "complete");
+});
+
 test("payment archive trigger advances dispute retention from latest evidence", async () => {
   const migration = normalizeSql(await readFile(
     new URL("../migrations/006_privacy_compliance.sql", import.meta.url),

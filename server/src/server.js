@@ -1119,10 +1119,11 @@ export function createZenaianServer({
   const privacyStore = !privacyService && config.billingMode !== "off"
     ? createPrivacyStoreRuntime(config, { pool: runtimeMainDatabasePool })
     : privacyService?.store || null;
-  const deletionGuard = (userId) => privacyDeletionGuard({
+  const deletionGuard = (userId, { client = null } = {}) => privacyDeletionGuard({
     privacyService,
     privacyStore,
     userId,
+    client,
   });
   const billingService = billing || createBillingRuntime(config, {
     deletionGuard,
@@ -3103,9 +3104,9 @@ function validatePrivacyHmacConfig(config) {
   }
 }
 
-async function privacyDeletionGuard({ privacyService, privacyStore, userId }) {
+async function privacyDeletionGuard({ privacyService, privacyStore, userId, client = null }) {
   if (privacyStore?.isDeletionBlocked) {
-    return Boolean(await privacyStore.isDeletionBlocked(userId));
+    return Boolean(await privacyStore.isDeletionBlocked(userId, { client }));
   }
   if (!privacyService?.assertUserAllowed) return false;
   try {

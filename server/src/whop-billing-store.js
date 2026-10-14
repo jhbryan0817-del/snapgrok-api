@@ -1938,7 +1938,10 @@ async function assertBillingUserAllowed(client, userId, deletionGuard) {
   // The raw-ID queue is intentionally removed after deletion completes. The
   // durable privacy audit is HMAC-keyed, so its lookup remains in the privacy
   // store and is injected here rather than duplicating key material in billing.
-  if (deletionGuard && await deletionGuard(userId)) {
+  // The guard queries the same database. Reuse this transaction's client:
+  // checking out another pooled connection while every transaction holds one
+  // can deadlock the entire pool under an otherwise modest burst.
+  if (deletionGuard && await deletionGuard(userId, { client })) {
     throw accountDeletionInProgress();
   }
 }
