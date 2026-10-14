@@ -16,6 +16,8 @@ const offset = Number(__ENV.ACCOUNT_OFFSET || 0);
 const iterations = Number(__ENV.ANALYSIS_ITERATIONS || 4);
 const controlIndex = Number(__ENV.CONTROL_INDEX || offset + vus);
 const admission = new Trend("analysis_admission_ms", true);
+const submission = new Trend("analysis_submission_ms", true);
+const upload = new Trend("analysis_upload_ms", true);
 const completion = new Trend("analysis_completion_ms", true);
 const control = new Trend("account_control_ms", true);
 const rejected = new Trend("rejected_analysis_ms", true);
@@ -25,6 +27,7 @@ const completed = new Counter("analysis_jobs_completed");
 let rejectionSequence = 0;
 
 export const options = {
+  batchPerHost: vus,
   scenarios: {
     analysis: { executor: "per-vu-iterations", vus, iterations, maxDuration: "3m", exec: "analysis", gracefulStop: "10s" },
   },
@@ -64,6 +67,16 @@ export function setup() {
   });
   const health = http.get(`${base}/api/health`, { timeout: "5s" });
   requireStatus(health, [200], "initial health");
+  if (__ENV.WARM_CONTROL === "true") {
+    // Report warm-up separately: it must not hide a cold-burst failure in the
+    // measured canary or be advertised as evidence for cold-start latency.
+    const warm = http.batch(refreshed.slice(0, vus).map(a => ["GET",
+      `${base}/api/extension/account/status`, null,
+      { headers: headers(a), timeout: "10s", tags: { path: "account_warmup" } },
+    ]));
+    for (const response of warm) requireStatus(response, [200], "warm account status");
+    console.info(`Account warm-up: ${warm.length} requests, maximum ${Math.round(Math.max(...warm.map(r => r.timings.duration)))} ms`);
+  }
   return refreshed;
 }
 
@@ -87,7 +100,12 @@ function runAnalysis(a, controlAccount) {
   const r = http.post(`${base}/api/analyze-jobs`, JSON.stringify({
     operationId, imageDataUrl: fixture.trim(), instruction: "Answer the displayed practice question.", shortcutName: "capture-full-screen",
   }), { headers: headers(a), timeout: "15s", tags: { path: "analysis_submit" } });
-  admission.add(r.timings.duration);
+  // A remote screenshot upload is not a backend-only latency measurement.
+  // Keep transport time visible and guard time to acknowledgement separately;
+  // server analysis_performance logs remain authoritative for backend timings.
+  submission.add(r.timings.duration);
+  upload.add(r.timings.sending);
+  admission.add(r.timings.waiting);
   requireStatus(r, [202], "analysis admission");
   started.add(1);
   const jobId = json(r).jobId;
