@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import pg from "pg";
 import { observePostgresPool } from "./postgres-runtime.js";
+import { inferenceBudgetError } from "./inference-budget.js";
 
 const { Pool } = pg;
 const ACCESS_HOLD_STATES = new Set(["payment_failed", "revoked"]);
@@ -312,6 +313,53 @@ export function createPostgresBillingStore({
         [userId, periodKey],
       );
       return result.rows[0] ? mapUsagePeriod(result.rows[0]) : null;
+    },
+
+    async checkInferenceBudget(budgets) {
+      const result = await database.query(
+        `SELECT limits.owner, limits.key
+         FROM unnest($1::text[], $2::text[], $3::integer[]) AS limits(owner, key, maximum)
+         JOIN billing_usage_periods AS usage
+           ON usage.clerk_user_id = limits.owner AND usage.period_key = limits.key
+         WHERE usage.consumed >= limits.maximum`,
+        [budgets.map(b => b.userId), budgets.map(b => b.key), budgets.map(b => b.limit)],
+      );
+      const exhausted = budgets.find(b => result.rows.some(r => r.owner === b.userId && r.key === b.key));
+      if (exhausted) throw inferenceBudgetError(exhausted);
+    },
+
+    async consumeInferenceBudget(userId, budgets) {
+      const client = await database.connect();
+      try {
+        await client.query("BEGIN");
+        await assertUserAllowed(client, userId);
+        const result = await client.query(
+          `INSERT INTO billing_usage_periods (
+             id, clerk_user_id, period_key, plan_id, allowance, consumed, starts_at, ends_at
+           ) SELECT limits.id, limits.owner, limits.key, 'ultra', limits.maximum, 1,
+                    limits.start_at, limits.end_at
+             FROM unnest($1::uuid[], $2::text[], $3::text[], $4::integer[],
+                         $5::timestamptz[], $6::timestamptz[])
+                  AS limits(id, owner, key, maximum, start_at, end_at)
+           ON CONFLICT (clerk_user_id, period_key) DO UPDATE SET
+             allowance = GREATEST(EXCLUDED.allowance,
+               billing_usage_periods.consumed + billing_usage_periods.reserved + 1),
+             consumed = billing_usage_periods.consumed + 1,
+             updated_at = current_timestamp
+           WHERE billing_usage_periods.consumed < EXCLUDED.allowance
+           RETURNING clerk_user_id AS owner, period_key AS key`,
+          [budgets.map(() => randomUUID()), budgets.map(b => b.userId), budgets.map(b => b.key),
+            budgets.map(b => b.limit), budgets.map(b => b.startsAt), budgets.map(b => b.endsAt)],
+        );
+        const exhausted = budgets.find(b => !result.rows.some(r => r.owner === b.userId && r.key === b.key));
+        if (exhausted) throw inferenceBudgetError(exhausted);
+        await client.query("COMMIT");
+      } catch (error) {
+        await rollbackQuietly(client);
+        throw normalizeDatabaseError(error);
+      } finally {
+        client.release();
+      }
     },
 
     async reserveUsage({ userId, operationId, planId, model, period }) {

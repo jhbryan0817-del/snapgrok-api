@@ -66,6 +66,10 @@ export function createConfig(environment = process.env) {
     1,
     200,
   );
+  if (parseCsv(environment.CANARY_USER_IDS).length &&
+      !/^[a-zA-Z0-9_-]{1,64}$/.test(String(environment.CANARY_RUN_ID || ""))) {
+    throw new Error("CANARY_RUN_ID must identify the authorized canary run.");
+  }
 
   return {
     deploymentRevision: safeDeploymentRevision(
@@ -98,6 +102,15 @@ export function createConfig(environment = process.env) {
     ),
     maxRequestBytes:
       boundedInteger(environment, "MAX_REQUEST_MB", 2, 1, 25) * 1024 * 1024,
+    maxControlRequestBytes: boundedInteger(environment, "MAX_CONTROL_REQUEST_BYTES", 8192, 1024, 65536),
+    analysisEligibilityMaxConcurrent: boundedInteger(environment, "ANALYSIS_ELIGIBILITY_MAX_CONCURRENT", 32, 1, 40),
+    globalXaiAttemptsPerDay: boundedInteger(environment, "GLOBAL_XAI_ATTEMPTS_PER_DAY", 5000, 1, 1000000),
+    freeXaiAttemptsPerDay: boundedInteger(environment, "FREE_XAI_ATTEMPTS_PER_DAY", 1000, 1, 1000000),
+    freeUserXaiAttemptsPerDay: boundedInteger(environment, "FREE_USER_XAI_ATTEMPTS_PER_DAY", 15, 5, 100),
+    paidUserXaiAttemptsPerDay: boundedInteger(environment, "PAID_USER_XAI_ATTEMPTS_PER_DAY", 1000, 500, 10000),
+    canaryUserIds: new Set(parseCsv(environment.CANARY_USER_IDS)),
+    canaryRunId: String(environment.CANARY_RUN_ID || "").trim(),
+    canaryMaxXaiAttempts: boundedInteger(environment, "CANARY_MAX_XAI_ATTEMPTS", 400, 1, 400),
     mockMode: strictBooleanFrom(environment, "MOCK_XAI", false),
     // Production inference always fails closed when xAI does not explicitly
     // confirm zero data retention. Non-production environments may opt into
@@ -1055,6 +1068,13 @@ export function createZenaianServer({
     maxWeight: config.maxActiveAnalysisBytes,
     scope: "analysis-bytes",
   });
+  const analysisEligibilityLimiter = new UserRateLimiter({
+    windowMs: 60000,
+    maxRequests: config.controlPlaneAuthenticationRateLimitMaxRequests,
+    maxConcurrent: config.analysisEligibilityMaxConcurrent,
+    maxTrackedUsers: 1,
+    scope: "global",
+  });
   const adaptiveAnalysisLimiter = adaptiveLimiter || new AdaptiveCapacityLimiter({
     maxConcurrent: config.maxConcurrentRequestsGlobal,
     minConcurrent: config.adaptiveConcurrencyEnabled
@@ -1190,6 +1210,14 @@ export function createZenaianServer({
       return await authenticateOperation();
     } finally {
       releaseAuthentication();
+    }
+  };
+  const assertAnalysisEligible = async (userId) => {
+    const release = analysisEligibilityLimiter.acquire("eligibility");
+    try {
+      await billingService.assertAnalysisEligible?.({ userId });
+    } finally {
+      release();
     }
   };
   const runBillingMaintenance = () => {
@@ -1700,14 +1728,15 @@ export function createZenaianServer({
             if (!auth.userAllowedChecked) {
               await privacyService?.assertUserAllowed(auth.userId);
             }
-            releaseGlobal = analysisGlobalRequestLimiter.acquire("analysis");
-            releaseAdaptive = adaptiveAnalysisLimiter.acquire();
+            releaseUser = userRateLimiter.acquire(auth.userId);
+            await assertAnalysisEligible(auth.userId);
             releaseMemory = analysisMemoryLimiter.acquire(
               analysisAdmissionWeight(config, request),
             );
-            releaseUser = userRateLimiter.acquire(auth.userId);
-            body = await readJsonBody(config, request);
+            body = await readJsonBody(config, request, { analysis: true });
             validateAnalyzeRequest(config, body);
+            releaseGlobal = analysisGlobalRequestLimiter.acquire("analysis");
+            releaseAdaptive = adaptiveAnalysisLimiter.acquire();
             const job = await analysisJobManager.create({
               auth,
               body,
@@ -2169,17 +2198,17 @@ export function createZenaianServer({
           let releaseGlobalLimit = null;
           let releaseAdaptive = null;
           let releaseMemory = null;
+          let releaseRateLimit = null;
           try {
             const auth = await admitAuthenticationOnly(
               () => authenticateRequest(request),
             );
             await privacyService?.assertUserAllowed(auth.userId);
-            releaseGlobalLimit = analysisGlobalRequestLimiter.acquire("analysis");
-            releaseAdaptive = adaptiveAnalysisLimiter.acquire();
+            releaseRateLimit = userRateLimiter.acquire(auth.userId);
+            await assertAnalysisEligible(auth.userId);
             releaseMemory = analysisMemoryLimiter.acquire(
               analysisAdmissionWeight(config, request),
             );
-            const releaseRateLimit = userRateLimiter.acquire(auth.userId);
             const downstreamController = new AbortController();
             const untrackAnalysis = accountAnalysisController.track(
               auth.userId,
@@ -2201,8 +2230,10 @@ export function createZenaianServer({
             response.once("close", abortDownstream);
 
             try {
-              body = await readJsonBody(config, request);
+              body = await readJsonBody(config, request, { analysis: true });
               validateAnalyzeRequest(config, body);
+              releaseGlobalLimit = analysisGlobalRequestLimiter.acquire("analysis");
+              releaseAdaptive = adaptiveAnalysisLimiter.acquire();
 
               access = validateAnalysisAccess(
                 config,
@@ -2235,6 +2266,9 @@ export function createZenaianServer({
                 mockMode: config.mockMode,
                 requireZeroDataRetention: config.requireXaiZdr,
                 maxStartsPerSecond: config.xaiMaxStartsPerSecond,
+                onBeforeUpstreamAttempt: () => billingService.recordInferenceAttempt?.({
+                  userId: auth.userId, planId: access.planId,
+                }),
                 signal: downstreamController.signal,
               });
 
@@ -2280,11 +2314,11 @@ export function createZenaianServer({
               request.off("aborted", abortDownstream);
               response.off("close", abortDownstream);
               untrackAnalysis();
-              releaseRateLimit();
               clearSensitiveBody(body);
               body = null;
             }
           } finally {
+            releaseRateLimit?.();
             releaseMemory?.();
             releaseAdaptive?.();
             releaseGlobalLimit?.();
@@ -2300,6 +2334,7 @@ export function createZenaianServer({
         const retryAfterSeconds = Number(error?.retryAfterSeconds) || 0;
         const errorCode = publicErrorCode(error);
         operationalErrorMonitor.record(status);
+        if (status === 413) response.setHeader("Connection", "close");
 
         console.error(
           JSON.stringify({
@@ -2558,7 +2593,9 @@ function createOperationalErrorMonitor({ config, now = Date.now }) {
     snapshot() {
       rollover();
       return {
-        degraded: serverErrorAlerted || rateLimitAlerted,
+        // Expected admission/quota rejections are an abuse signal, not evidence
+        // that this instance or a dependency is unhealthy.
+        degraded: serverErrorAlerted,
         serverErrors,
         rateLimits,
         windowStartedAt,
@@ -3151,6 +3188,7 @@ function createAnalysisPerformanceLogger(config, capacitySnapshot = null) {
     try {
       const totalMs = safePerformanceMetric(metrics?.totalMs);
       const xaiMs = safePerformanceMetric(metrics?.xaiMs);
+      const providerMs = safePerformanceMetric(metrics?.providerMs);
       const capacity = capacitySnapshot?.() || {};
       console.log(JSON.stringify({
         timestamp: new Date().toISOString(),
@@ -3161,6 +3199,8 @@ function createAnalysisPerformanceLogger(config, capacitySnapshot = null) {
           : "unknown",
         totalMs,
         nonXaiMs: Math.max(0, totalMs - xaiMs),
+        providerMs,
+        nonProviderMs: Math.max(0, totalMs - providerMs),
         admissionMs: safePerformanceMetric(metrics?.admissionMs),
         accessMs: safePerformanceMetric(metrics?.accessMs),
         xaiMs,
@@ -3432,7 +3472,8 @@ async function readRawBody(
   return Buffer.concat(chunks);
 }
 
-async function readJsonBody(config, request) {
+async function readJsonBody(config, request, { analysis = false } = {}) {
+  const maxBytes = analysis ? config.maxRequestBytes : config.maxControlRequestBytes;
   requireSingleRequestHeader(request, "content-type");
   requireSingleRequestHeader(request, "content-length");
   const contentType = String(request.headers["content-type"] || "")
@@ -3452,9 +3493,9 @@ async function readJsonBody(config, request) {
     const contentLength = Number(contentLengthHeader);
     if (
       !Number.isSafeInteger(contentLength) ||
-      contentLength > config.maxRequestBytes
+      contentLength > maxBytes
     ) {
-      throw requestTooLarge(config);
+      throw requestTooLarge({ maxRequestBytes: maxBytes });
     }
   }
 
@@ -3464,11 +3505,11 @@ async function readJsonBody(config, request) {
     request.destroy(
       httpError(408, "Request body timed out.", "REQUEST_BODY_TIMEOUT"),
     );
-  }, config.requestBodyTimeoutMs);
+  }, analysis ? config.requestBodyTimeoutMs : Math.min(config.requestBodyTimeoutMs, 5000));
   try {
-    for await (const chunk of request) {
+    for await (const chunk of request.iterator({ destroyOnReturn: false })) {
       total += chunk.length;
-      if (total > config.maxRequestBytes) throw requestTooLarge(config);
+      if (total > maxBytes) throw requestTooLarge({ maxRequestBytes: maxBytes });
       chunks.push(chunk);
     }
   } finally {
@@ -3493,7 +3534,7 @@ async function readJsonBody(config, request) {
 function requestTooLarge(config) {
   return httpError(
     413,
-    `Request exceeds ${Math.round(config.maxRequestBytes / 1024 / 1024)} MB.`,
+    `Request exceeds ${config.maxRequestBytes} bytes.`,
     "REQUEST_TOO_LARGE",
   );
 }

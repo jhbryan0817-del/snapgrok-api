@@ -396,6 +396,8 @@ export async function analyzeScreenshot({
   mockMode,
   requireZeroDataRetention = false,
   maxStartsPerSecond = 0,
+  onBeforeUpstreamAttempt = null,
+  onProviderTiming = null,
   signal,
 }) {
   if (signal?.aborted) throw signal.reason;
@@ -440,14 +442,22 @@ export async function analyzeScreenshot({
           deadline,
           signal,
         });
-        const upstreamRemainingMs = deadline - Date.now();
-        if (upstreamRemainingMs <= 0) {
+        if (deadline - Date.now() <= 0) {
           const timeoutError = new Error("The xAI request timed out.");
           timeoutError.status = 504;
           timeoutError.code = "XAI_TIMEOUT";
           throw timeoutError;
         }
-        const payload = await requestXai({
+        // Every format fallback and retry needs a durable start permit. It is
+        // never refunded when the client cancels a potentially billable call.
+        if (signal?.aborted) throw signal.reason;
+        await onBeforeUpstreamAttempt?.();
+        if (signal?.aborted) throw signal.reason;
+        const upstreamRemainingMs = deadline - Date.now();
+        if (upstreamRemainingMs <= 0) {
+          throw Object.assign(new Error("The xAI request timed out."), { status: 504, code: "XAI_TIMEOUT" });
+        }
+        const payload = await timedRequestXai({
           apiKey,
           timeoutMs: upstreamRemainingMs,
           requireZeroDataRetention,
@@ -459,7 +469,7 @@ export async function analyzeScreenshot({
             formatMode,
           }),
           imageDataUrl,
-        });
+        }, onProviderTiming);
         recordXaiSuccess({ model, maxStartsPerSecond });
 
         const result = parseResultText(extractOutputText(payload));
@@ -507,6 +517,15 @@ export async function analyzeScreenshot({
   }
 
   throw lastError || new Error("Unknown xAI request failure.");
+}
+
+async function timedRequestXai(input, onProviderTiming) {
+  const startedAt = Date.now();
+  try {
+    return await requestXai(input);
+  } finally {
+    try { onProviderTiming?.({ requestMs: Math.max(0, Date.now() - startedAt) }); } catch {}
+  }
 }
 
 async function waitForXaiStart({ model, maxStartsPerSecond, deadline, signal }) {
