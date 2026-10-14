@@ -57,6 +57,13 @@ accounts. This cap cannot exceed 400; midnight and restarts do not reset it.
 Disable it by clearing `CANARY_USER_IDS` after account cleanup. Never use these
 settings to bypass authentication, billing quotas, or provider ZDR enforcement.
 
+The October deployment retains 25 local/distributed analysis slots and the
+96 MiB request budget, with `DATABASE_POOL_MAX=32`. The approved per-network
+control ingress values are 900 requests/minute and 64 concurrent requests;
+the authenticated global control guard remains 80. Keep the 8 KiB control body
+cap and the existing adaptive RSS/event-loop/database thresholds enforced.
+See `CAPACITY.md` for the stopped canaries and the limits of these measurements.
+
 `scripts/k6-capacity.js` exercises normal device authentication, async analysis,
 long polling, account status, and anonymous rejection concurrently. Supply an
 external `ACCOUNT_FILE` and synthetic `IMAGE_FILE`; credentials and customer data
@@ -64,6 +71,12 @@ must never enter Git or reports. Live tests require a configured durable canary
 budget. Abort thresholds cover unexpected responses, control/admission latency,
 and a 90-second analysis deadline. Teardown revokes test sessions and cancels
 remaining jobs; delete the exact created accounts through the privacy workflow.
+`analysis_submission_ms` includes upload and response transfer;
+`analysis_upload_ms` records client send time; the two-second
+`analysis_admission_ms` threshold measures acknowledgement wait after sending.
+Use backend `nonProviderMs` logs alongside these client timings. Optional
+`WARM_CONTROL=true` runs parallel account-status warm-up outside the measured
+scenario and reports its maximum latency; never treat it as cold-start evidence.
 
 ## Response guide
 

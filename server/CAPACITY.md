@@ -1,6 +1,6 @@
 # Zenaian capacity and reliability
 
-Last measured: 2026-09-15
+Last measured: 2026-10-14
 
 ## Decision
 
@@ -10,6 +10,10 @@ the deployed setting or a service-level promise. The 25-request baseline is
 protected by a separate **96 MiB aggregate request-body budget** and an adaptive
 **10-25 admission window**, so concurrency automatically falls when screenshots
 are large or sustained runtime pressure is detected.
+
+The October canary retained this existing ceiling. It did not validate a higher
+limit: the final 25-VU burst stopped automatically on its conservative two-second
+acknowledgement target. Do not present the count as a two-second latency promise.
 
 Twenty-five concurrent requests with a ten-second end-to-end inference time has
 a theoretical steady-state ceiling of about 2.5 completed analyses per second,
@@ -64,10 +68,11 @@ xAI limits, or other traffic on the deployed Render service.
   diagnosis, adaptive limit, RSS, event-loop p99, and shared database-pool
   counts without logging screenshots, prompts, answers, or tokens.
 - Billing, device authentication, and ordinary privacy queries share one
-  twenty-connection main PostgreSQL pool. The separate privacy advisory-lock lane
-  remains to avoid callback deadlocks. One process can open up to 24 main
-  connections, and idle-client errors are handled without exposing database
-  details.
+  main PostgreSQL pool, configured to 32 connections after the October canary.
+  The separate four-connection privacy advisory-lock lane remains to avoid
+  callback deadlocks. One process can open up to 36 main database connections;
+  two overlapping deployment processes can open 72, below the inspected database
+  limit of 103. Idle-client errors are handled without exposing database details.
 - Extension v5.9 re-encodes oversized captures as efficient WebP toward a 512
   KiB binary-image target and retries only transient capacity responses with
   bounded jitter. Authentication, quota, and invalid-request failures are never
@@ -102,9 +107,54 @@ xAI limits, or other traffic on the deployed Render service.
   Cloudflare client header and otherwise falls back to the socket address. It
   does not trust `X-Forwarded-For` unless a different proxy mode is explicitly
   configured.
-- Repeated 5xx/429 bursts, database readiness, repeated Whop maintenance
+- Repeated 5xx bursts, database readiness, repeated Whop maintenance
   failures, privacy backlog, and the ZDR latch feed the aggregate health signal
   checked every ten minutes by the production-health workflow.
+
+## October 2026 live k6 canary
+
+The authorized canary used normal free-tier Clerk accounts, device pairing and
+refresh, a synthetic 1280 x 960 PNG of about 529 KiB (706 KiB encoded request),
+and real Grok analysis with ZDR enforcement. It ran from Singapore against the
+Virginia API. The API remained one Starter instance (0.5 CPU, 512 MiB); neither
+database nor service plans, instance counts, or storage sizes changed.
+
+The original 25-VU probes exposed nested pool checkout in the transactional
+privacy guard and prolonged global admission-lock contention. Privacy now uses
+the transaction's existing client; user-quota preparation precedes the global
+lock; related gate/reservation statements are combined. Pool configuration rose
+from 20 to 32. Subsequent probes had no adaptive reductions or pool-pressure
+events. This resolves observed starvation, but not every burst-latency cost.
+
+| Probe | Backend jobs completed / cancelled | k6 stop reason | Other observations |
+| --- | ---: | --- | --- |
+| Original 25 VUs, pool 20 | 10 / 3 | Adaptive database-pressure 429 | Admission fell to 10 |
+| Privacy-client fix, pool 20 | 3 / 13 | Adaptive database-pressure 429 | Admission fell to 13 |
+| Optimized gate, pool 32, cold 25 VUs | 14 / 9 | Submission p95 5.93 s > 2 s | Upload included in the original timer |
+| Warmed 25 VUs | 16 / 4 | Submission p95 2.74 s > 2 s | Original transport timer |
+| 8 VUs diagnostic | 14 / 7 | Submission p95 3.18 s > 2 s | Completed backend non-provider p95 0.91 s |
+| Final warmed 25 VUs | 21 / 4 | Acknowledgement p95 2.84 s > 2 s | Backend non-provider p95 2.30 s; RSS peak 146 MiB; event-loop p99 peak 27 ms; active jobs reached 25 |
+| One-account quota smoke | 5 / 0 | All thresholds passed | Five successful answers, then pre-body QUOTA_EXHAUSTED rejection |
+
+The final script records upload, complete submission, and acknowledgement wait
+separately. HTTP acknowledgement wait is not a pure server CPU measurement;
+content-free `providerMs` and `nonProviderMs` backend logs remain authoritative.
+Backend percentiles above use completed jobs and nearest-rank calculation; k6
+uses its own interpolated client percentiles. Backend completion can exceed the
+client-observed count when automatic abort interrupts polling.
+
+All seven probes consumed **123 durable provider-attempt permits** of the
+authorized 400 maximum: 83 backend jobs completed and 40 were cancelled during
+teardown. No backend job failed. The aborted probes did not complete their
+planned multi-wave tests, so 28 and 30 were not attempted. Account/poll traffic
+was exercised; invalid and exhausted requests were rejected without new provider
+work. All 86 disposable accounts were deleted through the privacy workflow.
+
+Keep the 25 ceiling and adaptive safeguards. These short probes do not establish
+a production SLA, paid-model capacity, or a sustained throughput benchmark.
+Before any later increase, repeat a budgeted multi-wave canary and examine
+database burst latency, representative uploads, account/control traffic, and
+provider behavior. Do not relax pressure thresholds merely to pass a test.
 
 ## Isolated load-test evidence
 
