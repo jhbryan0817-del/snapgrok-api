@@ -108,6 +108,8 @@ test(
         await verifyDistributedAdmission(scopedUrl);
         integrationPhase = "verify atomic quota";
         await verifyAtomicQuota(store);
+        integrationPhase = "verify durable inference budgets";
+        await verifyInferenceBudgets(store);
         integrationPhase = "verify checkout and membership mapping";
         await verifyCheckoutAndMembershipMapping(store, scopedUrl);
         integrationPhase = "verify deleted checkout tombstone";
@@ -298,6 +300,31 @@ async function verifyLegacyLedgerRetentionBackfill(database) {
      WHERE request_id = '00000000-0000-4000-8000-000000000001'`,
   );
   assert.equal(result.rows[0]?.correct, true);
+}
+
+async function verifyInferenceBudgets(store) {
+  const startsAt = new Date("2026-07-27T00:00:00.000Z");
+  const endsAt = new Date("2026-07-28T00:00:00.000Z");
+  const shared = { userId: "__test_xai_budget__", key: "attempts:shared", limit: 7,
+    code: "ANALYSIS_DAILY_BUDGET_REACHED", startsAt, endsAt };
+  const results = await Promise.allSettled(Array.from({ length: 20 }, (_, i) => {
+    const userId = `user_AttemptTester${i}`;
+    return store.consumeInferenceBudget(userId, [
+      { ...shared, userId, key: "attempts:user", limit: 15, code: "ANALYSIS_ATTEMPT_LIMITED" }, shared,
+    ]);
+  }));
+  assert.equal(results.filter(r => r.status === "fulfilled").length, 7);
+  for (const r of results.filter(r => r.status === "rejected")) assert.equal(r.reason.code, shared.code);
+  assert.equal((await store.getUsagePeriod(shared.userId, shared.key)).consumed, 7);
+  for (let i = 0; i < results.length; i += 1) {
+    const usage = await store.getUsagePeriod(`user_AttemptTester${i}`, "attempts:user");
+    assert.equal(usage?.consumed || 0, results[i].status === "fulfilled" ? 1 : 0);
+  }
+  await assert.rejects(store.checkInferenceBudget([shared]), e => e.code === shared.code);
+  // Tightening a ceiling below prior usage must fail closed, without violating
+  // the table's consumed <= allowance constraint or refunding existing starts.
+  await assert.rejects(store.consumeInferenceBudget("user_AttemptTester20", [{ ...shared, limit: 3 }]), e => e.code === shared.code);
+  assert.equal((await store.getUsagePeriod(shared.userId, shared.key)).consumed, 7);
 }
 
 async function verifyAtomicQuota(store) {

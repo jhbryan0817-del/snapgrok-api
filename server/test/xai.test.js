@@ -32,6 +32,23 @@ test("custom context supplements rather than replaces the default prompt", () =>
   assert.match(prompt, /Capture mode: capture-full-screen/);
 });
 
+test("a retry cannot bypass a rejected durable attempt permit", async () => {
+  const originalFetch = globalThis.fetch;
+  let starts = 0;
+  let permits = 0;
+  const limited = Object.assign(new Error("attempt budget exhausted"), { status: 429, code: "ANALYSIS_ATTEMPT_LIMITED" });
+  globalThis.fetch = async () => { starts += 1; return Response.json({ error: "unavailable" }, { status: 500 }); };
+  try {
+    await assert.rejects(analyzeScreenshot({
+      apiKey: "xai-test-key", model: "grok-budget-test", timeoutMs: 5000,
+      imageDataUrl: "data:image/png;base64,AAAA", mockMode: false,
+      onBeforeUpstreamAttempt: async () => { permits += 1; if (permits > 1) throw limited; },
+    }), e => e === limited);
+    assert.equal(starts, 1);
+    assert.equal(permits, 2);
+  } finally { globalThis.fetch = originalFetch; }
+});
+
 test("streams the large image field without changing the xAI JSON payload", async () => {
   const originalFetch = globalThis.fetch;
   const imageDataUrl = `data:image/jpeg;base64,${"A".repeat(128 * 1024)}`;

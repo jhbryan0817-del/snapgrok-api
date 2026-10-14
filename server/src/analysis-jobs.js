@@ -84,6 +84,7 @@ export function createAnalysisJobManager({
         activeBytesAtStart: admission?.activeBytes || 0,
         adaptiveLimitAtStart: admission?.adaptiveLimit || 0,
         xaiMs: 0,
+        providerMs: 0,
         settlementMs: 0,
       },
     };
@@ -124,6 +125,10 @@ export function createAnalysisJobManager({
         mockMode: config.mockMode,
         requireZeroDataRetention: config.requireXaiZdr,
         maxStartsPerSecond: config.xaiMaxStartsPerSecond,
+        onBeforeUpstreamAttempt: () => billingService.recordInferenceAttempt?.({
+          userId: job.userId, planId: job.access.planId,
+        }),
+        onProviderTiming: ({ requestMs }) => { job.performance.providerMs += requestMs; },
         signal: job.controller.signal,
       });
       job.performance.xaiMs = Math.max(0, now() - xaiStartedAt);
@@ -171,6 +176,7 @@ export function createAnalysisJobManager({
         admissionMs: job.performance.admissionMs,
         accessMs: job.performance.accessMs,
         xaiMs: job.performance.xaiMs,
+        providerMs: job.performance.providerMs,
         settlementMs: job.performance.settlementMs,
         requestBytes: job.performance.requestBytes,
         activeAtStart: job.performance.activeAtStart,

@@ -210,6 +210,70 @@ async function withServer(options, run) {
   }
 }
 
+test("rejected traffic cannot poison health with expected 429s", async () => {
+  const config = testConfig();
+  config.controlPlaneIngressRateLimitMaxRequests = 1;
+  config.operationalRateLimitThreshold = 2;
+  await withServer({ config }, async (baseUrl) => {
+    for (let i = 0; i < 4; i += 1) await fetch(`${baseUrl}/api/billing/status`, { headers: { Origin: EXTENSION_ORIGIN } });
+    assert.equal((await fetch(`${baseUrl}/api/health`)).status, 200);
+  });
+});
+
+test("quota preflight rejects without reading an upload or acquiring inference capacity", async () => {
+  const globalLimiter = trackingLimiter();
+  const memoryLimiter = trackingLimiter();
+  await withServer({
+    globalLimiter, memoryLimiter,
+    billing: billingStub({ async assertAnalysisEligible() {
+      throw Object.assign(new Error("Quota reached"), { status: 429, code: "QUOTA_EXHAUSTED" });
+    } }),
+  }, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/analyze`, requestOptions({ padding: "x".repeat(10000) }));
+    assert.equal(response.status, 429);
+    assert.equal((await response.json()).code, "QUOTA_EXHAUSTED");
+    assert.equal(globalLimiter.acquisitions, 0);
+    assert.equal(memoryLimiter.acquisitions, 0);
+  });
+});
+
+test("large control bodies are rejected before pairing authentication", async () => {
+  let exchanges = 0;
+  await withServer({ deviceSessions: {
+    async exchangePairing() { exchanges += 1; }, async maintenance() {}, async close() {},
+  } }, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/extension/pairings/exchange`, requestOptions({ padding: "x".repeat(8192) }));
+    assert.equal(response.status, 413);
+    assert.equal(exchanges, 0);
+  });
+});
+
+test("streamed control bodies cannot evade the size cap without Content-Length", async () => {
+  await withServer({ deviceSessions: { async exchangePairing() { assert.fail("must not exchange"); }, async maintenance() {}, async close() {} } }, async (baseUrl) => {
+    const result = await new Promise((resolve, reject) => {
+      const req = httpRequest(`${baseUrl}/api/extension/pairings/exchange`, {
+        method: "POST", headers: { Origin: EXTENSION_ORIGIN, "Content-Type": "application/json" },
+      }, response => {
+        response.resume();
+        response.on("end", () => resolve(response.statusCode));
+      });
+      req.on("error", reject);
+      req.write('{"padding":"');
+      req.end(`${"x".repeat(9000)}"}`);
+    });
+    assert.equal(result, 413);
+  });
+});
+
+test("invalid images do not acquire inference capacity", async () => {
+  const globalLimiter = trackingLimiter();
+  await withServer({ globalLimiter }, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/analyze`, requestOptions({ imageDataUrl: "invalid" }));
+    assert.equal(response.status, 400);
+    assert.equal(globalLimiter.acquisitions, 0);
+  });
+});
+
 test("health endpoint reveals no secret configuration", async () => {
   await withServer({}, async (baseUrl) => {
     const response = await fetch(`${baseUrl}/api/health`);

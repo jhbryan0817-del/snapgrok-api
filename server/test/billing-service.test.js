@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { createHmac, randomUUID } from "node:crypto";
 import test from "node:test";
 import { createBillingService } from "../src/billing-service.js";
+import { createConfig } from "../src/server.js";
 
 const TESTER = "user_SyntheticBillingTester0001";
 const OTHER_USER = "user_SyntheticBillingOther0002";
@@ -112,6 +113,33 @@ test("non-testers preserve legacy access during sandbox rollout", async () => {
     planId: "legacy",
   });
   assert.equal(storeCalls, 0);
+});
+
+test("quota preflight counts reserved questions and refuses exhausted uploads", async () => {
+  let budgetChecks = 0;
+  const service = createBillingService({
+    config: createConfig({ BILLING_MODE: "live" }), now: () => NOW, whopClient: fakeWhop(),
+    store: fakeStore({ async getUsagePeriod() { return { consumed: 4, reserved: 1 }; },
+      async checkInferenceBudget() { budgetChecks += 1; } }),
+  });
+  await assert.rejects(service.assertAnalysisEligible({ userId: TESTER }), e => e.code === "QUOTA_EXHAUSTED" && e.quota.reserved === 1);
+  assert.equal(budgetChecks, 0);
+});
+
+test("attempt accounting is independent from question reservation refunds", async () => {
+  let attempts = 0;
+  let releases = 0;
+  const service = createBillingService({
+    config: createConfig({ BILLING_MODE: "live" }), now: () => NOW, whopClient: fakeWhop(),
+    store: fakeStore({ async consumeInferenceBudget(userId, budgets) { attempts += 1; assert.equal(userId, TESTER); assert.equal(budgets[0].limit, 15); },
+      async releaseUsage() { releases += 1; } }),
+  });
+  for (let i = 0; i < 6; i += 1) {
+    await service.recordInferenceAttempt({ userId: TESTER, planId: "free" });
+    await service.releaseAnalysis({ userId: TESTER, reservation: { operationId: randomUUID() } });
+  }
+  assert.equal(attempts, 6);
+  assert.equal(releases, 6);
 });
 
 test("sandbox testers receive the free UTC quota and Grok 4.3", async () => {

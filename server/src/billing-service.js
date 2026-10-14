@@ -10,6 +10,7 @@ import {
   whopCatalogForPlan,
 } from "./billing-policy.js";
 import { verifyWhopWebhook } from "./whop.js";
+import { inferenceBudgets } from "./inference-budget.js";
 
 const MEMBERSHIP_EVENTS = new Set([
   "membership.activated",
@@ -158,6 +159,24 @@ export function createBillingService({
           updatedAt: isoOrNull(payment.updatedAt),
         })),
       };
+    },
+
+    async assertAnalysisEligible({ userId }) {
+      if (!isBillingEnforcedForUser(config, userId)) return;
+      const access = await resolveCurrentAccess(config, store, userId, now());
+      const usage = await store.getUsagePeriod(userId, access.period.key);
+      if ((usage?.consumed || 0) + (usage?.reserved || 0) >= access.period.allowance) {
+        throw Object.assign(publicError(429, "Your plan quota has been reached.", "QUOTA_EXHAUSTED"), {
+          quota: { planId: access.planId, allowance: access.period.allowance,
+            used: usage?.consumed || 0, reserved: usage?.reserved || 0, resetsAt: access.period.endsAt },
+        });
+      }
+      await store.checkInferenceBudget(inferenceBudgets(config, { userId, planId: access.planId }, now()));
+    },
+
+    async recordInferenceAttempt({ userId, planId }) {
+      if (!isBillingEnforcedForUser(config, userId)) return;
+      await store.consumeInferenceBudget(userId, inferenceBudgets(config, { userId, planId }, now()));
     },
 
     async reserveAnalysis({ userId, operationId, defaultModel }) {
@@ -803,6 +822,8 @@ export function createBypassBillingService(config) {
     async initialize() {},
     async close() {},
     async maintenance() {},
+    async assertAnalysisEligible() {},
+    async recordInferenceAttempt() {},
     async status() { return legacyStatus(); },
     async paymentHistory() {
       return { billingEnabled: false, payments: [] };
