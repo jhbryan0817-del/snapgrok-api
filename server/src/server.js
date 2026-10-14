@@ -104,8 +104,6 @@ export function createConfig(environment = process.env) {
       boundedInteger(environment, "MAX_REQUEST_MB", 2, 1, 25) * 1024 * 1024,
     maxControlRequestBytes: boundedInteger(environment, "MAX_CONTROL_REQUEST_BYTES", 8192, 1024, 65536),
     analysisEligibilityMaxConcurrent: boundedInteger(environment, "ANALYSIS_ELIGIBILITY_MAX_CONCURRENT", 32, 1, 40),
-    globalXaiAttemptsPerDay: boundedInteger(environment, "GLOBAL_XAI_ATTEMPTS_PER_DAY", 5000, 1, 1000000),
-    freeXaiAttemptsPerDay: boundedInteger(environment, "FREE_XAI_ATTEMPTS_PER_DAY", 1000, 1, 1000000),
     freeUserXaiAttemptsPerDay: boundedInteger(environment, "FREE_USER_XAI_ATTEMPTS_PER_DAY", 15, 5, 100),
     paidUserXaiAttemptsPerDay: boundedInteger(environment, "PAID_USER_XAI_ATTEMPTS_PER_DAY", 1000, 500, 10000),
     canaryUserIds: new Set(parseCsv(environment.CANARY_USER_IDS)),

@@ -31,17 +31,30 @@ degrade health. A client cannot poison readiness by repeatedly hitting a limit.
 
 ## Provider-spend and upload safeguards
 
-`GLOBAL_XAI_ATTEMPTS_PER_DAY=5000` caps all upstream starts per UTC day, and
-`FREE_XAI_ATTEMPTS_PER_DAY=1000` caps their free-tier subset. Per-account limits
-are 15 starts/day for free users and 1000 for paid users. These counters include
-each provider retry and format fallback. Cancellation releases an unsuccessful
-question reservation but never refunds a started provider attempt. Counters
-persist in the existing usage-period table across deploys; no migration is needed.
+There is no service-wide daily xAI attempt cap, including no shared free-tier
+daily cap. Legacy `GLOBAL_XAI_ATTEMPTS_PER_DAY` and `FREE_XAI_ATTEMPTS_PER_DAY`
+environment variables are ignored. Historical shared-counter rows can expire
+through normal retention; no migration or counter reset is needed.
 
-These are operational spending limits, separate from plan question allowances.
-They bound account-farming damage but do not prove that multiple accounts belong
-to different people. Keep Clerk's sign-up bot protection and email verification
-enabled before marketing; monitor free-budget exhaustion and adjust deliberately.
+Per-account safeguards remain 15 upstream starts per UTC day for free users
+and 1000 for paid users. These count each retry, format fallback, failed call,
+and cancelled call after its durable start permit is issued. A permit is not
+refunded, even if cancellation occurs before the provider request is sent.
+Counters persist in the existing usage-period table across deploys.
+
+Customer allowances are separate: Free provides 5 successful question analyses
+per UTC day, Plus 300 per monthly billing period, and Ultra 500 per monthly
+billing period. Failed or cancelled analyses release their question reservation;
+successful analysis settlement consumes one question regardless of provider
+retries. A completed result consumes its allowance even if the client never
+retrieves it. The account attempt safeguard can still temporarily block repeated
+unsuccessful work before the successful-question allowance is exhausted.
+
+Removing the shared daily caps prevents one group of accounts from exhausting
+everyone else's daily access, but removes the service-wide daily spend bound.
+Per-account limits do not cap aggregate spending across newly created accounts.
+Keep Clerk's sign-up bot protection and email verification enabled before
+marketing, and monitor provider spend and repeated failures/cancellations.
 
 Quota and attempt eligibility are checked before screenshot body allocation in
 a separate 32-slot lane. The transactional question reservation and atomic start
