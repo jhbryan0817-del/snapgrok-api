@@ -378,12 +378,6 @@ export function createPostgresBillingStore({
           throw existingOperationError(existing.rows[0], userId);
         }
 
-        await enforceDistributedAnalysisAdmission(client, {
-          globalConcurrentReservationLimit,
-          globalStartsPerMinuteLimit,
-          reservationTtlMs,
-        });
-
         const periodId = randomUUID();
         const periodResult = await client.query(
           `INSERT INTO billing_usage_periods (
@@ -424,17 +418,26 @@ export function createPostgresBillingStore({
           });
         }
 
+        // Prepare the independently locked user quota before taking the shared
+        // admission lock. Keep its critical section to the atomic gate, one
+        // reservation write, and commit so other users do not wait through
+        // unnecessary database round trips.
+        await enforceDistributedAnalysisAdmission(client, {
+          globalConcurrentReservationLimit,
+          globalStartsPerMinuteLimit,
+          reservationTtlMs,
+        });
         await client.query(
-          `INSERT INTO billing_analysis_usage (
-             operation_id, clerk_user_id, usage_period_id, plan_id, model_id, state
-           ) VALUES ($1, $2, $3, $4, $5, 'reserved')`,
-          [operationId, userId, usage.id, planId, model],
-        );
-        await client.query(
-          `UPDATE billing_usage_periods
+          `WITH reservation AS (
+             INSERT INTO billing_analysis_usage (
+               operation_id, clerk_user_id, usage_period_id, plan_id, model_id, state
+             ) VALUES ($1, $2, $3, $4, $5, 'reserved')
+             RETURNING operation_id
+           )
+           UPDATE billing_usage_periods
            SET reserved = reserved + 1, updated_at = now()
-           WHERE id = $1`,
-          [usage.id],
+           WHERE id = $3 AND EXISTS (SELECT 1 FROM reservation)`,
+          [operationId, userId, usage.id, planId, model],
         );
         await client.query("COMMIT");
         return {
@@ -2273,38 +2276,27 @@ async function enforceDistributedAnalysisAdmission(client, {
     "SELECT pg_advisory_xact_lock(hashtext($1))",
     ["zenaian:analysis-admission:v1"],
   );
-  const result = await client.query(
-    `SELECT count(*)::integer AS active
-     FROM billing_analysis_usage
-     WHERE state = 'reserved'
-       AND created_at >= now() - ($1::bigint * interval '1 millisecond')`,
-    [reservationTtlMs],
-  );
-  const active = Number(result.rows[0]?.active) || 0;
-  if (active >= globalConcurrentReservationLimit) {
-    throw distributedAdmissionError(
-      "The analysis service is at its shared capacity. Please try again shortly.",
-      "ANALYSIS_GLOBAL_CAPACITY_REACHED",
-      1,
-    );
-  }
-
   // A synthetic, non-user usage-period row is the durable minute bucket. Its
   // existing unique key makes this update atomic and indexed without adding a
   // new production migration. Normal retention cleanup removes expired buckets.
   const starts = await client.query(
-    `WITH admitted AS (
+    `WITH capacity AS MATERIALIZED (
+       SELECT count(*)::integer AS active
+       FROM billing_analysis_usage
+       WHERE state = 'reserved'
+         AND created_at >= now() - ($3::bigint * interval '1 millisecond')
+     ), admitted AS (
        INSERT INTO billing_usage_periods (
          id, clerk_user_id, period_key, plan_id, allowance, consumed,
          starts_at, ends_at
-       ) VALUES (
+       ) SELECT
          $1, '__zenaian_global_admission__',
          'global-analysis:' ||
            floor(extract(epoch FROM current_timestamp) / 60)::bigint::text,
          'ultra', $2, 1,
          date_trunc('minute', current_timestamp),
          date_trunc('minute', current_timestamp) + interval '1 minute'
-       )
+       FROM capacity WHERE capacity.active < $4
        ON CONFLICT (clerk_user_id, period_key)
        DO UPDATE SET
          allowance = EXCLUDED.allowance,
@@ -2313,16 +2305,24 @@ async function enforceDistributedAnalysisAdmission(client, {
        WHERE billing_usage_periods.consumed < EXCLUDED.allowance
        RETURNING consumed
      )
-     SELECT EXISTS(SELECT 1 FROM admitted) AS admitted,
+     SELECT capacity.active, EXISTS(SELECT 1 FROM admitted) AS admitted,
             GREATEST(
               1,
               ceil(extract(epoch FROM (
                 date_trunc('minute', current_timestamp) + interval '1 minute' -
                 current_timestamp
               )))::integer
-            ) AS retry_after_seconds`,
-    [randomUUID(), globalStartsPerMinuteLimit],
+            ) AS retry_after_seconds
+     FROM capacity`,
+    [randomUUID(), globalStartsPerMinuteLimit, reservationTtlMs, globalConcurrentReservationLimit],
   );
+  if (Number(starts.rows[0]?.active) >= globalConcurrentReservationLimit) {
+    throw distributedAdmissionError(
+      "The analysis service is at its shared capacity. Please try again shortly.",
+      "ANALYSIS_GLOBAL_CAPACITY_REACHED",
+      1,
+    );
+  }
   if (!starts.rows[0]?.admitted) {
     throw distributedAdmissionError(
       "The analysis service has reached its shared start-rate limit. Please try again shortly.",

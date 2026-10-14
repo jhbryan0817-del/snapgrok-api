@@ -123,8 +123,11 @@ test("database-coordinated analysis admission fails closed at shared capacity", 
     pool: scriptedPool((sql) => {
       queries.push(sql);
       if (sql.startsWith("SELECT operation_id")) return { rows: [] };
-      if (sql.startsWith("SELECT count(*)::integer AS active")) {
-        return { rows: [{ active: 1 }] };
+      if (sql.startsWith("INSERT INTO billing_usage_periods")) {
+        return { rows: [admissionUsageRow()] };
+      }
+      if (sql.startsWith("WITH capacity AS")) {
+        return { rows: [{ active: 1, admitted: false }] };
       }
       return { rows: [] };
     }),
@@ -141,18 +144,18 @@ test("database-coordinated analysis admission fails closed at shared capacity", 
   );
   assert.ok(queries.some((sql) => sql.includes("pg_advisory_xact_lock")));
   assert.ok(queries.some((sql) => sql === "ROLLBACK"));
-  assert.ok(!queries.some((sql) => sql.startsWith("INSERT INTO billing_usage_periods")));
+  assert.ok(!queries.some((sql) => sql.startsWith("WITH reservation AS")));
 });
 
 test("database-coordinated start budget returns a bounded retry interval", async () => {
   const store = createPostgresBillingStore({
     pool: scriptedPool((sql) => {
       if (sql.startsWith("SELECT operation_id")) return { rows: [] };
-      if (sql.startsWith("SELECT count(*)::integer AS active")) {
-        return { rows: [{ active: 0 }] };
+      if (sql.startsWith("INSERT INTO billing_usage_periods")) {
+        return { rows: [admissionUsageRow()] };
       }
-      if (sql.startsWith("WITH admitted AS")) {
-        return { rows: [{ admitted: false, retry_after_seconds: 17 }] };
+      if (sql.startsWith("WITH capacity AS")) {
+        return { rows: [{ active: 0, admitted: false, retry_after_seconds: 17 }] };
       }
       return { rows: [] };
     }),
@@ -1056,6 +1059,13 @@ function archivedPaymentRow() {
 
 function deletionBlockedError(error) {
   return error.status === 403 && error.code === "ACCOUNT_DELETION_IN_PROGRESS";
+}
+
+function admissionUsageRow() {
+  const { period } = analysisReservationInput();
+  return { id: "22222222-2222-4222-8222-222222222222", plan_id: "free",
+    allowance: period.allowance, consumed: 0, reserved: 0,
+    starts_at: period.startsAt, ends_at: period.endsAt };
 }
 
 function scriptedPool(runQuery, { deletionBlocked = false } = {}) {
