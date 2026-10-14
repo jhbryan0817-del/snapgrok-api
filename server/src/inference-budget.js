@@ -12,13 +12,7 @@ export function inferenceBudgets(config, { userId, planId }, at = new Date()) {
     counter(userId, `xai-attempts:${config.billingMode}:${day}`,
       planId === "free" ? config.freeUserXaiAttemptsPerDay : config.paidUserXaiAttemptsPerDay,
       "ANALYSIS_ATTEMPT_LIMITED"),
-    counter("__zenaian_xai_budget__", `all:${config.billingMode}:${day}`,
-      config.globalXaiAttemptsPerDay, "ANALYSIS_DAILY_BUDGET_REACHED"),
   ];
-  if (planId === "free") {
-    budgets.push(counter("__zenaian_xai_budget__", `free:${config.billingMode}:${day}`,
-      config.freeXaiAttemptsPerDay, "ANALYSIS_FREE_BUDGET_REACHED"));
-  }
   if (config.canaryUserIds?.has(userId)) {
     // A run does not reset at midnight or on process restart. Retention keeps it
     // for 30 days; use a new run ID for a separately authorized future canary.
