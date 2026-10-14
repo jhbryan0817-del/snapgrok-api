@@ -1305,7 +1305,20 @@ export function createZenaianServer({
     async (request, response) => {
       const requestId = randomUUID();
       const startedAt = Date.now();
-      const url = new URL(request.url || "/", "http://api.invalid");
+      let url;
+      try {
+        url = new URL(request.url || "/", "http://api.invalid");
+      } catch {
+        // HTTP accepts request targets that WHATWG URL parsing rejects. Keep
+        // malformed input out of the async handler's unhandled rejection path.
+        sendJson(config, request, response, 400, {
+          ok: false,
+          error: "The request URL is invalid.",
+          code: "INVALID_REQUEST_URL",
+          requestId,
+        }, requestId);
+        return;
+      }
       let releaseIngress = null;
 
       if (request.method === "OPTIONS") {

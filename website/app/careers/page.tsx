@@ -49,7 +49,7 @@ export default function CareersPage() {
 
         <a
           className="careers-application-button"
-          href="mailto:sneaksolve@gmail.com?subject=Zenaian%20Career%20Application"
+          href="mailto:info@zenaian.com?subject=Zenaian%20Career%20Application"
         >
           <span>Send your resume</span>
           <svg viewBox="0 0 20 20" aria-hidden="true">

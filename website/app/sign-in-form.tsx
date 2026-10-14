@@ -33,6 +33,7 @@ export function SignInForm() {
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const emailInput = useRef<HTMLInputElement>(null);
+  const actionInFlight = useRef(false);
   const hash = useSyncExternalStore(
     subscribeToHashChange,
     () => window.location.hash,
@@ -46,7 +47,8 @@ export function SignInForm() {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (busy) return;
+    if (busy || actionInFlight.current) return;
+    actionInFlight.current = true;
     setSubmitting(true);
     setErrorMessage("");
     try {
@@ -78,18 +80,20 @@ export function SignInForm() {
     } catch {
       setErrorMessage("Unable to sign in right now. Please try again.");
     } finally {
+      actionInFlight.current = false;
       setSubmitting(false);
     }
   }
 
   async function handleForgotPassword() {
-    if (busy) return;
+    if (busy || actionInFlight.current) return;
     setPassword("");
     if (!emailInput.current?.reportValidity()) {
       setErrorMessage("Enter your email address to reset your password.");
       emailInput.current?.focus();
       return;
     }
+    actionInFlight.current = true;
     setSubmitting(true);
     setErrorMessage("");
     try {
@@ -106,24 +110,31 @@ export function SignInForm() {
     } catch {
       setErrorMessage("Unable to start password recovery. Please try again.");
     } finally {
+      actionInFlight.current = false;
       setSubmitting(false);
     }
   }
 
   async function handleGoogleSignIn() {
-    if (busy) return;
+    if (busy || actionInFlight.current) return;
+    actionInFlight.current = true;
     setSubmitting(true);
     setErrorMessage("");
     try {
-      const { error } = await signIn.sso({
+      if (!clerk.client) throw new Error("Authentication is still loading.");
+      // The signal API's sso() can silently reuse an unfinished password
+      // attempt with no external verification URL. This public redirect API
+      // creates a fresh Google attempt and rejects a missing redirect.
+      await clerk.client.signIn.authenticateWithRedirect({
         strategy: "oauth_google",
-        redirectUrl: "/account",
-        redirectCallbackUrl: "/sign-in/sso-callback",
+        continueSignIn: false,
+        redirectUrl: "/sign-in/sso-callback",
+        redirectUrlComplete: "/account",
       });
-      if (error) setErrorMessage("Unable to sign in with Google. Please try again.");
     } catch {
       setErrorMessage("Unable to sign in with Google. Please try again.");
     } finally {
+      actionInFlight.current = false;
       setSubmitting(false);
     }
   }
@@ -153,7 +164,7 @@ export function SignInForm() {
   }
 
   const fieldError = errors.fields.identifier || errors.fields.password;
-  const message = fieldError?.longMessage || fieldError?.message || errorMessage;
+  const message = errorMessage || fieldError?.longMessage || fieldError?.message;
 
   return (
     <div className="sign-in-card">
