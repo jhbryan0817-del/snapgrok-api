@@ -530,10 +530,10 @@ export function createPostgresPrivacyStore({
       }
     },
 
-    async isDeletionBlocked(userId) {
+    async isDeletionBlocked(userId, { client = null } = {}) {
       const subjectHmacs = userHmacCandidates(userId);
       try {
-        const result = await database.query(
+        const result = await (client || database).query(
           `SELECT state FROM (
              SELECT state, 0 AS priority
              FROM privacy_deletion_queue
