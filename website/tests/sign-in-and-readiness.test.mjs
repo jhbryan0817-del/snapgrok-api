@@ -64,7 +64,7 @@ function find(tree, predicate) {
   return node;
 }
 
-function signInHarness({ result = "complete", failure = false, currentTask = null } = {}) {
+function signInHarness({ result = "complete", failure = false, currentTask = null, redirectFailure = false } = {}) {
   const calls = [];
   const signIn = {
     status: "needs_identifier",
@@ -92,7 +92,15 @@ function signInHarness({ result = "complete", failure = false, currentTask = nul
       useSignIn: () => ({ signIn, errors, fetchStatus: "idle" }),
       useUser: () => ({ isLoaded: true, isSignedIn: false }),
       useSession: () => ({ session: null }),
-      useClerk: () => ({ redirectToTasks: async (options) => calls.push(["tasks", options]) }),
+      useClerk: () => ({
+        client: { signIn: {
+          async authenticateWithRedirect(values) {
+            calls.push(["redirect", values]);
+            if (redirectFailure) throw new Error("Private provider detail");
+          },
+        } },
+        redirectToTasks: async (options) => calls.push(["tasks", options]),
+      }),
     },
     "next/link": { __esModule: true, default: "a" },
     "next/navigation": { useRouter: () => ({ replace: (url) => calls.push(["replace", url]) }) },
@@ -170,13 +178,54 @@ test("Google uses the OAuth callback and verification links retain the native Cl
   let tree = harness.render();
   await find(tree, (node) => node.props.className === "sign-in-google").props.onClick();
   assert.equal(harness.calls[0][1].strategy, "oauth_google");
-  assert.equal(harness.calls[0][1].redirectCallbackUrl, "/sign-in/sso-callback");
+  assert.equal(harness.calls[0][0], "redirect");
+  assert.equal(harness.calls[0][1].continueSignIn, false);
+  assert.equal(harness.calls[0][1].redirectUrl, "/sign-in/sso-callback");
+  assert.equal(harness.calls[0][1].redirectUrlComplete, "/account");
   harness.window.location.hash = "#/factor-one";
   tree = harness.render();
   assert.ok(find(tree, (node) => node.type === harness.ClerkSignIn));
   find(tree, (node) => node.props.className === "sign-in-back-link").props.onClick();
   assert.equal(harness.window.location.hash, "");
   assert.ok(find(harness.render(), (node) => node.props.name === "email"));
+});
+
+test("Google starts a fresh redirect after a failed password attempt", async () => {
+  const harness = signInHarness({ failure: true });
+  await harness.enterCredentials();
+  // An existing non-OAuth attempt makes the signal sso() path return without
+  // redirecting. The redirect API must be called with continuation disabled.
+  harness.signIn.id = "sia_password_attempt";
+  harness.signIn.status = "needs_first_factor";
+  harness.errors.fields.password = { message: "Old password error" };
+  const google = find(harness.render(), (node) => node.props.className === "sign-in-google");
+  const first = google.props.onClick();
+  const second = google.props.onClick();
+  await Promise.all([first, second]);
+  assert.equal(harness.calls.filter(([method]) => method === "redirect").length, 1);
+  assert.equal(harness.calls.at(-1)[1].continueSignIn, false);
+  assert.equal(harness.calls.some(([method]) => method === "sso"), false);
+});
+
+test("rapid password submissions cannot create competing sign-in attempts", async () => {
+  const harness = signInHarness();
+  const submit = find(harness.render(), (node) => node.type === "form").props.onSubmit;
+  await Promise.all([submit({ preventDefault() {} }), submit({ preventDefault() {} })]);
+  assert.equal(harness.calls.filter(([method]) => method === "password").length, 1);
+});
+
+test("Google errors remain visible over stale field errors and allow another attempt", async () => {
+  const harness = signInHarness({ redirectFailure: true });
+  harness.errors.fields.password = { message: "Old password error" };
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const button = find(harness.render(), (node) => node.props.className === "sign-in-google");
+    assert.equal(button.props.disabled, false);
+    await button.props.onClick();
+    const message = find(harness.render(), (node) => node.props.role === "alert").props.children;
+    assert.match(message, /Unable to sign in with Google/);
+    assert.doesNotMatch(message, /Old password|Private provider/);
+  }
+  assert.equal(harness.calls.length, 2);
 });
 
 test("password recovery initializes the email attempt before opening Clerk's reset screen", async () => {

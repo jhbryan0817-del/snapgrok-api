@@ -525,7 +525,7 @@ test("Careers is substantive and linked globally without an obsolete Use Cases r
   ]) {
     assert.ok(careers.includes(role), `${role} missing from Careers`);
   }
-  assert.match(careers, /mailto:sneaksolve@gmail\.com\?subject=/);
+  assert.match(careers, /mailto:info@zenaian\.com\?subject=Zenaian%20Career%20Application/);
   assert.equal((careers.match(/Send your resume/g) || []).length, 1);
   assert.doesNotMatch(careers, /WORK WITH US/);
   assert.match(careers, /Accounting Lead[\s\S]*Seoul, Korea/);

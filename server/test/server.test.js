@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { once } from "node:events";
+import { request as httpRequest } from "node:http";
 import test from "node:test";
 import {
   createAccountAnalysisController,
@@ -221,6 +222,27 @@ test("health endpoint reveals no secret configuration", async () => {
       ok: true,
       service: "zenaian-api",
     });
+  });
+});
+
+test("malformed request targets return 400 and leave the instance healthy", async () => {
+  await withServer({}, async (baseUrl) => {
+    for (const method of ["GET", "OPTIONS"]) {
+      const response = await new Promise((resolve, reject) => {
+        const request = httpRequest(baseUrl, { method, path: "//[" }, (response) => {
+          let body = "";
+          response.setEncoding("utf8");
+          response.on("data", (chunk) => { body += chunk; });
+          response.on("end", () => resolve({ status: response.statusCode, body: JSON.parse(body) }));
+        });
+        request.on("error", reject);
+        request.end();
+      });
+      assert.equal(response.status, 400);
+      assert.equal(response.body.code, "INVALID_REQUEST_URL");
+      assert.doesNotMatch(JSON.stringify(response.body), /\/\/\[/);
+      assert.equal((await fetch(`${baseUrl}/api/live`)).status, 200);
+    }
   });
 });
 

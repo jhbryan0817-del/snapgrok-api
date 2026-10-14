@@ -1,5 +1,7 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 
+const MAX_RESPONSE_BYTES = 1024 * 1024;
+
 const API_ORIGINS = Object.freeze({
   test: "https://sandbox-api.whop.com",
   live: "https://api.whop.com",
@@ -28,6 +30,7 @@ export function createWhopClient({
     const timeout = setTimeout(() => controller.abort(), timeoutMs);
     timeout.unref?.();
     let response;
+    let payload;
     try {
       response = await fetchImpl(`${apiOrigin}/api/v1${path}`, {
         method,
@@ -40,10 +43,13 @@ export function createWhopClient({
         },
         ...(body ? { body: JSON.stringify(body) } : {}),
       });
+      // The deadline must include the body, not just the response headers.
+      payload = await readBoundedResponse(response);
     } catch (error) {
-      if (error?.name === "AbortError") {
+      if (controller.signal.aborted || error?.name === "AbortError") {
         throw providerError(504, "Whop did not respond in time.", "WHOP_TIMEOUT");
       }
+      if (error?.code === "WHOP_RESPONSE_TOO_LARGE") throw error;
       throw providerError(
         502,
         "Whop could not be reached.",
@@ -53,7 +59,6 @@ export function createWhopClient({
       clearTimeout(timeout);
     }
 
-    const payload = await response.json().catch(() => null);
     if (!response.ok) {
       const status = response.status === 429 ? 503 : 502;
       const error = providerError(
@@ -185,6 +190,39 @@ export function createWhopClient({
       });
     },
   };
+}
+
+async function readBoundedResponse(response) {
+  const tooLarge = () => providerError(
+    502, "Whop returned an oversized response.", "WHOP_RESPONSE_TOO_LARGE",
+  );
+  if (Number(response.headers.get("content-length")) > MAX_RESPONSE_BYTES) {
+    await response.body?.cancel();
+    throw tooLarge();
+  }
+  if (!response.body) return null;
+  const reader = response.body.getReader();
+  const chunks = [];
+  let total = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > MAX_RESPONSE_BYTES) {
+        await reader.cancel();
+        throw tooLarge();
+      }
+      chunks.push(Buffer.from(value));
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  try {
+    return JSON.parse(Buffer.concat(chunks, total).toString("utf8"));
+  } catch {
+    return null;
+  }
 }
 
 export function verifyWhopWebhook({

@@ -11,6 +11,42 @@ const COMPANY = "biz_745hMbzbWHtrZr";
 const PLAN = "plan_QzpD3pxTswPLX";
 const ULTRA_PLAN = "plan_FZknYvJ1uz41F";
 
+test("Whop deadline stays active when response headers arrive but the body stalls", async () => {
+  const keepAlive = setTimeout(() => {}, 1000);
+  const client = createWhopClient({
+    apiKey: "test_key", companyId: COMPANY, mode: "test", timeoutMs: 20,
+    fetchImpl: async (_url, { signal }) => new Response(new ReadableStream({
+      start(controller) {
+        signal.addEventListener("abort", () => {
+          controller.error(new DOMException("Aborted", "AbortError"));
+        }, { once: true });
+      },
+    })),
+  });
+  try {
+    await assert.rejects(client.retrievePayment("pay_payment123456"),
+      (error) => error.code === "WHOP_TIMEOUT" && error.status === 504);
+  } finally {
+    clearTimeout(keepAlive);
+  }
+});
+
+test("Whop responses are bounded with and without Content-Length", async () => {
+  for (const declaredLength of [true, false]) {
+    let cancelled = false;
+    const client = createWhopClient({
+      apiKey: "test_key", companyId: COMPANY, mode: "test",
+      fetchImpl: async () => new Response(new ReadableStream({
+        start(controller) { controller.enqueue(new Uint8Array(1024 * 1024 + 1)); },
+        cancel() { cancelled = true; },
+      }), { headers: declaredLength ? { "Content-Length": String(1024 * 1024 + 1) } : {} }),
+    });
+    await assert.rejects(client.retrievePayment("pay_payment123456"),
+      (error) => error.code === "WHOP_RESPONSE_TOO_LARGE" && error.status === 502);
+    assert.equal(cancelled, true);
+  }
+});
+
 test("sandbox checkout keeps credentials server-side and pins the plan", async () => {
   let request;
   const client = createWhopClient({
